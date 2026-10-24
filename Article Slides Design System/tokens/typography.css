@@ -1,0 +1,21 @@
+/* Type — MyST article theme uses Tailwind's default system stacks + @tailwindcss/typography (prose).
+   Slide sizes = prose ratios scaled for a 1920×1080 canvas (prose base 16px → slide base 32px). */
+:root{
+--font-sans:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+--font-serif:ui-serif,Georgia,Cambria,"Times New Roman",Times,serif;
+--font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+/* prose reference (web) */
+--prose-base:1rem;--prose-lh:1.75;/* @kind font */--prose-h1:2.25em;--prose-h2:1.5em;--prose-h3:1.25em;--prose-lead:1.25em;--prose-sm:0.875em;
+/* slide scale (1920×1080) */
+--slide-fs-title:72px;--slide-lh-title:1.111;/* @kind font */
+--slide-fs-h2:48px;--slide-lh-h2:1.333;/* @kind font */
+--slide-fs-h3:40px;--slide-lh-h3:1.6;/* @kind font */
+--slide-fs-lead:40px;--slide-lh-lead:1.6;/* @kind font */
+--slide-fs-body:32px;--slide-lh-body:1.75;/* @kind font */
+--slide-fs-small:28px;--slide-lh-small:1.714;/* @kind font */
+--slide-fs-label:24px;--slide-lh-label:1.5;/* @kind font */
+--fw-thin:100;/* @kind font */--fw-light:300;/* @kind font */--fw-normal:400;/* @kind font */--fw-medium:500;/* @kind font */--fw-semibold:600;/* @kind font */--fw-bold:700;/* @kind font */--fw-extrabold:800;/* @kind font */
+/* semantic */
+--type-title-weight:var(--fw-extrabold);/* @kind font */--type-h2-weight:var(--fw-bold);/* @kind font */--type-h3-weight:var(--fw-semibold);/* @kind font */
+--link-decoration-thickness:0.1em;/* @kind spacing */--link-underline-offset:0.15em;/* @kind spacing */
+}

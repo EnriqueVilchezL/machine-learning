@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k-means clustering</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488;--c-f:#db2777}
+.dark{--c-e:#2dd4bf;--c-f:#f472b6}
+#cen-svg{cursor:crosshair;outline:none}
+.bt:disabled{opacity:.45;cursor:default}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 16</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">k-means clustering</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Find groups in data that has no labels, one centroid per group</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 16 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Data without labels</li>
+<li class="an-up" style="--d:.15s">Centroids and distance</li>
+<li class="an-up" style="--d:.25s">Assign, update, repeat</li>
+<li class="an-up" style="--d:.35s">Choosing K</li>
+<li class="an-up" style="--d:.45s">Starts, scaling and limits</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{\mathbf{x}_i\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> examples and no labels</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">K</span></td><td>Number of clusters, chosen by us</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\boldsymbol{\mu}_k</span></td><td>Centroid of cluster <span class="tex">k</span>, for <span class="tex">k = 1, \dots, K</span></td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">C_k</span></td><td>Set of examples in cluster <span class="tex">k</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">c_i</span></td><td>Cluster assigned to example <span class="tex">i</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>There is no <span class="tex">y_i</span>: nobody tells us the right group.</p><p>Uppercase <span class="tex">K</span> counts the clusters; lowercase <span class="tex">k</span> picks one of them.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Finding groups</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">No labels, no teacher: only the features and how close the examples are.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Data without labels">
+<div class="hdr" data-s="Finding groups"></div>
+<h2>Data without labels</h2>
+<div class="fr">
+<div class="figbox"><svg id="nolab-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">In supervised learning every example comes with its answer. In <strong>unsupervised</strong> learning we only have the features.</p>
+<p class="small frag up" data-step="cl" style="margin:0"><strong>Clustering</strong> divides the data into groups: examples in the same group are close, examples in different groups are far apart.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>The same 45 customers. (a) With labels. (b) Without labels. (c) Three groups found from the features alone.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The centroid" data-demo="cen">
+<div class="hdr" data-s="Finding groups"></div>
+<h2>The centroid</h2>
+<div class="fr">
+<div class="figbox"><svg id="cen-svg" class="interactive" tabindex="0" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">k-means describes each group by one point, its <strong>centroid</strong>: the average of the group, feature by feature. Click to add examples.</p>
+<div class="ro"><span>Examples</span><b id="cen-n">3</b></div>
+<div class="ro"><span>Centroid</span><b id="cen-mu" class="a">(2.00, 3.00)</b></div>
+<div class="ro"><span>Sum of squared distances</span><b id="cen-ss" class="bb">8.00</b></div>
+<div class="btns"><button class="bt chip" id="cen-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>One group of examples. The diamond is the centroid; the lines are the distances to it.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distance formula">
+<div class="hdr" data-s="Finding groups"></div>
+<h2>Distance to a centroid</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">k-means measures closeness with the <strong>squared Euclidean distance</strong>: one squared gap per feature, added up.</p>
+<div class="eq"><div class="m tex-d">\lVert \mathbf{x}_i - \boldsymbol{\mu}_k \rVert^2 = \sum_{j=1}^{d} (x_{ij} - \mu_{kj})^2</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="d1" style="margin:16px 0 0">It is the straight-line distance without the square root. The nearest centroid is the same with or without the root.</p>
+<p class="small frag up" data-step="d2" style="margin:16px 0 0">Squaring makes large gaps count much more: a point twice as far adds four times as much.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Example <span class="tex">\mathbf{x} = (2, 3)</span> and centroid <span class="tex">\boldsymbol{\mu} = (5, 7)</span>:</p><p><span class="tex">(2 - 5)^2 + (3 - 7)^2</span></p><p><span class="tex">= 9 + 16 = 25</span></p><p>The straight-line distance is <span class="tex">\sqrt{25} = 5</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The algorithm</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Assign every example to a centroid, move every centroid to its group, repeat.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two steps">
+<div class="hdr" data-s="The algorithm"></div>
+<h2>Two steps, repeated</h2>
+<p class="small" style="margin:-8px 0 8px">Place <span class="tex">K</span> centroids on random examples. Then alternate an <strong>assign</strong> step and an <strong>update</strong> step.</p>
+<div class="figbox"><svg id="steps-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 3:</b>(a) Start: three centroids at random examples. (b) Assign: each example takes the color of its nearest centroid. (c) Update: each centroid moves to the mean of its examples.</p>
+</section>
+
+<section class="s ats-prose" data-label="Assign and update formulas">
+<div class="hdr" data-s="The algorithm"></div>
+<h2>Assign and update</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Assign step: example <span class="tex">i</span> joins the cluster whose centroid is nearest.</p>
+<div class="eq"><div class="m tex-d">c_i = \underset{k}{\arg\min} \ \lVert \mathbf{x}_i - \boldsymbol{\mu}_k \rVert^2</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="u1" style="margin:0">Update step: each centroid becomes the mean of the examples in its cluster.</p>
+<div class="eq frag up" data-step="u1"><div class="m tex-d">\boldsymbol{\mu}_k = \frac{1}{|C_k|} \sum_{i \in C_k} \mathbf{x}_i</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="u2" style="margin:0"><span class="tex">|C_k|</span> is the number of examples in cluster <span class="tex">k</span>. <span class="tex">\arg\min_k</span> returns the cluster number, not the distance.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example: assign</div><p><span class="tex">\mathbf{x} = (2, 3)</span>, <span class="tex">\boldsymbol{\mu}_1 = (1, 1)</span>, <span class="tex">\boldsymbol{\mu}_2 = (5, 7)</span></p><p><span class="tex">1^2 + 2^2 = 5 \ \text{ vs } \ 3^2 + 4^2 = 25</span></p><p><span class="tex">\Rightarrow c = 1</span></p></aside>
+<aside class="am frag up" data-step="u1"><div class="t">Example: update</div><p><span class="tex">C_1 = \{(1, 2), (3, 2), (2, 5)\}</span></p><p><span class="tex">\boldsymbol{\mu}_1 = \big(\tfrac{1 + 3 + 2}{3}, \tfrac{2 + 2 + 5}{3}\big) = (2, 3)</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Running k-means" data-demo="lloyd">
+<div class="hdr" data-s="The algorithm"></div>
+<h2>Running k-means</h2>
+<div class="fr">
+<div class="figbox"><svg id="ll-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Press Step to run one assign or one update. Reset places new random centroids.</p>
+<div class="ctl"><label><span>Clusters <span class="tex">K</span></span><b id="ll-k-val">4</b></label><input type="range" id="ll-k" min="2" max="6" step="1" value="4"></div>
+<div class="btns"><button class="bt" id="ll-step">▶ Step</button><button class="bt chip" id="ll-reset">Reset</button></div>
+<div class="ro"><span>Iteration</span><b id="ll-it">0</b></div>
+<div class="ro"><span>Examples that changed</span><b id="ll-ch" class="a">0</b></div>
+<div class="ro"><span>Inertia <span class="tex">J</span></span><b id="ll-j" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>88 examples. Shading shows the region nearest to each centroid; thin lines trace each centroid's path.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Objective">
+<div class="hdr" data-s="The algorithm"></div>
+<h2>What k-means minimizes</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The <strong>inertia</strong>, or within-cluster sum of squares, adds the squared distance from every example to its own centroid:</p>
+<div class="eq"><div class="m tex-d">J = \sum_{k=1}^{K} \sum_{i \in C_k} \lVert \mathbf{x}_i - \boldsymbol{\mu}_k \rVert^2</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="j1" style="margin:12px 0 0">Assign never increases <span class="tex">J</span>: each example moves to a centroid that is at least as close.</p>
+<p class="small frag up" data-step="j2" style="margin:12px 0 0">Update never increases <span class="tex">J</span>: for a fixed group, the mean is the point with the smallest sum of squared distances.</p>
+<p class="small frag up" data-step="j3" style="margin:12px 0 0">Small <span class="tex">J</span> means tight clusters.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Group <span class="tex">\{(1, 2), (3, 2), (2, 5)\}</span>.</p><p>With the mean <span class="tex">(2, 3)</span>:</p><p><span class="tex">2 + 2 + 4 = 8</span></p><p>With the point <span class="tex">(1, 2)</span> instead:</p><p><span class="tex">0 + 4 + 10 = 14</span></p><p>The mean gives the smaller sum.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="When to stop">
+<div class="hdr" data-s="The algorithm"></div>
+<h2>When to stop</h2>
+<div class="fr">
+<div class="figbox"><svg id="conv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0"><span class="tex">J</span> goes down at every step and never goes back up.</p>
+<p class="small frag up" data-step="st" style="margin:0">Stop when no example changes cluster: then the centroids and <span class="tex">J</span> stop changing too. In practice, also set a maximum number of iterations.</p>
+<p class="small frag up" data-step="st2" style="margin:0">The algorithm always stops, but at a <strong>local</strong> minimum of <span class="tex">J</span>, which may not be the best one.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Inertia of one run on the data of Figure 4 with K = 4, after every assign and every update.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Choosing K and limits</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">How many groups, where to start, and when k-means gets it wrong.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The elbow method" data-demo="elbow">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>The elbow method</h2>
+<div class="fr">
+<div class="figbox"><svg id="elb-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0"><span class="tex">K</span> is a hyperparameter. More clusters always lower <span class="tex">J</span>; with <span class="tex">K = n</span> it reaches 0.</p>
+<div class="ctl"><label><span>Clusters <span class="tex">K</span></span><b id="elb-k-val">2</b></label><input type="range" id="elb-k" min="1" max="8" step="1" value="2"></div>
+<div class="ro"><span>Inertia <span class="tex">J</span></span><b id="elb-j" class="a">0</b></div>
+<div class="ro"><span>Drop from <span class="tex">K - 1</span></span><b id="elb-d" class="bb">0</b></div>
+<p class="small" style="margin:0">Look for the <strong>elbow</strong>: the K after which the curve flattens.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>80 examples. For each K, the best of 10 runs.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Different starts" data-demo="init">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>Different starts, different answers</h2>
+<div class="fr">
+<div class="figbox"><svg id="init-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Two runs with K = 4 on the same data, each from its own random start.</p>
+<div class="btns"><button class="bt" id="init-new">New starts</button></div>
+<div class="ro"><span><span class="tex">J</span>, run A</span><b id="init-ja" class="a">0</b></div>
+<div class="ro"><span><span class="tex">J</span>, run B</span><b id="init-jb" class="bb">0</b></div>
+<div><span class="tag" id="init-tag">Result</span></div>
+<p class="small frag up" data-step="ini" style="margin:0">Run k-means several times and keep the run with the lowest <span class="tex">J</span>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Hollow diamonds: starting centroids. Thin lines: their paths.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="k-means++">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>Smarter starts: k-means++</h2>
+<p class="small" style="margin:-8px 0 8px">Pick the first centroid at random. Each next centroid is a random example, with chance proportional to its squared distance to the nearest centroid so far.</p>
+<div class="figbox"><svg id="pp-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>Circle area shows the chance of being picked next. Far examples are likely, so the starts spread over the groups.</p>
+</section>
+
+<section class="s ats-prose" data-label="Scaling matters">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>Scaling matters</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="raw-svg" viewBox="0 0 792 600"></svg></div>
+<div class="figbox frag" data-step="sc"><svg id="sc-svg" viewBox="0 0 792 600"></svg></div>
+<div class="subcap">(a) Raw units: income in dollars decides alone</div>
+<div class="subcap frag" data-step="sc">(b) Both features scaled to 0 to 1</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 9:</b>40 customers, K = 2. In raw units a gap of 1 dollar counts as much as a gap of 1 year, so k-means splits by income. After min-max scaling (Topic 4) it finds the two age groups.</p>
+</section>
+
+<section class="s ats-prose" data-label="Limits">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>Where k-means struggles</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:64px;row-gap:8px">
+<div class="figbox"><svg id="lim1-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox"><svg id="lim2-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox"><svg id="lim3-svg" viewBox="0 0 520 520"></svg></div>
+<div class="subcap">(a) Groups that are not round</div>
+<div class="subcap">(b) Groups of different sizes</div>
+<div class="subcap">(c) A few outliers</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 10:</b>Colors show the k-means result with K = 2. Each example goes to the nearest centroid, so the border is always a straight line halfway between two centroids, and the means follow far points.</p>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Choosing K and limits"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>k-means at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Simple to explain: assign, update, repeat</td><td>K must be chosen before running it</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Fast, even with many examples</td><td>The result depends on the starting centroids</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Always stops after a few iterations</td><td>Assumes round groups of similar size</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Each centroid is a readable summary of its group</td><td>Sensitive to outliers and to feature scales</td></tr>
+<tr class="an-up" style="--d:.45s"><td>A new example is assigned with K distances</td><td>Needs numeric features where averages make sense</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>A good first clustering method for numeric, scaled features when the groups are compact and roughly round.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Clustering finds groups in data without labels; k-means describes each group by its centroid.</li>
+<li class="an-up" style="--d:.15s">The algorithm alternates two steps: assign each example to the nearest centroid, then move each centroid to the mean.</li>
+<li class="an-up" style="--d:.25s">Both steps lower the inertia J, so k-means always stops, but at a local minimum.</li>
+<li class="an-up" style="--d:.35s">Choose K with the elbow of J, run several starts (k-means++), and scale the features first.</li>
+<li class="an-up" style="--d:.45s">k-means prefers round groups of similar size and is pulled by outliers.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The original papers and two textbook chapters that cover k-means and other clustering methods.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">MacQueen, J. (1967). Some methods for classification and analysis of multivariate observations. <em>Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability</em>, 1, 281–297.</li>
+<li style="margin:.4em 0">Lloyd, S. P. (1982). Least squares quantization in PCM. <em>IEEE Transactions on Information Theory</em>, 28(2), 129–137.</li>
+<li style="margin:.4em 0">Arthur, D., &amp; Vassilvitskii, S. (2007). k-means++: The advantages of careful seeding. <em>Proceedings of the 18th Annual ACM-SIAM Symposium on Discrete Algorithms</em>, 1027–1035.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 12. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 14. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 17: hierarchical clustering.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, lin, clamp, mean, fmt, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared data and k-means helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const CV = ['--c-a', '--c-b', '--c-c', '--c-d', '--c-e', '--c-f'];
+const col = (k) => `var(${CV[k % CV.length]})`;
+const GRAY = 'var(--myst-color-border-strong)';
+function shuffle(n, r) {
+  const p = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  return p;
+}
+/* Gaussian blobs: each group is [cx, cy, sd, n] */
+function blobs(seed, groups) {
+  const r = rng(seed);
+  return groups.flatMap(([cx, cy, sd, n]) => Array.from({ length: n }, () => [cx + sd * gauss(r), cy + sd * gauss(r)]));
+}
+const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+function nearest(p, M) {
+  let best = 0, bd = Infinity;
+  M.forEach((m, k) => { const d = d2(p, m); if (d < bd) { bd = d; best = k; } });
+  return best;
+}
+const assign = (P, M) => P.map((p) => nearest(p, M));
+function update(P, c, M) {
+  return M.map((m, k) => {
+    const S = P.filter((_, i) => c[i] === k);
+    return S.length ? [mean(S.map((p) => p[0])), mean(S.map((p) => p[1]))] : m.slice();
+  });
+}
+const inertia = (P, c, M) => P.reduce((s, p, i) => s + d2(p, M[c[i]]), 0);
+const pickRandom = (P, K, r) => shuffle(P.length, r).slice(0, K).map((i) => P[i].slice());
+function pickPP(P, K, r) {
+  const M = [P[Math.floor(r() * P.length)].slice()];
+  while (M.length < K) {
+    const w = P.map((p) => Math.min(...M.map((m) => d2(p, m))));
+    let u = r() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < P.length - 1 && u > w[i]) { u -= w[i]; i++; }
+    M.push(P[i].slice());
+  }
+  return M;
+}
+/* Full run of the algorithm; keeps J after each step and the path of every centroid */
+function lloyd(P, M0, max = 100) {
+  let M = M0.map((m) => m.slice()), c = null;
+  const Js = [], path = [M.map((m) => m.slice())];
+  for (let it = 0; it < max; it++) {
+    const c2 = assign(P, M);
+    if (c && c2.every((v, i) => v === c[i])) break;
+    c = c2; Js.push(inertia(P, c, M));
+    M = update(P, c, M); Js.push(inertia(P, c, M));
+    path.push(M.map((m) => m.slice()));
+  }
+  return { M, c, J: inertia(P, c, M), Js, path, M0 };
+}
+function bestOf(P, K, runs, seed) {
+  let best = null;
+  for (let t = 0; t < runs; t++) {
+    const res = lloyd(P, pickPP(P, K, rng(seed + t)));
+    if (!best || res.J < best.J) best = res;
+  }
+  return best;
+}
+/* A bordered panel with its own data-to-pixel maps (equal units on both axes) */
+function panel(svg, x0, y0, w, h, dom, title) {
+  el('rect', { class: 'box', x: x0, y: y0, width: w, height: h, rx: 6 }, svg);
+  if (title) el('text', { class: 'ttl', x: x0, y: y0 - 16, text: title }, svg);
+  return { sx: lin(dom.x[0], dom.x[1], x0, x0 + w), sy: lin(dom.y[0], dom.y[1], y0 + h, y0) };
+}
+const DIAMOND = 'M0 -17L17 0L0 17L-17 0Z';
+function centroid(g, x, y, k, hollow) {
+  const node = el('path', { d: DIAMOND, transform: `translate(${x} ${y})`,
+    style: hollow ? `fill:var(--myst-color-bg);stroke:${col(k)};stroke-width:4` : `fill:${col(k)};stroke:var(--myst-color-text);stroke-width:3` }, g);
+  return node;
+}
+function dots(g, P, S, c, r = 9, cls = '') {
+  return P.map((p, i) => el('circle', { class: `pt ${cls}`, cx: S.sx(p[0]), cy: S.sy(p[1]), r, style: `fill:${c ? col(c[i]) : GRAY}` }, g));
+}
+
+/* Data sets */
+const D16 = blobs(3, [[3.4, 6.0, 0.85, 22], [8.2, 6.6, 0.85, 22], [12.8, 5.4, 0.85, 22], [7.2, 2.2, 0.85, 22]]);
+const D12 = blobs(11, [[2.6, 6.9, 0.7, 20], [5.4, 6.9, 0.7, 20], [9.4, 6.4, 0.7, 20], [6.2, 2.3, 0.7, 20]]);
+const D10 = blobs(5, [[2.6, 7.3, 0.75, 15], [7.5, 7.0, 0.75, 15], [5.0, 2.6, 0.75, 15]]);
+
+/* ───────── static figures ───────── */
+function drawNoLabels() {
+  const svg = $('nolab-svg');
+  const dom = { x: [0, 10], y: [0, 10] }, W = 360, Y0 = 170;
+  const truth = D10.map((_, i) => Math.floor(i / 15));
+  const res = bestOf(D10, 3, 5, 40);
+  [[0, '(a) with labels', 'an-fade'], [400, '(b) without labels', 'an-fade'], [800, '(c) groups found', 'frag']].forEach(([x0, title, cls], j) => {
+    const g = el('g', cls === 'frag' ? { class: 'frag', 'data-step': 'cl' } : { class: cls, style: `--d:${j * 0.3}s` }, svg);
+    const S = panel(g, x0, Y0, W, W, dom, title);
+    if (j === 0) {
+      D10.forEach((p, i) => {
+        const lab = truth[i] === 2 ? 1 : 0;
+        el('circle', { class: `pt ${lab ? 'fb' : 'fa'}`, cx: S.sx(p[0]), cy: S.sy(p[1]), r: 9 }, g);
+      });
+      legend(g, x0 + 10, Y0 + W + 50, [['dot', 'fa', 'bought'], ['dot', 'fb', 'did not buy']]);
+    } else if (j === 1) {
+      dots(g, D10, S, null);
+      el('text', { class: 'txs', x: x0 + W / 2, y: Y0 + W + 58, 'text-anchor': 'middle', text: 'only the features' }, g);
+    } else {
+      const hull = (k) => {
+        const Q = D10.filter((_, i) => res.c[i] === k), m = res.M[k];
+        const rad = Math.sqrt(Math.max(...Q.map((p) => d2(p, m)))) + 0.45;
+        el('circle', { cx: S.sx(m[0]), cy: S.sy(m[1]), r: S.sx(rad) - S.sx(0), style: `fill:none;stroke:${col(k)};stroke-width:3;stroke-dasharray:10 8` }, g);
+      };
+      [0, 1, 2].forEach(hull);
+      dots(g, D10, S, res.c);
+      el('text', { class: 'txs', x: x0 + W / 2, y: Y0 + W + 58, 'text-anchor': 'middle', text: 'three clusters' }, g);
+    }
+  });
+  el('text', { class: 'tk', x: 0, y: 60, text: 'feature 1: monthly spending · feature 2: store visits' }, svg);
+}
+
+function drawSteps() {
+  const svg = $('steps-svg');
+  const dom = { x: [0, 10], y: [0, 10] }, W = 450, Y0 = 40, XS = [0, 615, 1230];
+  const M0 = [D10[2], D10[5], D10[9]].map((p) => p.slice()); /* three starts, all in the top-left group */
+  const c1 = assign(D10, M0), M1 = update(D10, c1, M0);
+  XS.forEach((x0, j) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${j * 0.6}s` }, svg);
+    const S = panel(g, x0, Y0, W, W, dom, ['(a) start', '(b) assign', '(c) update'][j]);
+    if (j === 1) {
+      const cell = 0.25;
+      for (let x = 0; x < 10; x += cell) for (let y = 0; y < 10; y += cell) {
+        const k = nearest([x + cell / 2, y + cell / 2], M0);
+        el('rect', { x: S.sx(x), y: S.sy(y + cell), width: S.sx(cell) - S.sx(0) + 0.5, height: S.sx(cell) - S.sx(0) + 0.5, style: `fill:${col(k)};opacity:.13` }, g);
+      }
+    }
+    dots(g, D10, S, j ? c1 : null, 8);
+    if (j < 2) M0.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, j === 0));
+    else {
+      M0.forEach((m, k) => {
+        centroid(g, S.sx(m[0]), S.sy(m[1]), k, true);
+        el('path', { class: 'wire', d: `M${S.sx(m[0])} ${S.sy(m[1])}L${S.sx(M1[k][0])} ${S.sy(M1[k][1])}`, 'marker-end': 'url(#ah)', style: 'stroke-width:3' }, g);
+      });
+      M1.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, false));
+    }
+    if (j < 2) {
+      el('path', { class: 'wire', d: `M${x0 + W + 18} ${Y0 + W / 2}H${XS[j + 1] - 18}`, 'marker-end': 'url(#ah)' }, svg);
+    }
+  });
+  const loop = el('g', { class: 'an-fade', style: '--d:1.8s' }, svg);
+  el('path', { class: 'wire-a', d: `M${XS[2] + W / 2} ${Y0 + W + 10}V${Y0 + W + 60}H${XS[1] + W / 2}V${Y0 + W + 18}`, 'marker-end': 'url(#ah-a)' }, loop);
+  el('text', { class: 'txs', x: (XS[1] + XS[2] + W) / 2, y: Y0 + W + 104, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'repeat (b) and (c) until no example changes cluster' }, loop);
+}
+
+function drawConvergence() {
+  const svg = $('conv-svg');
+  /* the slowest of a few random starts, so several iterations are visible */
+  let run = null;
+  for (let s = 0; s < 40; s++) {
+    const res = lloyd(D16, pickRandom(D16, 4, rng(500 + s)));
+    if (!run || res.Js.length > run.Js.length) run = res;
+  }
+  const n = run.Js.length / 2;
+  const xt = Array.from({ length: n }, (_, i) => i + 1);
+  const top = Math.ceil(run.Js[0] / 100) * 100;
+  const step = top > 600 ? 200 : 100, yt = [];
+  for (let v = 0; v <= top; v += step) yt.push(v);
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0.5, n + 1], y: [0, top * 1.05], xt, yt, xl: 'iteration', yl: 'inertia J' });
+  const pts = run.Js.map((J, i) => [Math.floor(i / 2) + 1 + (i % 2) * 0.5, J]);
+  el('path', { class: 'curve-t an-draw', pathLength: 1, style: 'stroke-dasharray:none', d: pts.map(([x, y], i) => (i ? 'L' : 'M') + F.sx(x) + ' ' + F.sy(y)).join('') }, F.plot);
+  pts.forEach(([x, y], i) => el('circle', { class: `${i % 2 ? 'fb' : 'fa'} an-pop pt`, cx: F.sx(x), cy: F.sy(y), r: 10, style: `--d:${0.2 + i * 0.08}s` }, F.plot));
+  legend(svg, F.sx(n * 0.55), F.T + 40, [['dot', 'fa', 'after assign'], ['dot', 'fb', 'after update']]);
+  const last = pts[pts.length - 1];
+  const note = el('g', { class: 'frag', 'data-step': 'st' }, svg);
+  el('path', { class: 'wire', d: `M${F.sx(n + 0.6)} ${F.sy(last[1]) - 90}V${F.sy(last[1]) - 22}`, 'marker-end': 'url(#ah)' }, note);
+  el('text', { class: 'txs', x: F.sx(n + 0.6), y: F.sy(last[1]) - 104, 'text-anchor': 'end', text: 'no example changes: stop' }, note);
+  el('text', { class: 'tk', x: F.sx(pts[0][0]) + 18, y: F.sy(pts[0][1]) + 6, text: fmt(pts[0][1], 0) }, svg);
+  el('text', { class: 'tk', x: F.sx(last[0]), y: F.sy(last[1]) + 40, 'text-anchor': 'middle', text: fmt(last[1], 0) }, svg);
+}
+
+function drawPP() {
+  const svg = $('pp-svg');
+  const dom = { x: [0, 10], y: [0, 10] }, W = 480, Y0 = 50, XS = [0, 600, 1200];
+  const r = rng(21);
+  const M = [D10[4].slice()];
+  const states = [];
+  for (let s = 0; s < 3; s++) {
+    const w = D10.map((p) => Math.min(...M.map((m) => d2(p, m))));
+    states.push({ M: M.map((m) => m.slice()), w });
+    if (M.length < 3) {
+      let u = r() * w.reduce((a, b) => a + b, 0), i = 0;
+      while (i < D10.length - 1 && u > w[i]) { u -= w[i]; i++; }
+      M.push(D10[i].slice());
+    }
+  }
+  const titles = ['(a) first centroid: random', '(b) second: likely far away', '(c) third: in the last group'];
+  states.forEach((st, j) => {
+    const x0 = XS[j], g = el('g', { class: 'an-fade', style: `--d:${j * 0.6}s` }, svg);
+    const S = panel(g, x0, Y0, W, W, dom, titles[j]);
+    const wmax = Math.max(...st.w);
+    D10.forEach((p, i) => {
+      if (j < 2) el('circle', { cx: S.sx(p[0]), cy: S.sy(p[1]), r: 4 + 22 * Math.sqrt(st.w[i] / wmax), style: 'fill:var(--c-a);fill-opacity:.22;stroke:var(--c-a);stroke-width:1.5' }, g);
+      el('circle', { class: 'pt', cx: S.sx(p[0]), cy: S.sy(p[1]), r: 6, style: `fill:${GRAY}` }, g);
+    });
+    st.M.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, false));
+    if (j < 2) {
+      const nx = M[j + 1];
+      el('circle', { cx: S.sx(nx[0]), cy: S.sy(nx[1]), r: 30, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:6 6' }, g);
+      el('path', { class: 'wire', d: `M${x0 + W + 16} ${Y0 + W / 2}H${XS[j + 1] - 16}`, 'marker-end': 'url(#ah)' }, svg);
+    }
+  });
+}
+
+function drawScaling() {
+  const r = rng(61);
+  const P = [];
+  for (let g = 0; g < 2; g++) for (let i = 0; i < 20; i++) P.push([(g ? 60 : 27) + 3 * gauss(r), 25000 + 70000 * r()]);
+  const lo = [Math.min(...P.map((p) => p[0])), Math.min(...P.map((p) => p[1]))];
+  const hi = [Math.max(...P.map((p) => p[0])), Math.max(...P.map((p) => p[1]))];
+  const Z = P.map((p) => [(p[0] - lo[0]) / (hi[0] - lo[0]), (p[1] - lo[1]) / (hi[1] - lo[1])]);
+  const draw = (id, scaled) => {
+    const svg = $(id), X = scaled ? Z : P;
+    const res = bestOf(X, 2, 5, scaled ? 70 : 80);
+    const F = frame(svg, scaled
+      ? { W: 792, H: 600, l: 110, t: 30, r: 30, x: [-0.05, 1.05], y: [-0.05, 1.05], xt: [0, 0.5, 1], yt: [0, 0.5, 1], fx: (v) => fmt(v, 1), fy: (v) => fmt(v, 1), xl: 'age (scaled)', yl: 'income (scaled)' }
+      : { W: 792, H: 600, l: 110, t: 30, r: 30, x: [15, 75], y: [20000, 100000], xt: [20, 40, 60], yt: [20000, 60000, 100000], fy: (v) => v / 1000 + 'k', xl: 'age (years)', yl: 'income ($)' });
+    X.forEach((p, i) => el('circle', { class: 'pt an-pop', cx: F.sx(p[0]), cy: F.sy(p[1]), r: 11, style: `fill:${col(res.c[i])};--d:${0.02 * i}s` }, F.plot));
+    res.M.forEach((m, k) => centroid(F.plot, F.sx(m[0]), F.sy(m[1]), k, false));
+  };
+  draw('raw-svg', false); draw('sc-svg', true);
+}
+
+function drawLimits() {
+  const dom = { x: [0, 10], y: [0, 10] };
+  const show = (id, P, seed) => {
+    const svg = $(id), S = panel(svg, 10, 10, 500, 500, dom);
+    const res = bestOf(P, 2, 10, seed);
+    const g = el('g', { class: 'an-fade' }, svg);
+    dots(g, P, S, res.c, 7);
+    res.M.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, false));
+    return { S, res, g };
+  };
+  /* (a) two moons */
+  const r = rng(9), moons = [];
+  for (let i = 0; i < 70; i++) {
+    const t = Math.PI * r(), up = i % 2 === 0;
+    const X = up ? Math.cos(t) : 1 - Math.cos(t), Y = up ? Math.sin(t) : 0.5 - Math.sin(t);
+    moons.push([3.6 + 2.3 * X + 0.12 * gauss(r), 4.4 + 2.3 * Y + 0.12 * gauss(r)]);
+  }
+  show('lim1-svg', moons, 300);
+  /* (b) a wide group next to a tight one */
+  show('lim2-svg', blobs(14, [[3.6, 5, 1.25, 60], [7.6, 5, 0.35, 12]]), 310);
+  /* (c) two groups plus three far points */
+  const P3 = blobs(15, [[2.6, 3.0, 0.6, 20], [2.6, 7.0, 0.6, 20]]).concat([[9.0, 8.6], [9.3, 7.8], [8.7, 9.2]]);
+  const { S, g } = show('lim3-svg', P3, 320);
+  [[9.0, 8.6], [9.3, 7.8], [8.7, 9.2]].forEach((p) => el('circle', { cx: S.sx(p[0]), cy: S.sy(p[1]), r: 16, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:2.5' }, g));
+  el('text', { class: 'txs', x: S.sx(9.6), y: S.sy(6.9), 'text-anchor': 'end', text: 'outliers' }, g);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.cen = (() => {
+  const svg = $('cen-svg');
+  const START = [[1, 2], [3, 2], [2, 5]];
+  const F = frame(svg, { W: 1160, H: 700, l: 70, t: 20, x: [0, 10.5], y: [0, 6.5], xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6], xl: 'feature 1', yl: 'feature 2' });
+  const links = el('g', {}, F.plot), pts = el('g', {}, F.plot), top = el('g', {}, F.plot);
+  const mark = centroid(top, 0, 0, 0, false);
+  const lab = el('text', { class: 'txs', style: 'font-weight:600' }, top);
+  let P = START.map((p) => p.slice());
+  function draw() {
+    clear(links); clear(pts);
+    const mu = [mean(P.map((p) => p[0])), mean(P.map((p) => p[1]))];
+    P.forEach((p) => el('line', { x1: F.sx(p[0]), y1: F.sy(p[1]), x2: F.sx(mu[0]), y2: F.sy(mu[1]), style: 'stroke:var(--c-a);stroke-width:3;opacity:.6' }, links));
+    P.forEach((p) => el('circle', { class: 'pt fa', cx: F.sx(p[0]), cy: F.sy(p[1]), r: 12 }, pts));
+    mark.setAttribute('transform', `translate(${F.sx(mu[0])} ${F.sy(mu[1])})`);
+    lab.setAttribute('x', F.sx(mu[0]) + 26); lab.setAttribute('y', F.sy(mu[1]) - 18);
+    lab.textContent = `centroid (${fmt(mu[0], 2)}, ${fmt(mu[1], 2)})`;
+    $('cen-n').textContent = P.length;
+    $('cen-mu').textContent = `(${fmt(mu[0], 2)}, ${fmt(mu[1], 2)})`;
+    $('cen-ss').textContent = fmt(P.reduce((s, p) => s + d2(p, mu), 0), 2);
+  }
+  svg.addEventListener('click', (ev) => {
+    const p = toSvgPoint(svg, ev);
+    P.push([clamp(F.ix(p.x), 0.1, 10.4), clamp(F.iy(p.y), 0.1, 6.4)]);
+    draw();
+  });
+  $('cen-reset').addEventListener('click', () => { P = START.map((p) => p.slice()); draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.lloyd = (() => {
+  const svg = $('ll-svg'), P = D16;
+  const F = frame(svg, { W: 1160, H: 700, l: 70, t: 56, x: [0, 16], y: [0, 8.4], xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const CELL = 20, cells = [];
+  const shade = el('g', {}, F.plot), trails = el('g', {}, F.plot), dg = el('g', {}, F.plot), cg = el('g', {}, F.plot);
+  for (let px = F.L; px < F.W - F.R; px += CELL) {
+    for (let py = F.T; py < F.H - F.B; py += CELL) {
+      cells.push({ c: [F.ix(px + CELL / 2), F.iy(py + CELL / 2)], node: el('rect', { x: px, y: py, width: CELL, height: CELL, 'shape-rendering': 'crispEdges', style: 'fill:none' }, shade) });
+    }
+  }
+  const marks = dots(dg, P, F, null, 10);
+  const msg = el('text', { class: 'txs', x: F.L, y: 34, text: '' }, svg);
+  const slider = $('ll-k'), btn = $('ll-step');
+  let K = 4, M = [], c = null, phase = 'assign', iter = 0, done = false, seed = 0, nodes = [], anim = 0;
+  const showJ = () => { $('ll-j').textContent = c ? fmt(inertia(P, c, M), 1) : '—'; };
+  function paintShade() {
+    cells.forEach((cl) => { cl.node.style.fill = c ? col(nearest(cl.c, M)) : 'none'; cl.node.style.opacity = '.14'; });
+  }
+  function place(Ms) { Ms.forEach((m, k) => nodes[k].setAttribute('transform', `translate(${F.sx(m[0])} ${F.sy(m[1])})`)); }
+  function reset() {
+    cancelAnimationFrame(anim);
+    K = +slider.value; seed++;
+    M = pickRandom(P, K, rng(1000 + 37 * seed));
+    c = null; phase = 'assign'; iter = 0; done = false;
+    clear(trails); clear(cg);
+    nodes = M.map((m, k) => centroid(cg, 0, 0, k, false));
+    place(M); paintShade();
+    marks.forEach((m) => { m.style.fill = GRAY; });
+    msg.textContent = `Start: ${K} centroids placed on random examples`;
+    $('ll-k-val').textContent = K; $('ll-it').textContent = 0; $('ll-ch').textContent = '—';
+    btn.disabled = false; showJ();
+  }
+  function step() {
+    if (done) return;
+    if (phase === 'assign') {
+      const c2 = assign(P, M);
+      const changed = c ? c2.filter((v, i) => v !== c[i]).length : P.length;
+      $('ll-ch').textContent = changed;
+      if (c && changed === 0) {
+        done = true; btn.disabled = true;
+        msg.textContent = `Converged after ${iter} iterations: no example changed cluster`;
+        return;
+      }
+      c = c2; iter++; phase = 'update';
+      marks.forEach((m, i) => { m.style.fill = col(c[i]); });
+      paintShade();
+      msg.textContent = `Iteration ${iter}, assign: each example joins its nearest centroid`;
+      $('ll-it').textContent = iter;
+    } else {
+      const from = M.map((m) => m.slice()), to = update(P, c, M);
+      M = to; phase = 'assign';
+      from.forEach((m, k) => el('path', { d: `M${F.sx(m[0])} ${F.sy(m[1])}L${F.sx(to[k][0])} ${F.sy(to[k][1])}`, style: `stroke:${col(k)};stroke-width:3;stroke-dasharray:6 5;fill:none` }, trails));
+      const t0 = performance.now(), dur = REDUCED ? 0 : 500;
+      cancelAnimationFrame(anim);
+      const tick = (t) => {
+        const a = dur ? clamp((t - t0) / dur, 0, 1) : 1, e = 1 - (1 - a) ** 3;
+        place(from.map((m, k) => [m[0] + (to[k][0] - m[0]) * e, m[1] + (to[k][1] - m[1]) * e]));
+        if (a < 1) anim = requestAnimationFrame(tick); else paintShade();
+      };
+      anim = requestAnimationFrame(tick);
+      msg.textContent = `Iteration ${iter}, update: each centroid moves to the mean of its examples`;
+    }
+    showJ();
+  }
+  btn.addEventListener('click', step);
+  $('ll-reset').addEventListener('click', reset);
+  slider.addEventListener('input', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.elbow = (() => {
+  const svg = $('elb-svg'), P = D12, KMAX = 8;
+  const RES = Array.from({ length: KMAX }, (_, i) => bestOf(P, i + 1, 10, 200 + 20 * i));
+  const S = panel(svg, 0, 150, 520, 390, { x: [0, 12], y: [0, 9] });
+  const title = el('text', { class: 'ttl', x: 0, y: 134, text: '' }, svg);
+  const dg = el('g', {}, svg), cg = el('g', {}, svg);
+  const marks = dots(dg, P, S, null, 8);
+  const sub = el('svg', { id: 'elb-curve', x: 600, y: 0, width: 560, height: 700, viewBox: '0 0 560 700', overflow: 'visible' }, svg);
+  const Js = RES.map((r) => r.J), top = Math.ceil(Js[0] / 100) * 100;
+  const yt = [0, top / 2, top];
+  const F = frame(sub, { W: 560, H: 700, l: 100, t: 40, r: 10, x: [0.5, KMAX + 0.5], y: [0, top * 1.05], xt: [1, 2, 3, 4, 5, 6, 7, 8], yt, fy: (v) => fmt(v, 0), xl: 'number of clusters K', yl: 'inertia J' });
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: Js.map((J, i) => (i ? 'L' : 'M') + F.sx(i + 1) + ' ' + F.sy(J)).join('') }, F.plot);
+  Js.forEach((J, i) => el('circle', { class: 'fa an-pop', cx: F.sx(i + 1), cy: F.sy(J), r: 8, style: `--d:${0.2 + i * 0.08}s` }, F.plot));
+  el('text', { class: 'txs', x: F.sx(4) + 16, y: F.sy(Js[3]) - 70, text: 'elbow' }, sub);
+  el('path', { class: 'wire', d: `M${F.sx(4) + 28} ${F.sy(Js[3]) - 60}L${F.sx(4) + 8} ${F.sy(Js[3]) - 18}`, 'marker-end': 'url(#ah)' }, sub);
+  const vline = el('line', { class: 'curve-t', y1: F.T, y2: F.H - F.B }, sub);
+  const ring = el('circle', { r: 18, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, sub);
+  const slider = $('elb-k');
+  function draw() {
+    const K = +slider.value, R = RES[K - 1];
+    marks.forEach((m, i) => { m.style.fill = col(R.c[i]); });
+    clear(cg);
+    R.M.forEach((m, k) => centroid(cg, S.sx(m[0]), S.sy(m[1]), k, false));
+    title.textContent = `K = ${K}: ${K} cluster${K > 1 ? 's' : ''}`;
+    vline.setAttribute('x1', F.sx(K)); vline.setAttribute('x2', F.sx(K));
+    ring.setAttribute('cx', F.sx(K)); ring.setAttribute('cy', F.sy(R.J));
+    $('elb-k-val').textContent = K;
+    $('elb-j').textContent = fmt(R.J, 1);
+    $('elb-d').textContent = K > 1 ? Math.round(100 * (1 - R.J / Js[K - 2])) + '%' : '—';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.init = (() => {
+  const svg = $('init-svg'), P = D12, K = 4, dom = { x: [0, 12], y: [0, 9] };
+  const XS = [0, 620], W = 540, H = 405, Y0 = 130;
+  const run = (s) => lloyd(P, pickRandom(P, K, rng(7000 + s)));
+  const best = bestOf(P, K, 10, 900).J;
+  /* first view: one good run and one stuck run, found by trying seeds in order */
+  let sa = 0, sb = 0;
+  for (let s = 0; s < 200; s++) { if (run(s).J < best * 1.01) { sa = s; break; } }
+  for (let s = 0; s < 200; s++) { const r = run(s); if (r.J > best * 1.5 && [...Array(K).keys()].every((k) => r.c.filter((v) => v === k).length >= 4)) { sb = s; break; } }
+  let next = 200;
+  const parts = XS.map((x0, j) => {
+    const S = panel(svg, x0, Y0, W, H, dom, `run ${j ? 'B' : 'A'}`);
+    const g = el('g', {}, svg);
+    const jt = el('text', { class: 'tx', x: x0 + W / 2, y: Y0 + H + 56, 'text-anchor': 'middle' }, svg);
+    return { S, g, jt };
+  });
+  function show(j, res) {
+    const { S, g, jt } = parts[j];
+    clear(g);
+    for (let k = 0; k < K; k++) {
+      el('path', { d: res.path.map((Ms, i) => (i ? 'L' : 'M') + S.sx(Ms[k][0]) + ' ' + S.sy(Ms[k][1])).join(''), style: `fill:none;stroke:${col(k)};stroke-width:2.5;stroke-dasharray:6 5` }, g);
+    }
+    dots(g, P, S, res.c, 8);
+    res.M0.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, true));
+    res.M.forEach((m, k) => centroid(g, S.sx(m[0]), S.sy(m[1]), k, false));
+    jt.textContent = `J = ${fmt(res.J, 1)}`;
+    $(j ? 'init-jb' : 'init-ja').textContent = fmt(res.J, 1);
+  }
+  function draw(a, b) {
+    const ra = run(a), rb = run(b);
+    show(0, ra); show(1, rb);
+    const same = Math.abs(ra.J - rb.J) < 1e-6 * ra.J;
+    const tag = $('init-tag');
+    tag.textContent = same ? 'Same result' : 'Different results';
+    tag.style.color = same ? 'var(--c-c)' : 'var(--c-b)';
+  }
+  $('init-new').addEventListener('click', () => { draw(next, next + 1); next += 2; });
+  draw(sa, sb);
+  return {};
+})();
+
+drawNoLabels(); drawSteps(); drawConvergence(); drawPP(); drawScaling(); drawLimits();
+})();
+</script>
+</body>
+</html>

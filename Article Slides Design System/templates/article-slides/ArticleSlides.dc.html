@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Article Slides" description="16:9 research-talk deck in the MyST article style: title block, margin notes, numbered figures, equations, theorems, references" -->
+<helmet><script src="./ds-base.js"></script><script src="./image-slot.js"></script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"><script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script><style>body{margin:0;background:#e7e5e4}</style></helmet>
+<x-import component-from-global-scope="deck-stage" from="./deck-stage.js" width="1920" height="1080" hint-size="100%,100%">
+<section data-label="01 Title" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300"><div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Research Talk</div><div style="font-weight:600;font-variant:small-caps">Proceedings of the Workshop</div><div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)">Volume 4, Issue 2</div></div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Reproducible figures from executable notebooks</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">A workflow for publishing article-style results as slides</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Authors</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliations</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Ana Rojas</div><div style="font-size:28px">Universidad Ejemplo</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Luis Mora</div><div style="font-size:28px">Escuela de Física, Universidad Ejemplo</div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>October 22, 2026</span><span>·</span><span>https://doi.org/10.5281/zenodo.0000000</span></div>
+</section>
+<section data-label="02 Abstract" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Summary" number="2" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px;align-content:center">
+<div>
+<h2 style="margin-bottom:24px;font-size:32px;line-height:1.5;font-weight:600">Abstract</h2>
+<div style="padding:32px 48px;border-radius:2px;background:var(--myst-color-bg-secondary)"><p style="margin:0;font-size:36px;line-height:1.7">Figures in a paper are usually exported by hand and drift from the code that made them. We run each notebook as part of the build, so every figure, table and number on these slides comes straight from its source cell.</p></div>
+<p style="margin-top:32px"><strong style="margin-right:16px">Keywords:</strong>reproducibility, notebooks, scientific publishing</p>
+</div>
+</div>
+</section>
+<section data-label="03 Outline" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Outline" number="3" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px 96px 424px;align-content:start">
+<div>
+<h2>In this talk</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li>Introduction</li>
+<li>Methods</li>
+<li>Results</li>
+<li>Discussion</li>
+</ol>
+</div>
+<div></div>
+<sc-if value="{{ showMargin }}" hint-placeholder-val="{{ true }}"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Aside" title="Materials" hint-size="424px,200px">Slides, data and notebooks are archived with the DOI on the title slide.</x-import></sc-if>
+</div>
+</section>
+<section data-label="04 Section" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg-secondary);display:flex;flex-direction:column;padding:96px 120px;border-top:1px solid var(--myst-color-border)">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Section 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Introduction</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Why figures drift from the code that produced them.</p>
+</div>
+</section>
+<section data-label="05 Content + margin" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Introduction" number="5" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px 96px 424px;align-content:start">
+<div>
+<h2>The export step is where errors enter</h2>
+<p class="lead">Most figures pass through a manual copy before they reach a paper or a talk.</p>
+<ul>
+<li>Plots are saved, renamed and pasted by hand</li>
+<li>Numbers in the text are retyped from notebook output</li>
+<li>Later changes to the data rarely reach the slides</li>
+</ul>
+</div>
+<div></div>
+<sc-if value="{{ showMargin }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:40px;padding-top:8px">
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Aside" title="Survey" hint-size="424px,160px">Based on 48 interviews with lab groups, 2025.</x-import>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Aside" title="Related work" hint-size="424px,160px">Compare with literate programming and executable papers.</x-import>
+</div></sc-if>
+</div>
+</section>
+<section data-label="06 Figure" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:40px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Results" number="6" total="14" hint-size="100%,36px"></x-import></div>
+<h2 style="margin-bottom:32px">Error rate falls once export is automated</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 424px;column-gap:96px">
+<div style="position:relative;min-height:0"><image-slot id="fig-main" shape="rect" placeholder="Drop Figure 1 (plot or chart)"></image-slot></div>
+<div style="align-self:end;font-size:28px;line-height:1.714;color:var(--myst-color-text-tertiary)"><strong style="color:var(--myst-color-text-secondary);font-weight:700;margin-right:8px">Figure 1:</strong>Share of figures with a mismatch between paper and source, before and after the change. Bars show 95% intervals.</div>
+</div>
+</section>
+<section data-label="07 Two figures" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:40px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Results" number="7" total="14" hint-size="100%,36px"></x-import></div>
+<h2 style="margin-bottom:32px">Both groups converge on the same workflow</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:64px;row-gap:12px">
+<div style="position:relative;min-height:0"><image-slot id="fig-2a" shape="rect" placeholder="Drop Figure 2a"></image-slot></div>
+<div style="position:relative;min-height:0"><image-slot id="fig-2b" shape="rect" placeholder="Drop Figure 2b"></image-slot></div>
+<div style="text-align:center;font-size:28px;color:var(--myst-color-text-tertiary)">(a) Group A</div>
+<div style="text-align:center;font-size:28px;color:var(--myst-color-text-tertiary)">(b) Group B</div>
+</div>
+<div style="margin-top:20px;font-size:28px;line-height:1.714;color:var(--myst-color-text-tertiary)"><strong style="color:var(--myst-color-text-secondary);font-weight:700;margin-right:8px">Figure 2:</strong>Time from data change to updated figure, per group.</div>
+</section>
+<section data-label="08 Equation" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Methods" number="8" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px 96px 424px;align-content:start">
+<div>
+<h2>Model</h2>
+<p>Each output is a deterministic function of its inputs and environment:</p>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Equation" tex="y = f_{\theta}(x,\, e), \qquad \theta = \arg\min_{\theta} \sum_{i=1}^{n} \ell\big(f_{\theta}(x_i), y_i\big)" number="1" hint-size="100%,160px"></x-import>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Proof" kind="definition" number="1" title="Reproducible output" hint-size="100%,200px"><p style="margin:0">An output is reproducible if rebuilding with the same <code>x</code> and <code>e</code> returns the same bytes.</p></x-import>
+</div>
+<div></div>
+<sc-if value="{{ showMargin }}" hint-placeholder-val="{{ true }}"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Aside" title="Notation" hint-size="424px,200px">x: input data. e: pinned environment. θ: fitted parameters.</x-import></sc-if>
+</div>
+</section>
+<section data-label="09 Theorem" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Methods" number="9" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px;align-content:start">
+<div>
+<h2>Builds are stable under caching</h2>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Proof" kind="theorem" number="1" title="Cache safety" hint-size="100%,200px"><p style="margin:0">If every cell is keyed by the hash of its source and inputs, a cached build equals a clean build.</p></x-import>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Proof" kind="proof" hint-size="100%,200px"><p style="margin:0">A cell is reused only when its key matches, so its output is the output of the same function on the same arguments. Induct over the cell order. ∎</p></x-import>
+</div>
+</div>
+</section>
+<section data-label="10 Code" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Methods" number="10" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px 96px 424px;align-content:start">
+<div>
+<h2>A figure is a labelled cell</h2>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.CodeBlock" filename="analysis.ipynb" show-line-numbers="{{ true }}" emphasize-lines="{{ hl }}" code="{{ code }}" hint-size="100%,360px"></x-import>
+<p>The label <code>fig-error</code> is what the slide references; the image is rebuilt on every run.</p>
+</div>
+<div></div>
+<sc-if value="{{ showMargin }}" hint-placeholder-val="{{ true }}"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Aside" title="Tip" hint-size="424px,200px">Keep one figure per cell so labels stay one-to-one.</x-import></sc-if>
+</div>
+</section>
+<section data-label="11 Table" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Results" number="11" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px;align-content:start">
+<div>
+<h2>Results by group</h2>
+<div style="font-size:28px;line-height:1.714;color:var(--myst-color-text-tertiary);margin-bottom:16px"><strong style="color:var(--myst-color-text-secondary);font-weight:700;margin-right:8px">Table 1:</strong>Mismatched figures per paper, before and after.</div>
+<table style="font-size:32px"><thead><tr><th>Group</th><th>Papers</th><th>Before</th><th>After</th></tr></thead><tbody><tr><td>A</td><td>14</td><td>3.1</td><td>0.2</td></tr><tr><td>B</td><td>9</td><td>2.4</td><td>0.0</td></tr><tr><td>C</td><td>21</td><td>4.0</td><td>0.3</td></tr></tbody></table>
+</div>
+</div>
+</section>
+<section data-label="12 Takeaway" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Discussion" number="12" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px;align-content:start">
+<div>
+<h2>What changes for authors</h2>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Admonition" kind="tip" title="Take-home" hint-size="100%,180px"><p style="margin:0">Reference figures by label, never by file. The build does the rest.</p></x-import>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Admonition" kind="warning" title="Limitation" hint-size="100%,180px"><p style="margin:0">Long-running cells still need a cache; see Theorem 1.</p></x-import>
+</div>
+</div>
+</section>
+<section data-label="13 Quote" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:1;display:grid;grid-template-columns:1160px;justify-content:center;align-content:center">
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Blockquote" pull="{{ true }}" attribution="Participant 17, interview" hint-size="1160px,300px">We stopped asking which version of the plot was in the paper.</x-import>
+</div>
+</section>
+<section data-label="14 References" class="ats-prose {{ dk }}" style="position:relative;width:1920px;height:1080px;overflow:hidden;box-sizing:border-box;background:var(--myst-color-bg);display:flex;flex-direction:column;padding:96px 120px">
+<div style="flex:none;margin-bottom:56px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.SlideHeader" subject="Backmatter" number="14" total="14" hint-size="100%,36px"></x-import></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px 96px 424px;align-content:start">
+<div>
+<h2>Thank you</h2>
+<p class="lead">Questions and comments: ana.rojas@example.org</p>
+<div style="display:flex;gap:16px;margin:24px 0 72px"><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Button" href="#" hint-size="260px,56px">Read the paper</x-import><x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.Button" variant="chip" icon="outline/document-arrow-down" href="#" hint-size="260px,56px">Download PDF</x-import></div>
+<x-import component-from-global-scope="ArticleSlidesDesignSystem_a47fec.References" items="{{ refs }}" hint-size="100%,260px"></x-import>
+</div>
+</div>
+</section>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;showMargin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      dk: this.props.dark ? 'dark' : '',
+      showMargin: this.props.showMargin ?? true,
+      hl: [5],
+      code: "import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.read_csv('runs.csv')\nfig, ax = plt.subplots()  # label: fig-error\ndf.groupby('stage').error.mean().plot.bar(ax=ax)\nax.set_ylabel('Mismatch rate')",
+      refs: [
+        'Knuth, D. E. (1984). Literate programming. The Computer Journal, 27(2), 97–111.',
+        'Author, B., & Author, C. (2024). Executable papers in practice. Journal of Open Research, 3(1), 1–12.',
+        'Author, D. (2025). Caching notebook builds. Proceedings of the Workshop, 4(2), 45–52.'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train-test split</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.sq{transition:transform .6s var(--ease-out)}
+.sq rect{transition:fill .4s}
+.cm{color:var(--myst-color-text-tertiary)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 5</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Train-test split</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Keeping part of the data aside, so we can measure honestly how a model does on new cases</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 5 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why we hold data out</li>
+<li class="an-up" style="--d:.15s">Training, validation and test sets</li>
+<li class="an-up" style="--d:.25s">Random and stratified splits</li>
+<li class="an-up" style="--d:.35s">How big the test set should be</li>
+<li class="an-up" style="--d:.45s">Time order, groups and leakage</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: a class or a number</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathcal{D}_{\text{train}}, \ \mathcal{D}_{\text{test}}</span></td><td>Training and test sets, with <span class="tex">n_{\text{train}}</span> and <span class="tex">n_{\text{test}}</span> examples</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\hat{f}, \ \hat{y} = \hat{f}(\mathbf{x})</span></td><td>Model learned from the training set and its prediction</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">L(y, \hat{y})</span></td><td>Loss: the cost of predicting <span class="tex">\hat{y}</span> when the truth is <span class="tex">y</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>A hat marks something learned from data: <span class="tex">\hat{f}</span> is the fitted model, <span class="tex">\hat{y}</span> its guess.</p><p>The subscripts train and test say which set a symbol refers to.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why hold data out</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A score on data the model has already seen tells us very little.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Memorizing">
+<div class="hdr" data-s="Why hold data out"></div>
+<h2>Studying vs memorizing</h2>
+<div class="fr">
+<div class="figbox"><svg id="memo-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:22px">
+<p class="small" style="margin:0">A student who memorizes the answers of last year's exam gets full marks on that exam. On a new exam, the memorized answers do not help.</p>
+<p class="small frag up" style="margin:0">A model can do the same with its training data. Only questions it has never seen show whether it understood.</p>
+<aside class="adm k-note sm frag up"><div class="h"><i data-i="note"></i><span>The idea</span></div><div class="b"><p>Keep some examples hidden during training and use them as the exam.</p></div></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>Scores of two models. The memorizer is perfect on its training data and much worse on new data.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Training and test error">
+<div class="hdr" data-s="Why hold data out"></div>
+<h2>Training and test error</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The error of a model on a set is its average loss over the examples of that set:</p>
+<div class="eq"><div class="m tex-d">\text{Err}_{\text{train}} = \frac{1}{n_{\text{train}}} \sum_{i \in \mathcal{D}_{\text{train}}} L\big(y_i, \hat{f}(\mathbf{x}_i)\big)</div><div class="n">(1)</div></div>
+<div class="eq frag up" data-step="e1"><div class="m tex-d">\text{Err}_{\text{test}} = \frac{1}{n_{\text{test}}} \sum_{i \in \mathcal{D}_{\text{test}}} L\big(y_i, \hat{f}(\mathbf{x}_i)\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="e2" style="margin:16px 0 0">For classes, the 0-1 loss counts 1 for a wrong answer and 0 for a right one. The error is then the share of mistakes:</p>
+<div class="eq frag up" data-step="e2"><div class="m tex-d">L(y, \hat{y}) = \mathbb{I}(y \neq \hat{y}), \qquad \text{accuracy} = 1 - \text{Err}</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="e3" style="margin:16px 0 0">Only <span class="tex">\text{Err}_{\text{test}}</span> uses examples the model never saw, so only it estimates the error on new cases.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The memorizer of Figure 1 gets all training examples right:</p><p><span class="tex">\text{Err}_{\text{train}} = 0</span></p><p>On 20 new examples it gets 11 right:</p><p><span class="tex">\text{Err}_{\text{test}} = \tfrac{9}{20} = 0.45</span></p><p><span class="tex">\text{accuracy} = 1 - 0.45 = 0.55</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Split demo" data-demo="split">
+<div class="hdr" data-s="Why hold data out"></div>
+<h2>Shuffle, then split</h2>
+<div class="fr">
+<div class="figbox"><svg id="split-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<div class="ctl"><label><span>Test share</span><b id="split-p-val">20%</b></label><input type="range" id="split-p" min="10" max="50" step="5" value="20"></div>
+<div class="btns"><button class="bt" id="split-shuffle">Shuffle and split</button><button class="bt chip" id="split-noshuffle">No shuffle</button></div>
+<div class="ro"><span>Training examples</span><b id="split-ntr" class="a">32</b></div>
+<div class="ro"><span>Test examples</span><b id="split-nte" class="bb">8</b></div>
+<p class="small" style="margin:0">The examples are numbered in the order they were collected. Without shuffling, the test set is only the newest ones.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>40 examples split into training (blue) and test (orange). The strip at the bottom marks the test examples in collection order.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Split formulas">
+<div class="hdr" data-s="Why hold data out"></div>
+<h2>The split in symbols</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Shuffle the <span class="tex">n</span> examples, then cut them into two sets that share no example:</p>
+<div class="eq"><div class="m tex-d">\mathcal{D} = \mathcal{D}_{\text{train}} \cup \mathcal{D}_{\text{test}}, \qquad \mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{test}} = \varnothing</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="s1" style="margin:16px 0 0">With a test share <span class="tex">p</span>, the two sizes are:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">n_{\text{test}} = p\,n, \qquad n_{\text{train}} = (1 - p)\,n</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="s2" style="margin:16px 0 0">The empty intersection <span class="tex">\varnothing</span> means that no test example is used to fit <span class="tex">\hat{f}</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 2 with <span class="tex">n = 40</span> and <span class="tex">p = 0.2</span>:</p><p><span class="tex">n_{\text{test}} = 0.2 \times 40 = 8</span></p><p><span class="tex">n_{\text{train}} = 0.8 \times 40 = 32</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Three sets">
+<div class="hdr" data-s="Why hold data out"></div>
+<h2>Training, validation and test</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 400" preserveAspectRatio="xMidYMid meet">
+<g class="an-grow" style="--d:0s"><rect class="box-a" x="0" y="10" width="1000" height="74" rx="4"/><text class="tx" x="500" y="57" text-anchor="middle" font-weight="600">Training 60%</text></g>
+<g class="an-grow" style="--d:.25s"><rect x="1010" y="10" width="325" height="74" rx="4" style="fill:var(--c-c-soft);stroke:var(--c-c);stroke-width:3"/><text class="tx" x="1172" y="57" text-anchor="middle" font-weight="600">Validation 20%</text></g>
+<g class="an-grow" style="--d:.5s"><rect class="box-b" x="1345" y="10" width="335" height="74" rx="4"/><text class="tx" x="1512" y="57" text-anchor="middle" font-weight="600">Test 20%</text></g>
+<g class="an-fade" style="--d:.8s">
+<text class="ttl" x="500" y="128" text-anchor="middle">used to learn</text>
+<text class="ttl" x="1172" y="128" text-anchor="middle">used to choose</text>
+<text class="ttl" x="1512" y="128" text-anchor="middle">used to report</text>
+</g>
+<g class="frag up" data-step="fit">
+<rect class="box-a" x="100" y="170" width="200" height="70" rx="4"/><text class="tx" x="200" y="215" text-anchor="middle">model A</text>
+<rect class="box-a" x="400" y="170" width="200" height="70" rx="4"/><text class="tx" x="500" y="215" text-anchor="middle">model B</text>
+<rect class="box-a" x="700" y="170" width="200" height="70" rx="4"/><text class="tx" x="800" y="215" text-anchor="middle">model C</text>
+<text class="txs" x="500" y="290" text-anchor="middle">fit several models, or one model with different settings</text>
+</g>
+<g class="frag up" data-step="choose">
+<path class="wire" d="M908 205H1022" marker-end="url(#ah)"/>
+<circle r="7" class="ink3"><animateMotion dur="1.4s" repeatCount="indefinite" path="M908 205H1022"/></circle>
+<rect class="box" x="1032" y="150" width="280" height="160" rx="4"/>
+<text class="tx" x="1172" y="195" text-anchor="middle">A: 78%</text>
+<text class="tx" x="1172" y="237" text-anchor="middle" font-weight="700" style="fill:var(--c-c)">B: 84%</text>
+<text class="tx" x="1172" y="279" text-anchor="middle">C: 81%</text>
+<text class="txs" x="1172" y="350" text-anchor="middle">keep the best: B</text>
+</g>
+<g class="frag up" data-step="test">
+<path class="wire" d="M1312 230H1360" marker-end="url(#ah)"/>
+<rect class="box-b" x="1370" y="150" width="300" height="160" rx="4"/>
+<rect x="1500" y="172" width="40" height="30" rx="3" class="fb"/><path d="M1508 172v-10a12 12 0 0 1 24 0" style="fill:none;stroke:var(--c-b);stroke-width:4"/>
+<text class="tx" x="1520" y="250" text-anchor="middle">model B</text>
+<text class="tx" x="1520" y="290" text-anchor="middle" font-weight="700">test score 82%</text>
+<text class="txs" x="1520" y="350" text-anchor="middle">opened only once, at the end</text>
+</g>
+</svg>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 3:</b>Each set has one job. Models learn on training data, we choose among them with validation data, and the test set gives the final score.</p>
+<aside class="adm k-warn sm frag up" style="margin-top:20px;max-width:1400px"><div class="h"><i data-i="warning"></i><span>Warning</span></div><div class="b"><p>If you look at the test score and then change the model, the test set has become a second validation set. Its score is now too optimistic.</p></div></aside>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Splitting well</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A test set should look like the data the model will meet, and be large enough to trust.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Stratified split" data-demo="strat">
+<div class="hdr" data-s="Splitting well"></div>
+<h2>Random vs stratified</h2>
+<div class="fr">
+<div class="figbox"><svg id="strat-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">200 card payments, 20 of them fraud (10%). Each split puts 40 payments in the test set.</p>
+<div class="btns"><button class="bt" id="strat-go">Split again</button><button class="bt chip" id="strat-reset">Reset</button></div>
+<div class="ro"><span>Random: fraud share</span><b id="strat-range" class="bb">—</b></div>
+<div class="ro"><span>Stratified: fraud share</span><b id="strat-fix" class="a">10%</b></div>
+<p class="small" style="margin:0">Stratified: each class is split on its own, so the test set keeps 10%.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Top: current test sets, fraud in orange. Bottom: fraud share in the last 12 test sets.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Class shares">
+<div class="hdr" data-s="Splitting well"></div>
+<h2>Class shares</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The share of class <span class="tex">c</span> is the number of its examples <span class="tex">n_c</span> over the total:</p>
+<div class="eq"><div class="m tex-d">\pi_c = \frac{n_c}{n}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="c1" style="margin:16px 0 0">A stratified split cuts each class on its own, so the test set keeps the same share:</p>
+<div class="eq frag up" data-step="c1"><div class="m tex-d">n_{\text{test},\,c} \approx \pi_c \, n_{\text{test}}</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="c2" style="margin:16px 0 0">A random split matches <span class="tex">\pi_c</span> only on average. With a rare class, one test set can be far from it.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>200 payments, 20 of them fraud:</p><p><span class="tex">\pi_{\text{fraud}} = \tfrac{20}{200} = 0.10</span></p><p>A stratified test set of 40 gets <span class="tex">0.10 \times 40 = 4</span> fraud and 36 normal payments.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Test set size" data-demo="noise">
+<div class="hdr" data-s="Splitting well"></div>
+<h2>Small test sets give noisy scores</h2>
+<div class="fr">
+<div class="figbox"><svg id="noise-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The model is right 80% of the time on new data. We measure it on test sets of different sizes.</p>
+<div class="ctl"><label><span>Test set size</span><b id="noise-n-val">50</b></label><input type="range" id="noise-n" min="0" max="5" step="1" value="1"></div>
+<div class="btns"><button class="bt" id="noise-go">Repeat 50 splits</button></div>
+<div class="ro"><span>Lowest score</span><b id="noise-lo" class="bb">—</b></div>
+<div class="ro"><span>Highest score</span><b id="noise-hi" class="bb">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Measured accuracy over 50 random test sets. With 20 examples it ranges widely; with 1000 it stays close to 80%.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Standard error">
+<div class="hdr" data-s="Splitting well"></div>
+<h2>How noisy is a test score</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Say the model is right with probability <span class="tex">a</span> on new data. The accuracy measured on <span class="tex">n_{\text{test}}</span> examples moves around <span class="tex">a</span> by about one standard error:</p>
+<div class="eq"><div class="m tex-d">\text{SE} = \sqrt{\frac{a\,(1 - a)}{n_{\text{test}}}}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="n1" style="margin:16px 0 0">About 95% of measured scores fall within two standard errors of <span class="tex">a</span>.</p>
+<p class="small frag up" data-step="n2" style="margin:16px 0 0">The size sits under a square root: four times more test examples only halves the noise.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The model of Figure 5 has <span class="tex">a = 0.8</span>.</p><p>With <span class="tex">n_{\text{test}} = 20</span>:</p><p><span class="tex">\text{SE} = \sqrt{0.16/20} \approx 0.089</span></p><p>so scores range about 80% ± 18 points.</p><p>With <span class="tex">n_{\text{test}} = 1000</span>:</p><p><span class="tex">\text{SE} \approx 0.013</span></p><p>so about 80% ± 2.5 points.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Hidden traps</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Sometimes a random split lets the answer slip into training.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Time order">
+<div class="hdr" data-s="Hidden traps"></div>
+<h2>Data with a time order</h2>
+<div class="figbox"><svg id="time-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 6:</b>Monthly sales over three years. (a) A shuffled split lets the model train on months that come after the test months. (b) A split by date trains on the past and tests on the future, as in real use.</p>
+</section>
+
+<section class="s ats-prose" data-label="Groups">
+<div class="hdr" data-s="Hidden traps"></div>
+<h2>Keep each patient together</h2>
+<div class="fr">
+<div class="figbox"><svg id="groups-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:22px">
+<p class="small" style="margin:0">Several rows often come from one person: scans, visits or purchases.</p>
+<p class="small frag up" style="margin:0">If a patient is in both sets, the model can recognize the patient instead of the disease, and the test score looks too good.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Six patients, four scans each. Purple outlines mark patients in both sets.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Leakage">
+<div class="hdr" data-s="Hidden traps"></div>
+<h2>Leakage checklist</h2>
+<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:24px 56px;align-content:center">
+<svg viewBox="0 0 500 230" style="width:100%" class="an-fade">
+<rect class="box-a" x="10" y="20" width="200" height="190" rx="4"/><text class="ttl" x="110" y="52" text-anchor="middle">training</text>
+<rect class="box-b" x="290" y="20" width="200" height="190" rx="4"/><text class="ttl" x="390" y="52" text-anchor="middle">test</text>
+<rect x="30" y="72" width="160" height="26" rx="3" class="zone"/><rect x="30" y="108" width="160" height="26" rx="3" style="fill:var(--c-d);fill-opacity:.25;stroke:var(--c-d);stroke-width:2"/><rect x="30" y="144" width="160" height="26" rx="3" class="zone"/>
+<rect x="310" y="72" width="160" height="26" rx="3" class="zone"/><rect x="310" y="144" width="160" height="26" rx="3" style="fill:var(--c-d);fill-opacity:.25;stroke:var(--c-d);stroke-width:2"/>
+<text class="txs" x="110" y="129" text-anchor="middle">#17</text><text class="txs" x="390" y="165" text-anchor="middle">#17</text>
+<path d="M190 121C250 121 250 157 310 157" style="fill:none;stroke:var(--c-d);stroke-width:3;stroke-dasharray:6 6"/>
+</svg>
+<svg viewBox="0 0 500 230" style="width:100%;--d:.2s" class="an-fade">
+<rect class="box-a" x="10" y="30" width="170" height="60" rx="4"/><text class="tx" x="95" y="70" text-anchor="middle">training</text>
+<rect class="box-b" x="10" y="140" width="170" height="60" rx="4"/><text class="tx" x="95" y="180" text-anchor="middle">test</text>
+<rect class="box" x="300" y="85" width="190" height="64" rx="4"/><text class="tx" x="395" y="126" text-anchor="middle">fit scaler</text>
+<path class="wire-a" d="M180 60C240 60 240 105 292 105" marker-end="url(#ah-a)"/>
+<path class="curve-b" style="stroke-width:3" stroke-dasharray="8 6" d="M180 170C240 170 240 130 292 130" marker-end="url(#ah)"/>
+<text x="232" y="198" text-anchor="middle" style="font-size:40px;font-weight:700;fill:var(--c-b)">×</text>
+</svg>
+<svg viewBox="0 0 500 230" style="width:100%;--d:.4s" class="an-fade">
+<path class="ax" d="M20 120H470" marker-end="url(#ah)"/>
+<circle class="fa" cx="80" cy="120" r="10"/><text class="txs" x="80" y="90" text-anchor="middle">loan given</text>
+<line x1="250" y1="40" x2="250" y2="200" style="stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6"/><text class="txs" x="250" y="30" text-anchor="middle">prediction made</text>
+<circle class="fb" cx="400" cy="120" r="10"/><text class="txs" x="400" y="164" text-anchor="middle">sent to collections</text><text class="txs" x="400" y="194" text-anchor="middle">(recorded later)</text>
+<text class="tk" x="470" y="104" text-anchor="end">time</text>
+</svg>
+<aside class="adm k-danger sm an-up" style="--d:.1s"><div class="h"><i data-i="danger"></i><span>Duplicates across sets</span></div><div class="b"><p>The same row in training and test is a question the model has already seen. Remove duplicates before splitting.</p></div></aside>
+<aside class="adm k-warn sm an-up" style="--d:.3s"><div class="h"><i data-i="warning"></i><span>Preprocessing on all data</span></div><div class="b"><p>A scaler or imputer fitted on all rows has seen the test set. Split first, then fit on training only.</p></div></aside>
+<aside class="adm k-warn sm an-up" style="--d:.5s"><div class="h"><i data-i="caution"></i><span>Future information</span></div><div class="b"><p>A feature recorded after the moment of prediction gives away the answer. Use only what is known at that moment.</p></div></aside>
+</div>
+<p class="cap" style="margin-top:28px"><b>Figure 8:</b>Three common leaks. Each one makes the test score higher than the score the model will get in real use.</p>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A model is judged on examples it never saw during training.</li>
+<li class="an-up" style="--d:.15s">Training data teaches, validation data chooses, test data reports once.</li>
+<li class="an-up" style="--d:.25s">Stratify when a class is rare, so the test set keeps its share.</li>
+<li class="an-up" style="--d:.35s">Small test sets give noisy scores.</li>
+<li class="an-up" style="--d:.45s">Split by time or by group when the data has that structure.</li>
+<li class="an-up" style="--d:.55s">Split first, then preprocess using the training data only.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers more ways to split data and to spot leakage.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Géron, A. (2022). <em>Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow</em> (3rd ed.). O'Reilly. Chapter 2.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.). Springer. Section 7.2.</li>
+<li style="margin:.4em 0">Kaufman, S., Rosset, S., Perlich, C., &amp; Stitelman, O. (2012). Leakage in data mining: Formulation, detection, and avoidance. <em>ACM Transactions on Knowledge Discovery from Data</em>, 6(4), 1–21.</li>
+<li style="margin:.4em 0">Roberts, D. R., et al. (2017). Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. <em>Ecography</em>, 40(8), 913–929.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Cross-validation: every example takes a turn in the test set.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── static figures ───────── */
+function drawMemo() {
+  const svg = document.getElementById('memo-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 110, x: [0, 2], y: [0, 100], yt: [0, 25, 50, 75, 100], fy: (v) => v + '%', yl: 'share of correct answers' });
+  const models = [['memorizer', 100, 55], ['learner', 88, 84]];
+  const BW = 130;
+  models.forEach(([name, tr, te], i) => {
+    const xc = F.sx(0.5 + i);
+    [[tr, 'fa', -BW - 6], [te, 'fb', 6]].forEach(([v, cls, dx], k) => {
+      const d = 0.2 + i * 0.5 + k * 0.2;
+      el('rect', { class: `${cls} an-growy`, x: xc + dx, y: F.sy(v), width: BW, height: F.sy(0) - F.sy(v), rx: 2, style: `--d:${d}s` }, F.plot);
+      el('text', { class: 'tx an-fade', x: xc + dx + BW / 2, y: F.sy(v) - 14, 'text-anchor': 'middle', 'font-weight': 700, text: v + '%', style: `--d:${d + 0.5}s` }, svg);
+    });
+    el('text', { class: 'tx', x: xc, y: F.H - F.B + 44, 'text-anchor': 'middle', 'font-weight': 600, text: name }, svg);
+  });
+  legend(svg, F.L + 10, 34, [['dot', 'fa', 'training data (seen)']]);
+  legend(svg, F.L + 400, 34, [['dot', 'fb', 'new data (not seen)']]);
+  const g = el('g', { class: 'frag' }, svg);
+  const x0 = F.sx(0.5) + BW + 24;
+  el('path', { d: `M${x0} ${F.sy(100)}V${F.sy(55)}`, style: 'stroke:var(--c-d);stroke-width:3', 'marker-start': 'url(#ah)', 'marker-end': 'url(#ah)' }, g);
+  el('text', { class: 'txs', x: x0 + 14, y: F.sy(80), style: 'fill:var(--c-d)', text: 'gap: what was' }, g);
+  el('text', { class: 'txs', x: x0 + 14, y: F.sy(80) + 30, style: 'fill:var(--c-d)', text: 'memorized' }, g);
+}
+
+function drawTime() {
+  const svg = document.getElementById('time-svg');
+  const r = rng(12), M = 36;
+  const sales = Array.from({ length: M }, (_, t) => 50 + 0.9 * t + 9 * Math.sin((2 * Math.PI * t) / 12) + 2.5 * gauss(r));
+  const sx = lin(0, M - 1, 140, 1640);
+  const rnd = rng(3), shuffledTest = new Set();
+  while (shuffledTest.size < 9) shuffledTest.add(Math.floor(rnd() * M));
+  const panel = (y0, title, isTest, cut) => {
+    const sy = lin(30, 100, y0 + 230, y0 + 60);
+    el('text', { class: 'ttl', x: 0, y: y0 + 28, text: title }, svg);
+    if (cut) {
+      const xc = (sx(26) + sx(27)) / 2;
+      el('rect', { x: xc, y: y0 + 48, width: 1660 - xc, height: 196, style: 'fill:var(--c-b);fill-opacity:.07' }, svg);
+      el('line', { x1: xc, x2: xc, y1: y0 + 44, y2: y0 + 248, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8' }, svg);
+      el('text', { class: 'txs', x: xc - 16, y: y0 + 76, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: '← past: training' }, svg);
+      el('text', { class: 'txs', x: xc + 16, y: y0 + 76, style: 'fill:var(--c-b)', text: 'future: test →' }, svg);
+    }
+    el('path', { class: 'wire an-draw', pathLength: 1, d: sales.map((v, t) => (t ? 'L' : 'M') + sx(t) + ' ' + sy(v)).join('') }, svg);
+    sales.forEach((v, t) => el('circle', { class: `pt ${isTest(t) ? 'fb' : 'fa'} an-pop`, cx: sx(t), cy: sy(v), r: 10, style: `--d:${0.3 + t * 0.03}s` }, svg));
+    el('path', { class: 'ax', d: `M120 ${y0 + 250}H1660` }, svg);
+    ['2023', '2024', '2025'].forEach((yr, k) => el('text', { class: 'tk', x: sx(k * 12), y: y0 + 280, 'text-anchor': 'start', text: yr }, svg));
+  };
+  panel(0, '(a) shuffled split: wrong for time data', (t) => shuffledTest.has(t), false);
+  panel(320, '(b) split by date: train on the past, test on the future', (t) => t >= 27, true);
+  legend(svg, 1240, 18, [['dot', 'fa', 'training']]);
+  legend(svg, 1440, 18, [['dot', 'fb', 'test']]);
+}
+
+function drawGroups() {
+  const svg = document.getElementById('groups-svg');
+  const r = rng(9), P = 6, S = 4, SLOT = 186, CS = 34, CG = 8;
+  const gx = (p) => 20 + p * SLOT;
+  const panel = (y0, title, isTest, gap) => {
+    el('text', { class: 'ttl', x: 0, y: y0, text: title }, svg);
+    for (let p = 0; p < P; p++) {
+      const x = gx(p) + (gap && p >= 4 ? 40 : 0) - (gap ? 20 : 0);
+      const tests = Array.from({ length: S }, (_, s) => isTest(p, s));
+      const mixed = tests.some(Boolean) && !tests.every(Boolean);
+      const g = el('g', { class: 'an-up', style: `--d:${0.1 + p * 0.08 + (y0 > 300 ? 0.5 : 0)}s` }, svg);
+      el('rect', { x: x - 10, y: y0 + 24, width: S * (CS + CG) - CG + 20, height: 118, rx: 6, style: mixed ? 'fill:none;stroke:var(--c-d);stroke-width:3;stroke-dasharray:8 6' : 'fill:none;stroke:var(--myst-color-border);stroke-width:1.5' }, g);
+      el('text', { class: 'txs', x: x + (S * (CS + CG) - CG) / 2, y: y0 + 60, 'text-anchor': 'middle', text: `patient ${p + 1}` }, g);
+      tests.forEach((t, s) => el('rect', { class: t ? 'fb' : 'fa', x: x + s * (CS + CG), y: y0 + 82, width: CS, height: CS, rx: 3 }, g));
+    }
+  };
+  const rowTest = Array.from({ length: P * S }, () => r() < 0.3);
+  const both = [...Array(P).keys()].filter((p) => { const t = rowTest.slice(p * S, p * S + S); return t.some(Boolean) && !t.every(Boolean); }).map((p) => p + 1);
+  const list = both.length > 1 ? both.slice(0, -1).join(', ') + ' and ' + both[both.length - 1] : String(both[0]);
+  panel(40, `(a) split by row: patients ${list} end up in both sets`, (p, s) => rowTest[p * S + s], false);
+  panel(330, '(b) split by patient: each patient goes to one side', (p) => p >= 4, true);
+  el('text', { class: 'txs', x: 20 + 2 * SLOT, y: 520, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'training: patients 1 to 4' }, svg);
+  el('text', { class: 'txs', x: 20 + 4.9 * SLOT, y: 520, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'test: patients 5 and 6' }, svg);
+  legend(svg, 20, 620, [['dot', 'fa', 'scan in training']]);
+  legend(svg, 320, 620, [['dot', 'fb', 'scan in test']]);
+  return rowTest;
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.split = (() => {
+  const svg = document.getElementById('split-svg');
+  const N = 40, C = 52, STEP = 66, r = rng(7);
+  el('rect', { class: 'zone', x: 0, y: 60, width: 760, height: 290, rx: 6 }, svg);
+  el('rect', { class: 'zone', x: 790, y: 60, width: 370, height: 290, rx: 6 }, svg);
+  const trLab = el('text', { class: 'tx', x: 0, y: 40, 'font-weight': 700, style: 'fill:var(--c-a)' }, svg);
+  const teLab = el('text', { class: 'tx', x: 790, y: 40, 'font-weight': 700, style: 'fill:var(--c-b)' }, svg);
+  const squares = Array.from({ length: N }, (_, i) => {
+    const g = el('g', { class: 'sq' }, svg);
+    el('rect', { width: C, height: C, rx: 4 }, g);
+    el('text', { x: C / 2, y: C / 2 + 8, 'text-anchor': 'middle', style: 'font-size:22px;font-weight:600;fill:#fff', text: i + 1 }, g);
+    return g;
+  });
+  el('text', { class: 'ttl', x: 0, y: 440, text: 'collection order: 1 is the oldest, 40 the newest' }, svg);
+  const SW = 1160 / N;
+  const strip = Array.from({ length: N }, (_, i) => el('rect', { x: i * SW + 2, y: 462, width: SW - 4, height: 60, rx: 3 }, svg));
+  [1, 10, 20, 30, 40].forEach((v) => el('text', { class: 'tk', x: (v - 0.5) * SW, y: 556, 'text-anchor': 'middle', text: v }, svg));
+  const note = el('text', { class: 'txs', x: 580, y: 630, 'text-anchor': 'middle' }, svg);
+  const slider = document.getElementById('split-p');
+  let order = [...Array(N).keys()], shuffled = false;
+  function draw() {
+    const p = +slider.value, nTe = Math.round((N * p) / 100), nTr = N - nTe;
+    document.getElementById('split-p-val').textContent = p + '%';
+    document.getElementById('split-ntr').textContent = nTr;
+    document.getElementById('split-nte').textContent = nTe;
+    trLab.textContent = `Training (${nTr})`; teLab.textContent = `Test (${nTe})`;
+    order.forEach((id, slot) => {
+      const test = slot >= nTr, k = test ? slot - nTr : slot;
+      const x = test ? 806 + (k % 5) * STEP : 16 + (k % 11) * STEP;
+      const y = 74 + Math.floor(k / (test ? 5 : 11)) * STEP;
+      squares[id].style.transform = `translate(${x}px, ${y}px)`;
+      squares[id].firstChild.setAttribute('class', test ? 'fb' : 'fa');
+      strip[id].setAttribute('class', test ? 'fb' : 'fa');
+      strip[id].style.fillOpacity = test ? 1 : 0.35;
+    });
+    note.textContent = shuffled ? 'After shuffling, the test examples come from the whole collection period.' : 'Not shuffled: the test set holds only the newest examples.';
+  }
+  slider.addEventListener('input', draw);
+  document.getElementById('split-shuffle').addEventListener('click', () => {
+    for (let i = N - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    shuffled = true; draw();
+  });
+  document.getElementById('split-noshuffle').addEventListener('click', () => { order = [...Array(N).keys()]; shuffled = false; draw(); });
+  document.getElementById('split-shuffle').click();
+  return {};
+})();
+
+DEMOS.strat = (() => {
+  const svg = document.getElementById('strat-svg');
+  const N = 200, NF = 20, NT = 40, KEEP = 12, r = rng(17);
+  const PX = [110, 680], CELL = 38, G = 6;
+  const sy = lin(0, 30, 600, 330), bx = (p, i) => PX[p] + i * 36;
+  const names = ['Random split', 'Stratified split'];
+  const cells = [], caps = [], barG = [];
+  PX.forEach((x0, p) => {
+    el('text', { class: 'tx', x: x0, y: 30, 'font-weight': 700, text: names[p] }, svg);
+    cells.push(Array.from({ length: NT }, (_, i) => el('rect', { x: x0 + (i % 10) * (CELL + G), y: 54 + Math.floor(i / 10) * (CELL + G), width: CELL, height: CELL, rx: 3 }, svg)));
+    caps.push(el('text', { class: 'txs', x: x0, y: 262, text: '' }, svg));
+    [0, 10, 20, 30].forEach((v) => {
+      el('line', { class: 'gl', x1: x0, x2: x0 + KEEP * 36, y1: sy(v), y2: sy(v) }, svg);
+      el('text', { class: 'tk', x: x0 - 12, y: sy(v) + 8, 'text-anchor': 'end', text: v + '%' }, svg);
+    });
+    el('path', { class: 'ax', d: `M${x0} ${sy(30)}V${sy(0)}H${x0 + KEEP * 36}` }, svg);
+    barG.push(el('g', {}, svg));
+    el('line', { x1: x0, x2: x0 + KEEP * 36, y1: sy(10), y2: sy(10), style: 'stroke:var(--myst-color-text);stroke-width:2.5;stroke-dasharray:8 6' }, svg);
+    el('text', { class: 'tk', x: x0 + KEEP * 18, y: 640, 'text-anchor': 'middle', text: 'last 12 splits' }, svg);
+  });
+  el('text', { class: 'lb', transform: `translate(40 ${sy(15)}) rotate(-90)`, 'text-anchor': 'middle', text: 'fraud in test' }, svg);
+  el('text', { class: 'txs', x: 1110, y: sy(10) - 12, 'text-anchor': 'end', text: 'whole dataset: 10%' }, svg);
+  const pick = (arr, k) => { const a = arr.slice(); for (let i = 0; i < k; i++) { const j = i + Math.floor(r() * (a.length - i)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, k); };
+  const ids = [...Array(N).keys()], fraud = ids.slice(0, NF), normal = ids.slice(NF);
+  let hist;
+  const shuffle = (a) => pick(a, a.length);
+  function show(p, test) {
+    const k = test.filter((i) => i < NF).length;
+    test.forEach((id, i) => cells[p][i].setAttribute('class', id < NF ? 'fb' : 'zone'));
+    caps[p].textContent = `test set: ${k} fraud of ${NT} (${Math.round((100 * k) / NT)}%)`;
+    return (100 * k) / NT;
+  }
+  function drawBars() {
+    barG.forEach((g, p) => {
+      while (g.firstChild) g.firstChild.remove();
+      hist.slice(-KEEP).forEach((h, i) => {
+        const v = h[p];
+        el('rect', { class: `${p ? 'fa' : 'fb'}${i === Math.min(hist.length, KEEP) - 1 ? ' an-growy' : ''}`, x: bx(p, i) + 4, y: sy(v), width: 28, height: Math.max(2, sy(0) - sy(v)), rx: 2 }, g);
+      });
+    });
+    const rs = hist.map((h) => h[0]);
+    document.getElementById('strat-range').textContent = hist.length > 1 ? `${Math.min(...rs)}% to ${Math.max(...rs)}%` : `${rs[0]}%`;
+  }
+  function split() {
+    const rand = pick(ids, NT);
+    const strat = shuffle(pick(fraud, NF * NT / N).concat(pick(normal, NT - NF * NT / N)));
+    hist.push([show(0, rand), show(1, strat)]);
+    drawBars();
+  }
+  function reset() { hist = []; split(); }
+  document.getElementById('strat-go').addEventListener('click', split);
+  document.getElementById('strat-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.noise = (() => {
+  const svg = document.getElementById('noise-svg');
+  const SIZES = [20, 50, 100, 200, 500, 1000], TRUE = 0.8, RUNS = 50, W = 2.5, r = rng(21);
+  const F = frame(svg, { W: 1160, H: 700, l: 100, t: 70, x: [48, 100], y: [0, 40], xt: [50, 60, 70, 80, 90, 100], yt: [0, 10, 20, 30, 40], fx: (v) => v + '%', xl: 'measured accuracy on the test set', yl: 'number of splits' });
+  const band = el('rect', { y: F.T, height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.08;display:none' }, F.plot);
+  const bars = el('g', {}, F.plot);
+  el('line', { x1: F.sx(80), x2: F.sx(80), y1: F.T - 30, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8' }, svg);
+  el('text', { class: 'txs', x: F.sx(80), y: F.T - 40, 'text-anchor': 'middle', text: 'true accuracy: 80%' }, svg);
+  const slider = document.getElementById('noise-n');
+  let counts, scores, timer = null;
+  const n = () => SIZES[+slider.value];
+  function one() {
+    let hits = 0;
+    for (let i = 0; i < n(); i++) if (r() < TRUE) hits++;
+    return (100 * hits) / n();
+  }
+  function draw() {
+    while (bars.firstChild) bars.firstChild.remove();
+    Object.entries(counts).forEach(([k, c]) => {
+      const x = k * W;
+      el('rect', { class: 'fa', x: F.sx(x - W / 2) + 2, y: F.sy(Math.min(c, 40)), width: F.sx(W) - F.sx(0) - 4, height: F.sy(0) - F.sy(Math.min(c, 40)), rx: 2 }, bars);
+    });
+    if (scores.length) {
+      const lo = Math.min(...scores), hi = Math.max(...scores);
+      band.style.display = ''; band.setAttribute('x', F.sx(lo - W / 2)); band.setAttribute('width', F.sx(hi + W / 2) - F.sx(lo - W / 2));
+      document.getElementById('noise-lo').textContent = fmt(lo, 1) + '%';
+      document.getElementById('noise-hi').textContent = fmt(hi, 1) + '%';
+    } else {
+      band.style.display = 'none';
+      document.getElementById('noise-lo').textContent = '—';
+      document.getElementById('noise-hi').textContent = '—';
+    }
+  }
+  function add() {
+    const s = clamp(one(), 50, 100);
+    scores.push(s);
+    const k = Math.round(s / W);
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  function clear() { clearInterval(timer); timer = null; counts = {}; scores = []; draw(); }
+  function run() {
+    clear();
+    if (REDUCED) { for (let i = 0; i < RUNS; i++) add(); draw(); return; }
+    timer = setInterval(() => { add(); draw(); if (scores.length >= RUNS) { clearInterval(timer); timer = null; } }, 30);
+  }
+  slider.addEventListener('input', () => { document.getElementById('noise-n-val').textContent = n(); clear(); });
+  document.getElementById('noise-go').addEventListener('click', run);
+  clear();
+  for (let i = 0; i < RUNS; i++) add();
+  draw();
+  return {};
+})();
+
+drawMemo(); drawTime(); drawGroups();
+})();
+</script>
+</body>
+</html>

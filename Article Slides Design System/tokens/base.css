@@ -1,0 +1,34 @@
+/* Element defaults + slide prose. Mirrors myst-theme typography.css and the @tailwindcss/typography overrides in styles/index.js.
+   Prose ratios are kept exactly (h1 2.25em, h2 1.5em, h3 1.25em, lead 1.25em, small 0.875em); slides set the base to 32px. */
+a{color:var(--myst-color-link);text-decoration:underline;text-decoration-thickness:var(--link-decoration-thickness);text-underline-offset:var(--link-underline-offset);text-decoration-color:var(--myst-color-link-underline)}
+a:hover{color:var(--myst-color-link-hover);text-decoration-color:var(--myst-color-link-hover)}
+.smallcaps{font-variant:small-caps}
+.ats-prose{font-family:var(--font-sans);font-size:var(--slide-fs-body);line-height:var(--slide-lh-body);color:var(--myst-color-prose-body);text-wrap:pretty}
+.ats-prose h1{font-size:2.25em;line-height:1.111;font-weight:800;color:var(--myst-color-text);margin:0 0 .4em;text-wrap:balance}
+.ats-prose h2{font-size:1.5em;line-height:1.333;font-weight:700;color:var(--myst-color-text);margin:0 0 .667em;text-wrap:balance}
+.ats-prose h3{font-size:1.25em;line-height:1.6;font-weight:600;color:var(--myst-color-text);margin:1em 0 .4em}
+.ats-prose h4,.ats-prose h5,.ats-prose h6{font-size:1em;line-height:1.5;font-weight:600;color:var(--myst-color-text);margin:1em 0 .5em}
+.ats-prose h5,.ats-prose h6{font-weight:500}
+.ats-prose h1:first-child,.ats-prose h2:first-child,.ats-prose h3:first-child{margin-top:0}
+.ats-prose p{margin:0 0 .75em}
+.ats-prose .lead{font-size:1.25em;line-height:1.6;color:var(--myst-color-text-secondary);margin:0 0 .8em}
+.ats-prose ul,.ats-prose ol{margin:0 0 .75em;padding-left:1.625em}
+.ats-prose li{margin:.25em 0;padding-left:.375em}
+.ats-prose li>p{margin:.25em 0}
+.ats-prose ul>li::marker{color:var(--myst-color-border-strong)}
+.ats-prose ol>li::marker{color:var(--myst-color-text-tertiary)}
+.ats-prose strong{color:var(--myst-color-text);font-weight:600}
+.ats-prose code{font-family:var(--font-mono);font-size:.875em;font-weight:400;color:var(--myst-color-code)}
+.ats-prose kbd{font-family:var(--font-mono);font-size:.875em;font-weight:500;color:var(--myst-color-text);border-radius:.3125rem;padding:.1875em .375em;box-shadow:0 0 0 1px var(--myst-color-kbd-shadow),0 3px 0 var(--myst-color-kbd-shadow)}
+.ats-prose hr{border:0;border-top:1px solid var(--myst-color-border);margin:1.5em 0}
+.ats-prose table{width:100%;border-collapse:collapse;font-size:.875em;line-height:1.714;margin:0 0 1em}
+.ats-prose thead th{color:var(--myst-color-text);font-weight:600;border-bottom:1px solid var(--myst-color-border-strong);text-align:left;padding:.5em;vertical-align:bottom}
+.ats-prose td{border-bottom:1px solid var(--myst-color-border);padding:.5em;vertical-align:top}
+.ats-prose tbody tr:hover td{background:var(--myst-color-bg-secondary)}
+.ats-prose dl{margin:0 0 .75em}
+.ats-prose dt{margin-top:.75em}
+.ats-prose dt>strong{color:var(--myst-color-accent-text);font-weight:700}
+.ats-prose dd{margin:.25em 0 0 2em}
+.ats-prose cite{font-style:normal}
+.ats-prose sup{font-size:.75em;line-height:0}
+.ats-prose>:last-child,.ats-prose aside>div>:last-child,.ats-prose figure>:last-child{margin-bottom:0}

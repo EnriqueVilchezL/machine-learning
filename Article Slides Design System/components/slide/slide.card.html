@@ -1,0 +1,17 @@
+<!-- @dsCard group="Components" viewport="700x500" name="Slide" subtitle="Slide, SlideHeader, FooterLink" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{margin:0;background:#fff}.half{--slide-fs-body:16px;--slide-fs-small:14px;--slide-fs-label:12px;--slide-fs-lead:20px;font-size:16px;padding:20px 24px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.ArticleSlidesDesignSystem_a47fec;
+const { Slide, SlideHeader, FooterLink, Aside } = NS;
+ReactDOM.createRoot(document.getElementById('root')).render(<div>
+<div style={{width:700,height:394,overflow:'hidden'}}><div style={{transform:'scale(0.36458)',transformOrigin:'0 0'}}>
+<Slide layout="body-margin" header={<SlideHeader subject="Methods" venue="Proceedings" number={3} total={12} />} margin={<Aside title="Sample">Twelve sites, collected 2024–2026.</Aside>}>
+<h2>Study design</h2><p className="lead">Each site ran the same notebook against local data.</p><ul><li>Pinned environments per site</li><li>Outputs written straight to figures</li><li>No manual export step</li></ul>
+</Slide></div></div>
+<div className="ats-prose half" style={{display:'flex',gap:12,borderTop:'1px solid var(--myst-color-border)'}}><FooterLink direction="prev" group="Previous" title="Background" /><FooterLink group="Next" title="Results" /></div>
+</div>);</script></body></html>

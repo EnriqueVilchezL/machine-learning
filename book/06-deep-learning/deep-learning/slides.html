@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488;--c-h:#64748b}
+.dark{--c-e:#2dd4bf;--c-h:#94a3b8}
+.fe{fill:var(--c-e)}.fh{fill:var(--c-h)}
+.gray{fill:var(--myst-color-text-tertiary)}
+svg .tk{font-size:24px}
+.halo{paint-order:stroke;stroke:var(--myst-color-bg);stroke-width:8px;stroke-linejoin:round}
+.ats-prose table.tb.cmp td{padding:.2em .6em;vertical-align:middle}
+.ats-prose table.tb.nt td,.ats-prose table.tb.nt th{padding:.3em .6em}
+.thumb{display:block;width:200px;height:56px;overflow:hidden;border:1px solid var(--myst-color-border);border-radius:2px}
+.btns.tight{gap:10px}
+.btns.tight .bt{font-size:26px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 22</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Deep learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Networks of many layers that learn their own features from raw data</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 22 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">From features to representations</li>
+<li class="an-up" style="--d:.15s">Why now and how it learns</li>
+<li class="an-up" style="--d:.25s">Architectures and the chapter ahead</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this chapter.</p>
+<table class="tb nt" style="font-size:26px">
+<colgroup><col style="width:38%"><col style="width:62%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x} \in \mathbb{R}^d, \ y, \ \hat{y}</span></td><td>Input with <span class="tex">d</span> features, its target and the output</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">l = 1, \dots, L</span></td><td>Layer number; the network has <span class="tex">L</span> layers</td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">\mathbf{W}^{(l)}, \ \mathbf{b}^{(l)}</span></td><td>Weights and biases of layer <span class="tex">l</span></td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">\mathbf{z}^{(l)}, \ \mathbf{a}^{(l)}</span></td><td>Weighted sums and outputs of layer <span class="tex">l</span>; <span class="tex">\mathbf{a}^{(0)} = \mathbf{x}</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">g</span></td><td>Activation: <span class="tex">\sigma</span>, tanh, ReLU or softmax</td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">\boldsymbol{\theta}, \ L(y, \hat{y}), \ J(\boldsymbol{\theta})</span></td><td>All parameters; loss of one example; cost</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">\alpha, \ \nabla_{\boldsymbol{\theta}} J</span></td><td>Learning rate and gradient of the cost</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">B</span>, epoch</td><td>Batch size; one pass over the training data</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold lowercase letters are vectors; bold capitals are matrices.</p><p>The superscript <span class="tex">(l)</span> names a layer. It is not a power.</p><p>The learning rate <span class="tex">\alpha</span> plays the same role as in linear and logistic regression: the size of each step.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">From features to representations</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Instead of designing features by hand, let layers learn them.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Features by hand">
+<div class="hdr" data-s="Representations"></div>
+<h2>Features by hand</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<div class="figbox" style="flex:none;height:580px"><svg id="pipe-svg" viewBox="0 0 1160 580"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 1:</b>(a) A person turns the raw input into features, then a model learns from them. (b) A deep network learns the features and the model together.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">So far</div><p>Chapters 3 to 5 worked on features someone chose: word counts, averages, ratios (Topic 3).</p><p>Good features take expert time, and they miss patterns nobody thought of.</p></aside>
+<aside class="am frag up" data-step="f1"><div class="t">Representation</div><p>A new set of numbers that describes each example. Deep learning learns it from the data.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Learning the features">
+<div class="hdr" data-s="Representations"></div>
+<h2>Learning the features</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="rep1-svg" viewBox="0 0 400 400"></svg></div>
+<div class="figbox an-fade" style="--d:.3s"><svg id="rep2-svg" viewBox="0 0 400 400"></svg></div>
+<div class="figbox an-fade" style="--d:.55s"><svg id="rep3-svg" viewBox="0 0 400 400"></svg></div>
+<div class="figbox an-fade" style="--d:.8s"><svg id="rep4-svg" viewBox="0 0 400 400"></svg></div>
+<div class="subcap"><b>(a) Pixels</b><br>the raw input</div>
+<div class="subcap"><b>(b) Edges</b><br>layer 1: lines at many angles</div>
+<div class="subcap"><b>(c) Parts</b><br>layer 2: edges combine</div>
+<div class="subcap"><b>(d) Objects</b><br>layer 3: parts combine</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 2:</b>Each layer builds on the one before it. Early layers find simple patterns; later layers combine them into larger ones. Nobody tells the network what an edge is.</p>
+</section>
+
+<section class="s ats-prose" data-label="Composition" data-demo="chain">
+<div class="hdr" data-s="Representations"></div>
+<h2>A chain of simple functions</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 4px">A network applies one simple function per layer, each to the output of the one before:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">\hat{y} = f^{(L)}\Big(\dots f^{(2)}\big(f^{(1)}(\mathbf{x})\big)\Big)</div><div class="n">(1)</div></div>
+<div class="figbox" style="flex:none;height:470px"><svg id="chain-svg" viewBox="0 0 1160 470"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 3:</b>Three steps: a line, a cut at zero, another line. Together they draw a bent line, which none of them draws alone.</p>
+</div>
+<div class="side" style="gap:20px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p style="margin:0"><span class="tex">f^{(1)}(x) = 2x - 1</span></p><p style="margin:0"><span class="tex">f^{(2)}(u) = \max(0, u)</span></p><p><span class="tex">f^{(3)}(v) = 3v + 0.5</span></p><p style="margin:0">At <span class="tex">x = 2</span>: <span class="tex">3 \to 3 \to \hat{y} = 9.5</span></p><p>At <span class="tex">x = 0</span>: <span class="tex">-1 \to 0 \to \hat{y} = 0.5</span></p></aside>
+<div class="ctl"><label><span>Input <span class="tex">x</span></span><b id="ch-val">2.00</b></label><input type="range" id="ch-in" min="-2" max="3" step="0.25" value="2"></div>
+<div class="ro"><span>Output <span class="tex">\hat{y}</span></span><b id="ch-y" class="bb">9.50</b></div>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="One layer">
+<div class="hdr" data-s="Representations"></div>
+<h2>One layer of units</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 4px">Each unit takes a weighted sum of its inputs, adds a bias and applies the activation <span class="tex">g</span>:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">\mathbf{z}^{(l)} = \mathbf{W}^{(l)} \mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}, \qquad \mathbf{a}^{(l)} = g\big(\mathbf{z}^{(l)}\big)</div><div class="n">(2)</div></div>
+<div class="figbox" style="flex:none;height:440px"><svg id="layer-svg" viewBox="0 0 1160 440"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 4:</b>A layer with two inputs and two units. Weights sit on the arrows, biases next to the units. ReLU keeps positive sums and turns negative ones into 0.</p>
+</div>
+<div class="side" style="gap:20px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{W} = \begin{bmatrix} 1 &amp; -2 \\ 0.5 &amp; 1 \end{bmatrix}</span></p><p><span class="tex">\mathbf{x} = (1, \ 2), \quad \mathbf{b} = (1, \ -1)</span></p><p><span class="tex">z_1 = 1 \cdot 1 - 2 \cdot 2 + 1 = -2</span></p><p><span class="tex">z_2 = 0.5 \cdot 1 + 1 \cdot 2 - 1 = 1.5</span></p><p>With ReLU: <span class="tex">\mathbf{a} = (0, \ 1.5)</span>.</p></aside>
+<aside class="am"><div class="t">Why <span class="tex">g</span>?</div><p>Without it, a stack of layers collapses into one linear function.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why deep" data-demo="depth">
+<div class="hdr" data-s="Representations"></div>
+<h2>Why depth helps</h2>
+<div class="fr">
+<div class="figbox"><svg id="depth-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Each layer has two ReLU units that compute the same tent shape:</p>
+<p class="small" style="margin:0"><span class="tex">t(x) = 2\,\mathrm{ReLU}(x) - 4\,\mathrm{ReLU}(x - 0.5)</span></p>
+<div class="ctl"><label><span>Layers <span class="tex">L</span></span><b id="dp-val">3</b></label><input type="range" id="dp-in" min="1" max="6" step="1" value="3"></div>
+<div class="ro"><span>Hidden units</span><b id="dp-u">6</b></div>
+<div class="ro"><span>Straight pieces</span><b id="dp-p" class="a">8</b></div>
+<div class="ro"><span>Units in one wide layer</span><b id="dp-w" class="bb">7</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Each layer folds [0, 1] in half, so <span class="tex">L</span> layers give <span class="tex">2^L</span> pieces.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="History">
+<div class="hdr" data-s="Representations"></div>
+<h2>A short history</h2>
+<div class="figbox" style="flex:1"><svg id="hist-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 6:</b>The main ideas are old. Backpropagation dates from 1986; deep networks took off only after 2012, when data and hardware caught up.</p>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why now and how it learns</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Large data sets, fast hardware and better methods made deep networks practical.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why now">
+<div class="hdr" data-s="Learning"></div>
+<h2>Why now?</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="now1-svg" viewBox="0 0 400 380"></svg></div>
+<div class="figbox an-fade" style="--d:.25s"><svg id="now2-svg" viewBox="0 0 400 380"></svg></div>
+<div class="figbox an-fade" style="--d:.45s"><svg id="now3-svg" viewBox="0 0 400 380"></svg></div>
+<div class="figbox frag up" data-step="n1"><svg id="now4-svg" viewBox="0 0 400 380"></svg></div>
+<div class="subcap"><b>(a) Data</b><br>labeled sets grew from thousands to millions of examples</div>
+<div class="subcap"><b>(b) Compute</b><br>graphics cards do thousands of multiplications at once</div>
+<div class="subcap"><b>(c) Methods</b><br>ReLU, dropout, better starting weights</div>
+<div class="subcap frag up" data-step="n1"><b>(d) Scale</b><br>error keeps falling as data and models grow (sketch)</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>All three came together around 2010. AlexNet (2012) learned from 1.2 million images on two graphics cards in about six days. Older methods level off; bigger networks with more data keep improving.</p>
+</section>
+
+<section class="s ats-prose" data-label="Cost">
+<div class="hdr" data-s="Learning"></div>
+<h2>Cost as average loss</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 4px">The loss <span class="tex">L</span> scores one prediction. The cost averages it over the <span class="tex">n</span> training examples:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">J(\boldsymbol{\theta}) = \frac{1}{n} \sum_{i=1}^{n} L\big(y_i, \hat{y}_i\big)</div><div class="n">(3)</div></div>
+<div class="figbox" style="flex:none;height:380px"><svg id="cost-svg" viewBox="0 0 1160 380"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 8:</b>Squared loss <span class="tex">(y - \hat{y})^2</span> on three examples. The cost is the height of the dashed line.</p>
+<p class="small frag up" data-step="c1" style="margin:12px 0 0">Training looks for the <span class="tex">\boldsymbol{\theta}</span>, every weight and bias, that makes <span class="tex">J(\boldsymbol{\theta})</span> small.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Targets <span class="tex">1, 0, 2</span>; outputs <span class="tex">0.8, 0.4, 1.5</span>.</p><p>Losses: <span class="tex">0.04, \ 0.16, \ 0.25</span>.</p><p><span class="tex">J = \tfrac{0.04 + 0.16 + 0.25}{3} = 0.15</span>.</p></aside>
+<aside class="am frag up" data-step="c1"><div class="t">Batches and epochs</div><p>In practice each step uses a batch of <span class="tex">B</span> examples. With <span class="tex">n = 1000</span> and <span class="tex">B = 50</span>, one epoch takes <span class="tex">1000 / 50 = 20</span> steps.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Gradient step">
+<div class="hdr" data-s="Learning"></div>
+<h2>One step downhill</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 4px">The gradient points uphill. Gradient descent moves every parameter a small step the other way:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">\boldsymbol{\theta} \ \leftarrow \ \boldsymbol{\theta} - \alpha \, \nabla_{\boldsymbol{\theta}} J(\boldsymbol{\theta})</div><div class="n">(4)</div></div>
+<div class="figbox" style="flex:none;height:440px"><svg id="step-svg" viewBox="0 0 1160 440"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 9:</b>Two steps on <span class="tex">J(\theta) = (\theta - 3)^2</span> with <span class="tex">\alpha = 0.1</span>. The slope gets flatter near the bottom, so the steps get shorter.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">J(\theta) = (\theta - 3)^2</span>, so <span class="tex">J'(\theta) = 2(\theta - 3)</span>.</p><p>At <span class="tex">\theta = 1</span>: slope <span class="tex">-4</span>, <span class="tex">J = 4</span>.</p><p><span class="tex">\theta \leftarrow 1 - 0.1 \cdot (-4) = 1.4</span>, <span class="tex">J = 2.56</span>.</p><p>Next: <span class="tex">\theta = 1.72</span>, <span class="tex">J \approx 1.64</span>.</p></aside>
+<aside class="am"><div class="t">In a network</div><p>The same rule updates millions of weights at once. Topic 23 shows how backpropagation finds every slope.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Gradient descent demo" data-demo="gd">
+<div class="hdr" data-s="Learning"></div>
+<h2>Roll down the cost</h2>
+<div class="fr">
+<div style="display:flex;flex-direction:column;min-height:0;gap:8px">
+<div class="figbox" style="flex:none;height:470px"><svg id="gd-svg" viewBox="0 0 1160 470"></svg></div>
+<div class="figbox" style="flex:none;height:220px"><svg id="gdj-svg" viewBox="0 0 1160 220"></svg></div>
+</div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Pick a learning rate and take steps on <span class="tex">J(\theta) = (\theta - 3)^2</span>.</p>
+<div class="ctl"><label><span>Learning rate <span class="tex">\alpha</span></span><b id="gd-val">0.10</b></label><input type="range" id="gd-in" min="0.01" max="1.1" step="0.01" value="0.1"></div>
+<div class="btns tight"><button class="bt" id="gd-step">Step</button><button class="bt chip" id="gd-run">Run 30</button><button class="bt chip" id="gd-reset">Reset</button></div>
+<div class="ro"><span>Step</span><b id="gd-k">0</b></div>
+<div class="ro"><span><span class="tex">\theta</span></span><b id="gd-t" class="a">-0.50</b></div>
+<div class="ro"><span>Cost <span class="tex">J(\theta)</span></span><b id="gd-j" class="bb">12.25</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>Top: the ball and its path. Bottom: the cost after each step. Try <span class="tex">\alpha = 0.02</span> (slow), <span class="tex">0.5</span> (one step), <span class="tex">0.95</span> (zigzag) and <span class="tex">1.05</span> (diverges).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Fit demo" data-demo="fit">
+<div class="hdr" data-s="Learning"></div>
+<h2>More units, curvier boundaries</h2>
+<div class="fr">
+<div class="figbox"><svg id="fit-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Change the network and watch it learn the circle.</p>
+<div class="ctl"><label><span>Units per hidden layer</span><b id="fit-h-val">3</b></label><input type="range" id="fit-h" min="1" max="8" step="1" value="3"></div>
+<div class="ctl"><label><span>Hidden layers</span><b id="fit-l-val">1</b></label><input type="range" id="fit-l" min="1" max="3" step="1" value="1"></div>
+<div class="btns tight"><button class="bt" id="fit-train">Train again</button></div>
+<div class="ro"><span>Parameters</span><b id="fit-p">13</b></div>
+<div class="ro"><span>Training accuracy</span><b id="fit-acc" class="a">·</b></div>
+<div class="ro"><span>Cost <span class="tex">J</span></span><b id="fit-j" class="bb">·</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>One unit draws a straight line. Three units can close a triangle; more bend it further.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Overfitting">
+<div class="hdr" data-s="Learning"></div>
+<h2>Too many weights, too little data</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<div class="figbox" style="flex:none;height:600px"><svg id="over-svg" viewBox="0 0 1160 600"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 12:</b>A sketch of cost during training. The training cost keeps falling; the cost on held-out validation data turns up once the network starts to memorize.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Many weights</div><p>AlexNet had about 60 million weights and 1.2 million training images. With so much freedom, a network can memorize noise.</p></aside>
+<aside class="am frag up" data-step="o2"><div class="t">Regularization</div><p>More data, or flipped and cropped copies of it.</p><p>A penalty on large weights.</p><p>Dropout: switch off random units while training.</p><p>Early stopping at the lowest validation cost.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Architectures and the chapter ahead</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Different kinds of data call for different network shapes.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Data and architectures">
+<div class="hdr" data-s="Architectures"></div>
+<h2>The data picks the shape</h2>
+<div class="figbox" style="flex:1"><svg id="arch-svg" viewBox="0 0 1680 640"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 13:</b>Each kind of data or task has a matching architecture. All of them are built from the layers of equation (2) and trained with gradient descent.</p>
+</section>
+
+<section class="s ats-prose" data-label="The chapter ahead">
+<div class="hdr" data-s="Architectures"></div>
+<h2>The chapter ahead</h2>
+<p class="cap" style="margin-bottom:12px"><b>Table 2:</b>The nine topics of this chapter and the question each one answers.</p>
+<table class="tb cmp" style="font-size:26px">
+<colgroup><col style="width:8%"><col style="width:30%"><col style="width:49%"><col style="width:13%"></colgroup>
+<thead><tr><th>Topic</th><th>Method</th><th>Question</th><th>Picture</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>23</td><td><strong>Neural networks</strong></td><td>How does a network compute, and how does it learn its weights?</td><td><svg class="thumb" id="th-nn" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.10s"><td>24</td><td><strong>Automatic differentiation</strong></td><td>How does a computer find every slope, exactly and fast?</td><td><svg class="thumb" id="th-ad" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.15s"><td>25</td><td><strong>Convolutional networks</strong></td><td>How do we find the same pattern anywhere in an image?</td><td><svg class="thumb" id="th-cnn" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.20s"><td>26</td><td><strong>Recurrent networks</strong></td><td>How do we read a sequence step by step, with memory?</td><td><svg class="thumb" id="th-rnn" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.25s"><td>27</td><td><strong>Autoencoders</strong></td><td>How do we squeeze data into a few numbers and rebuild it?</td><td><svg class="thumb" id="th-ae" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.30s"><td>28</td><td><strong>Generative adversarial networks</strong></td><td>How can a network create new, realistic examples?</td><td><svg class="thumb" id="th-gan" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.35s"><td>29</td><td><strong>Transfer learning</strong></td><td>How do we reuse a trained network for a new task?</td><td><svg class="thumb" id="th-tl" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.40s"><td>30</td><td><strong>Deep reinforcement learning</strong></td><td>What if there are too many states for a table?</td><td><svg class="thumb" id="th-drl" viewBox="0 0 200 56"></svg></td></tr>
+<tr class="an-up" style="--d:.45s"><td>31</td><td><strong>Transformers</strong></td><td>How can every word look at every other word?</td><td><svg class="thumb" id="th-tr" viewBox="0 0 200 56"></svg></td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="s ats-prose" data-label="Limits and responsibility">
+<div class="hdr" data-s="Architectures"></div>
+<h2>Limits and responsibility</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="lim1-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.25s"><svg id="lim2-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.45s"><svg id="lim3-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.65s"><svg id="lim4-svg" viewBox="0 0 400 360"></svg></div>
+<div class="subcap"><b>(a) Data and compute</b><br>many examples, long training</div>
+<div class="subcap"><b>(b) Hard to explain</b><br>millions of weights, no simple rule to read</div>
+<div class="subcap"><b>(c) Bias in the data</b><br>a group seldom seen gets more errors</div>
+<div class="subcap"><b>(d) Energy</b><br>large models use a lot of electricity</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 14:</b>Before using a deep network, ask three questions. Would a simpler model do? Does the data represent the people it will serve? Must each decision be explained?</p>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Strengths and limits">
+<div class="hdr" data-s="Closing"></div>
+<h2>Strengths and limits</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Deep learning at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Limits</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Learns features from raw pixels, sound and text</td><td>Needs many labeled examples</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Best results on images, speech and language</td><td>Needs much computing power and energy</td></tr>
+<tr class="an-up" style="--d:.25s"><td>One recipe, layers plus gradient descent, fits many tasks</td><td>Hard to explain a single decision</td></tr>
+<tr class="an-up" style="--d:.35s"><td>A trained network can be reused for a new task</td><td>Many settings to tune: layers, units, <span class="tex">\alpha</span>, <span class="tex">B</span></td></tr>
+<tr class="an-up" style="--d:.45s"><td>Keeps improving with more data and larger models</td><td>Copies the bias in its training data</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>When there is a lot of data with structure, such as images, sound or text. For a small table of features, try the methods of chapter 3 first.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Deep learning learns the features itself, layer by layer, from raw data.</li>
+<li class="an-up" style="--d:.15s">A network chains simple layers: weighted sum, bias, activation <span class="tex">g</span>.</li>
+<li class="an-up" style="--d:.25s">Depth builds complex shapes from few units.</li>
+<li class="an-up" style="--d:.35s">Training lowers the cost <span class="tex">J(\boldsymbol{\theta})</span> by gradient descent; <span class="tex">\alpha</span> sets the step.</li>
+<li class="an-up" style="--d:.45s">The kind of data picks the architecture: CNNs for images, RNNs and Transformers for sequences.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>References</h2>
+<section>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Chapters 1 and 6. MIT Press.</li>
+<li style="margin:.4em 0">LeCun, Y., Bengio, Y., &amp; Hinton, G. (2015). Deep learning. <em>Nature</em>, 521(7553), 436-444.</li>
+<li style="margin:.4em 0">Rosenblatt, F. (1958). The perceptron: A probabilistic model for information storage and organization in the brain. <em>Psychological Review</em>, 65(6), 386-408.</li>
+<li style="margin:.4em 0">Rumelhart, D. E., Hinton, G. E., &amp; Williams, R. J. (1986). Learning representations by back-propagating errors. <em>Nature</em>, 323(6088), 533-536.</li>
+<li style="margin:.4em 0">LeCun, Y., Bottou, L., Bengio, Y., &amp; Haffner, P. (1998). Gradient-based learning applied to document recognition. <em>Proceedings of the IEEE</em>, 86(11), 2278-2324.</li>
+<li style="margin:.4em 0">Krizhevsky, A., Sutskever, I., &amp; Hinton, G. E. (2012). ImageNet classification with deep convolutional neural networks. <em>Advances in Neural Information Processing Systems</em>, 25.</li>
+<li style="margin:.4em 0">Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). Attention is all you need. <em>Advances in Neural Information Processing Systems</em>, 30.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 23: neural networks.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, lin, clamp, fmt, frame, legend, curvePath } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const relu = (z) => Math.max(0, z);
+const num = (v, d = 2) => fmt(v, d).replace('-', '−');
+function arrow(svg, x1, y1, x2, y2, accent) {
+  return el('path', { class: accent ? 'wire-a' : 'wire', d: `M${x1} ${y1}L${x2} ${y2}`, 'marker-end': accent ? 'url(#ah-a)' : 'url(#ah)' }, svg);
+}
+function box(svg, x, y, w, h, cls, l1, l2) {
+  el('rect', { class: cls, x, y, width: w, height: h, rx: 6 }, svg);
+  el('text', { class: 'tx', x: x + w / 2, y: y + h / 2 + (l2 ? -6 : 10), 'text-anchor': 'middle', 'font-weight': 600, text: l1 }, svg);
+  if (l2) el('text', { class: 'txs', x: x + w / 2, y: y + h / 2 + 30, 'text-anchor': 'middle', text: l2 }, svg);
+}
+/* a small face drawn in pixels */
+const FACE = ['...####...', '.##....##.', '.#......#.', '#..#..#..#', '#........#', '#...##...#', '#........#', '.#.#..#.#.', '.#..##..#.', '..######..'];
+function pixFace(svg, x, y, s, seed = 3) {
+  const r = rng(seed);
+  FACE.forEach((row, j) => [...row].forEach((c, i) => {
+    const o = c === '#' ? 0.75 + 0.2 * r() : 0.06 + 0.1 * r();
+    el('rect', { x: x + i * s, y: y + j * s, width: s - 1, height: s - 1, class: 'ink', style: `opacity:${o.toFixed(2)}` }, svg);
+  }));
+}
+/* a small layered network, used in icons and thumbnails */
+function miniNet(svg, cols, x0, x1, yc, h, r, clsFor) {
+  const xs = cols.map((_, i) => x0 + (i * (x1 - x0)) / (cols.length - 1));
+  const ys = cols.map((n) => Array.from({ length: n }, (_, j) => yc + (n === 1 ? 0 : -h / 2 + (j * h) / (n - 1))));
+  for (let i = 0; i < cols.length - 1; i++) ys[i].forEach((y) => ys[i + 1].forEach((y2) => el('line', { x1: xs[i], y1: y, x2: xs[i + 1], y2, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, svg)));
+  ys.forEach((col, i) => col.forEach((y) => el('circle', { cx: xs[i], cy: y, r, class: clsFor ? clsFor(i, cols.length) : (i === cols.length - 1 ? 'fb' : 'fa') }, svg)));
+}
+
+/* ───────── Part 1 figures ───────── */
+function drawPipes() {
+  const svg = $('pipe-svg');
+  el('text', { class: 'ttl', x: 20, y: 50, text: '(a) classic machine learning' }, svg);
+  pixFace(svg, 20, 80, 13);
+  arrow(svg, 158, 145, 202, 145);
+  box(svg, 210, 85, 330, 120, 'box-b', 'hand-made features', 'chosen by a person');
+  el('text', { class: 'txs ink3', x: 375, y: 245, 'text-anchor': 'middle', text: 'Topic 3: feature engineering' }, svg);
+  arrow(svg, 540, 145, 592, 145);
+  box(svg, 600, 85, 250, 120, 'box', 'model', 'line, tree, SVM');
+  arrow(svg, 850, 145, 902, 145);
+  el('text', { class: 'tx', x: 920, y: 155, 'font-weight': 700, text: '“face”' }, svg);
+  const g = el('g', { class: 'frag up', 'data-step': 'f1' }, svg);
+  el('text', { class: 'ttl', x: 20, y: 320, text: '(b) deep learning' }, g);
+  pixFace(g, 20, 350, 13);
+  arrow(g, 158, 415, 202, 415, true);
+  [['layer 1', 'edges'], ['layer 2', 'parts'], ['layer 3', 'objects']].forEach(([a, b], i) => {
+    box(g, 210 + i * 225, 355, 200, 120, 'box-a', a, b);
+    if (i < 2) arrow(g, 410 + i * 225, 415, 430 + i * 225, 415, true);
+  });
+  arrow(g, 860, 415, 902, 415, true);
+  el('text', { class: 'tx', x: 920, y: 425, 'font-weight': 700, text: '“face”' }, g);
+  el('path', { d: 'M210 492v14H860v-14', style: 'fill:none;stroke:var(--c-a);stroke-width:3' }, g);
+  el('text', { class: 'txs', x: 535, y: 548, 'text-anchor': 'middle', 'font-weight': 600, style: 'fill:var(--c-a)', text: 'features learned from the data' }, g);
+}
+
+function drawLayers() {
+  const next = (svg) => arrow(svg, 352, 190, 394, 190);
+  let svg = $('rep1-svg');
+  pixFace(svg, 50, 50, 28);
+  next(svg);
+  /* edges: small patches with oriented strokes */
+  svg = $('rep2-svg');
+  const ang = [0, 45, 90, 135, 30, 120, 90, 0, 60];
+  ang.forEach((a, k) => {
+    const i = k % 3, j = Math.floor(k / 3), cx = 85 + i * 95, cy = 95 + j * 95, t = (a * Math.PI) / 180;
+    el('rect', { class: 'box', x: cx - 40, y: cy - 40, width: 80, height: 80, rx: 4 }, svg);
+    el('path', { class: 'curve-a', d: `M${cx - 28 * Math.cos(t)} ${cy + 28 * Math.sin(t)}L${cx + 28 * Math.cos(t)} ${cy - 28 * Math.sin(t)}`, style: 'stroke-width:7' }, svg);
+  });
+  next(svg);
+  /* parts */
+  svg = $('rep3-svg');
+  [[110, 120], [250, 120], [110, 260], [250, 260]].forEach(([x, y]) => el('rect', { class: 'box', x: x - 62, y: y - 62, width: 124, height: 124, rx: 4 }, svg));
+  el('ellipse', { cx: 110, cy: 120, rx: 40, ry: 24, style: 'fill:none;stroke:var(--c-a);stroke-width:6' }, svg);
+  el('circle', { cx: 110, cy: 120, r: 11, class: 'ink' }, svg);
+  el('path', { class: 'curve-a', d: 'M250 80L228 150H268', style: 'stroke-width:6;stroke-linejoin:round' }, svg);
+  el('path', { class: 'curve-a', d: 'M70 245Q110 295 150 245', style: 'stroke-width:6' }, svg);
+  el('path', { class: 'curve-a', d: 'M210 275Q250 225 290 275', style: 'stroke-width:6' }, svg);
+  next(svg);
+  /* object */
+  svg = $('rep4-svg');
+  el('circle', { cx: 190, cy: 190, r: 140, class: 'box-a' }, svg);
+  [[140, 150], [240, 150]].forEach(([x, y]) => {
+    el('ellipse', { cx: x, cy: y, rx: 30, ry: 18, style: 'fill:var(--myst-color-bg);stroke:var(--c-a);stroke-width:5' }, svg);
+    el('circle', { cx: x, cy: y, r: 9, class: 'ink' }, svg);
+  });
+  el('path', { d: 'M190 170L176 220H204', style: 'fill:none;stroke:var(--myst-color-text);stroke-width:5;stroke-linejoin:round' }, svg);
+  el('path', { d: 'M135 250Q190 295 245 250', style: 'fill:none;stroke:var(--myst-color-text);stroke-width:6;stroke-linecap:round' }, svg);
+  el('text', { class: 'tx', x: 190, y: 385, 'text-anchor': 'middle', 'font-weight': 700, text: '“face”' }, svg);
+}
+
+function drawLayer() {
+  const svg = $('layer-svg');
+  const inY = [100, 330], uX = 560, R = 62;
+  [['x₁ = 1', inY[0]], ['x₂ = 2', inY[1]]].forEach(([t, y]) => box(svg, 30, y - 36, 130, 72, 'box', t));
+  /* edges: [from input, to unit, weight, label t] */
+  [[0, 0, '1', 0.5], [1, 1, '1', 0.5], [0, 1, '0.5', 0.28], [1, 0, '−2', 0.28]].forEach(([i, j, w, t]) => {
+    const x1 = 160, y1 = inY[i], x2 = uX - R - 6, y2 = inY[j];
+    el('path', { class: 'wire', d: `M${x1} ${y1}L${x2} ${y2}`, 'marker-end': 'url(#ah)' }, svg);
+    const lx = x1 + t * (x2 - x1), ly = y1 + t * (y2 - y1) + (i === j ? -14 : 9);
+    el('text', { class: 'tx halo', x: lx, y: ly, 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-a)', text: w }, svg);
+  });
+  const vals = [['z₁ = −2', 'a₁ = 0', 'b₁ = 1'], ['z₂ = 1.5', 'a₂ = 1.5', 'b₂ = −1']];
+  inY.forEach((y, j) => {
+    el('circle', { cx: uX, cy: y, r: R, class: 'box-a' }, svg);
+    el('text', { class: 'txs', x: uX, y: y + 9, 'text-anchor': 'middle', 'font-weight': 600, text: vals[j][0] }, svg);
+    el('text', { class: 'txs', x: uX, y: j ? y + R + 32 : y - R - 14, 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)', text: '+ ' + vals[j][2] }, svg);
+    arrow(svg, uX + R, y, uX + R + 52, y);
+    box(svg, uX + R + 60, y - 36, 150, 72, 'box-b', vals[j][1]);
+  });
+  /* ReLU plot */
+  const px = lin(-2, 2, 900, 1140), py = lin(-0.4, 2, 300, 60);
+  el('path', { class: 'ax', d: `M${px(-2)} ${py(0)}H${px(2)}M${px(0)} ${py(-0.4)}V${py(2)}` }, svg);
+  el('path', { class: 'curve-a', d: `M${px(-2)} ${py(0)}L${px(0)} ${py(0)}L${px(2)} ${py(2)}` }, svg);
+  el('circle', { cx: px(-2), cy: py(0), r: 10, class: 'fb pt' }, svg);
+  el('circle', { cx: px(1.5), cy: py(1.5), r: 10, class: 'fb pt' }, svg);
+  el('text', { class: 'tk', x: px(2), y: py(0) + 32, 'text-anchor': 'end', text: 'z' }, svg);
+  el('text', { class: 'txs', x: 1020, y: 360, 'text-anchor': 'middle', text: 'g(z) = max(0, z)' }, svg);
+}
+
+const CHAIN = { f1: (x) => 2 * x - 1, f2: relu, f3: (v) => 3 * v + 0.5 };
+const chainOut = (x) => CHAIN.f3(CHAIN.f2(CHAIN.f1(x)));
+
+function drawHistory() {
+  const svg = $('hist-svg');
+  const sx = (y) => 100 + (y - 1950) * 20, AY = 300;
+  el('rect', { class: 'zone', x: sx(1969), y: AY - 18, width: sx(1985) - sx(1969), height: 36 }, svg);
+  el('text', { class: 'txs ink3', x: sx(1977), y: AY - 64, 'text-anchor': 'middle', text: 'neural networks' }, svg);
+  el('text', { class: 'txs ink3', x: sx(1977), y: AY - 34, 'text-anchor': 'middle', text: 'out of favor' }, svg);
+  el('path', { class: 'ax', d: `M${sx(1948)} ${AY}H${sx(2026)}`, 'marker-end': 'url(#ah)' }, svg);
+  for (let y = 1950; y <= 2020; y += 10) {
+    el('line', { x1: sx(y), x2: sx(y), y1: AY - 8, y2: AY + 8, class: 'ax' }, svg);
+    el('text', { class: 'tk', x: sx(y), y: AY + 38, 'text-anchor': 'middle', text: y }, svg);
+  }
+  const EV = [[1958, 'Perceptron', 'one unit learns', 'a straight boundary', 1], [1986, 'Backpropagation', 'gradients train', 'several layers', 0], [1998, 'LeNet', 'a CNN reads', 'handwritten digits', 1], [2012, 'AlexNet', 'wins ImageNet:', 'error 26% → 15%', 0], [2017, 'Transformer', 'attention models', 'for language', 1]];
+  EV.forEach(([yr, name, d1, d2, up], i) => {
+    const x = sx(yr), g = el('g', { class: 'an-up', style: `--d:${(0.1 + i * 0.15).toFixed(2)}s` }, svg);
+    const top = up ? 50 : 380, h = 180;
+    el('line', { x1: x, x2: x, y1: up ? top + h : AY, y2: up ? AY : top, style: 'stroke:var(--c-a);stroke-width:2;stroke-dasharray:6 5' }, g);
+    el('rect', { class: 'box', x: x - 160, y: top, width: 320, height: h, rx: 6 }, g);
+    el('text', { x, y: top + 44, 'text-anchor': 'middle', style: 'font-size:32px;font-weight:700;fill:var(--c-a)', text: yr }, g);
+    el('text', { class: 'tx', x, y: top + 84, 'text-anchor': 'middle', 'font-weight': 600, text: name }, g);
+    el('text', { class: 'txs', x, y: top + 122, 'text-anchor': 'middle', text: d1 }, g);
+    el('text', { class: 'txs', x, y: top + 154, 'text-anchor': 'middle', text: d2 }, g);
+    el('circle', { cx: x, cy: AY, r: 12, class: 'fa pt' }, g);
+  });
+}
+
+/* ───────── Part 2 figures ───────── */
+function drawNow() {
+  /* (a) data */
+  let svg = $('now1-svg');
+  const r = rng(11);
+  const tiles = (x0, y0, n, s) => { for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) el('rect', { x: x0 + i * s, y: y0 + j * s, width: s - 3, height: s - 3, class: 'fa', style: `opacity:${(0.3 + 0.6 * r()).toFixed(2)}` }, svg); };
+  tiles(66, 216, 2, 24);
+  tiles(200, 120, 7, 24);
+  el('line', { class: 'ax', x1: 30, x2: 380, y1: 292, y2: 292 }, svg);
+  el('text', { class: 'txs', x: 90, y: 326, 'text-anchor': 'middle', text: '60 thousand' }, svg);
+  el('text', { class: 'tk', x: 90, y: 358, 'text-anchor': 'middle', text: '1998' }, svg);
+  el('text', { class: 'txs', x: 282, y: 326, 'text-anchor': 'middle', text: '1.2 million' }, svg);
+  el('text', { class: 'tk', x: 282, y: 358, 'text-anchor': 'middle', text: '2012' }, svg);
+  el('text', { class: 'ttl', x: 30, y: 60, text: 'labeled images' }, svg);
+  /* (b) compute */
+  svg = $('now2-svg');
+  el('rect', { class: 'box', x: 30, y: 140, width: 130, height: 130, rx: 6 }, svg);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) el('rect', { x: 45 + i * 52, y: 155 + j * 52, width: 46, height: 46, class: 'fh', style: 'opacity:.7' }, svg);
+  el('rect', { class: 'box-a', x: 200, y: 90, width: 180, height: 180, rx: 6 }, svg);
+  for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) el('rect', { x: 210 + i * 13.5, y: 100 + j * 13.5, width: 10, height: 10, class: 'fa', style: 'opacity:.75' }, svg);
+  el('text', { class: 'tx', x: 95, y: 316, 'text-anchor': 'middle', 'font-weight': 600, text: 'CPU' }, svg);
+  el('text', { class: 'tk', x: 95, y: 350, 'text-anchor': 'middle', text: 'few big cores' }, svg);
+  el('text', { class: 'tx', x: 290, y: 316, 'text-anchor': 'middle', 'font-weight': 600, text: 'GPU' }, svg);
+  el('text', { class: 'tk', x: 290, y: 350, 'text-anchor': 'middle', text: 'many small ones' }, svg);
+  /* (c) methods: sigmoid flattens, ReLU keeps a slope */
+  svg = $('now3-svg');
+  const px = lin(-4, 4, 40, 370), py = lin(-0.2, 3.2, 290, 50);
+  el('path', { class: 'ax', d: `M${px(-4)} ${py(0)}H${px(4)}M${px(0)} ${py(-0.2)}V${py(3.2)}` }, svg);
+  el('path', { class: 'curve-b', d: curvePath((z) => 1 / (1 + Math.exp(-2 * z)), -4, 4, px, py) }, svg);
+  el('path', { class: 'curve-a', d: curvePath(relu, -4, 3.15, px, py) }, svg);
+  el('text', { class: 'txs', x: px(-3.9), y: py(1) - 16, style: 'fill:var(--c-b)', 'font-weight': 600, text: 'sigmoid' }, svg);
+  el('text', { class: 'txs', x: px(1.4), y: py(2.9), style: 'fill:var(--c-a)', 'font-weight': 600, 'text-anchor': 'end', text: 'ReLU' }, svg);
+  el('text', { class: 'tk', x: 205, y: 340, 'text-anchor': 'middle', text: 'flat ends slow learning' }, svg);
+  /* (d) scale sketch */
+  svg = $('now4-svg');
+  const qx = lin(0, 10, 60, 380), qy = lin(0, 1, 290, 40);
+  el('path', { class: 'ax', d: `M${qx(0)} ${qy(1)}V${qy(0)}H${qx(10)}` }, svg);
+  el('path', { class: 'curve-b', d: curvePath((t) => 0.42 + 0.5 * Math.exp(-t / 1.6), 0, 10, qx, qy) }, svg);
+  el('path', { class: 'curve-a', d: curvePath((t) => 0.92 - 0.072 * t, 0, 10, qx, qy) }, svg);
+  el('text', { class: 'txs', x: qx(10), y: qy(0.72), 'text-anchor': 'end', style: 'fill:var(--c-b)', 'font-weight': 600, text: 'older methods' }, svg);
+  el('text', { class: 'txs', x: qx(10), y: qy(0.2) + 36, 'text-anchor': 'end', style: 'fill:var(--c-a)', 'font-weight': 600, text: 'deep networks' }, svg);
+  el('text', { class: 'tk', x: qx(5), y: 330, 'text-anchor': 'middle', text: 'amount of data' }, svg);
+  el('text', { class: 'tk', transform: `translate(36 ${qy(0.5)}) rotate(-90)`, 'text-anchor': 'middle', text: 'error' }, svg);
+}
+
+function drawCost() {
+  const svg = $('cost-svg');
+  const y = [1, 0, 2], yh = [0.8, 0.4, 1.5], L = y.map((v, i) => (v - yh[i]) ** 2);
+  const F = frame(svg, { W: 1160, H: 380, l: 110, r: 300, t: 30, b: 90, x: [-0.5, 2.5], y: [0, 0.3], yt: [0, 0.1, 0.2, 0.3], fy: (v) => v.toFixed(1), yl: 'loss' });
+  L.forEach((v, i) => {
+    el('rect', { x: F.sx(i) - 60, y: F.sy(v), width: 120, height: F.sy(0) - F.sy(v), class: 'fa an-growy', style: `--d:${(0.1 + i * 0.15).toFixed(2)}s;opacity:.8` }, F.plot);
+    el('text', { class: 'txs', x: F.sx(i), y: F.sy(v) - 12, 'text-anchor': 'middle', 'font-weight': 700, text: v.toFixed(2) }, svg);
+    el('text', { class: 'txs', x: F.sx(i), y: F.sy(0) + 36, 'text-anchor': 'middle', text: `y = ${y[i]}, ŷ = ${yh[i]}` }, svg);
+  });
+  el('line', { x1: F.L, x2: F.W - F.R, y1: F.sy(0.15), y2: F.sy(0.15), style: 'stroke:var(--c-b);stroke-width:4;stroke-dasharray:12 8' }, svg);
+  el('text', { class: 'tx', x: F.W - F.R + 20, y: F.sy(0.15) + 10, 'font-weight': 700, style: 'fill:var(--c-b)', text: 'J = 0.15' }, svg);
+  el('text', { class: 'txs ink3', x: F.W - F.R + 20, y: F.sy(0.15) + 46, text: 'average of' }, svg);
+  el('text', { class: 'txs ink3', x: F.W - F.R + 20, y: F.sy(0.15) + 76, text: 'the three bars' }, svg);
+}
+
+const JQ = (t) => (t - 3) ** 2;
+function drawStep() {
+  const svg = $('step-svg');
+  const F = frame(svg, { W: 1160, H: 440, l: 96, r: 24, t: 20, b: 80, x: [0, 6], y: [0, 9], xt: [0, 1, 2, 3, 4, 5, 6], yt: [0, 3, 6, 9], xl: 'θ', yl: 'J(θ)' });
+  el('path', { class: 'curve-a', d: curvePath(JQ, 0, 6, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-t', d: `M${F.sx(0.35)} ${F.sy(4 - 4 * (0.35 - 1))}L${F.sx(1.45)} ${F.sy(4 - 4 * 0.45)}` }, F.plot);
+  el('text', { class: 'txs', x: F.sx(0.45), y: F.sy(6.8), 'font-weight': 600, text: 'slope −4' }, svg);
+  const pts = [1, 1.4, 1.72];
+  for (let k = 0; k < 2; k++) el('path', { class: 'wire-a', d: `M${F.sx(pts[k]) + 8} ${F.sy(JQ(pts[k])) + 4}L${F.sx(pts[k + 1]) - 6} ${F.sy(JQ(pts[k + 1])) - 6}`, 'marker-end': 'url(#ah-a)', style: 'stroke-width:4' }, svg);
+  pts.forEach((t, k) => el('circle', { cx: F.sx(t), cy: F.sy(JQ(t)), r: k ? 10 : 13, class: k ? 'fa pt' : 'fb pt' }, svg));
+  el('text', { class: 'txs', x: F.sx(1) + 24, y: F.sy(4) - 8, 'font-weight': 600, text: 'θ = 1, J = 4' }, svg);
+  el('text', { class: 'txs', x: F.sx(1.4) + 26, y: F.sy(2.56) + 8, text: 'θ = 1.4, J = 2.56' }, svg);
+  el('text', { class: 'txs', x: F.sx(1.72) + 24, y: F.sy(1.64) + 8, text: 'θ = 1.72, J ≈ 1.64' }, svg);
+  el('circle', { cx: F.sx(3), cy: F.sy(0), r: 9, class: 'fc pt' }, svg);
+  el('text', { class: 'txs', x: F.sx(3), y: F.sy(0) - 20, 'text-anchor': 'middle', style: 'fill:var(--c-c)', 'font-weight': 600, text: 'minimum' }, svg);
+}
+
+function drawOverfit() {
+  const svg = $('over-svg');
+  const F = frame(svg, { W: 1160, H: 600, l: 96, r: 24, t: 30, b: 84, x: [0, 100], y: [0, 1.1], xt: [0, 25, 50, 75, 100], yt: [0, 0.5, 1], xl: 'epochs', yl: 'cost J', grid: false });
+  const tr = (x) => 0.9 * Math.exp(-x / 18) + 0.05, va = (x) => 0.9 * Math.exp(-x / 18) + 0.15 + 0.00006 * x * x;
+  let best = 0;
+  for (let x = 0; x <= 100; x += 0.1) if (va(x) < va(best)) best = x;
+  const g = el('g', { class: 'frag up', 'data-step': 'o1' }, svg);
+  el('rect', { class: 'zone', x: F.sx(best), y: F.T, width: F.W - F.R - F.sx(best), height: F.H - F.B - F.T }, g);
+  el('line', { x1: F.sx(best), x2: F.sx(best), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--c-c);stroke-width:3;stroke-dasharray:10 8' }, g);
+  el('text', { class: 'txs', x: F.sx(best) + 14, y: F.T + 34, 'font-weight': 600, style: 'fill:var(--c-c)', text: 'stop here' }, g);
+  el('text', { class: 'tx', x: F.sx(78), y: F.sy(0.62), 'text-anchor': 'middle', 'font-weight': 700, text: 'overfitting' }, g);
+  el('path', { class: 'curve-a', d: curvePath(tr, 0, 100, F.sx, F.sy) }, svg);
+  el('path', { class: 'curve-b', d: curvePath(va, 0, 100, F.sx, F.sy) }, svg);
+  el('circle', { cx: F.sx(best), cy: F.sy(va(best)), r: 10, class: 'fc pt' }, svg);
+  legend(svg, 760, 90, [['line', 'curve-a', 'training cost'], ['line', 'curve-b', 'validation cost']]);
+}
+
+/* ───────── Part 3 figures ───────── */
+function drawArch() {
+  const svg = $('arch-svg');
+  const W = 390, H = 300, G = 40;
+  const CARDS = [
+    ['Tables', 'Multilayer perceptron', 23, 'table'], ['Images', 'Convolutional network', 25, 'image'],
+    ['Sequences', 'Recurrent network', 26, 'seq'], ['Long text', 'Transformer', 31, 'text'],
+    ['Compression', 'Autoencoder', 27, 'ae'], ['New examples', 'GAN', 28, 'gan'],
+    ['Little data', 'Transfer learning', 29, 'tl'], ['Decisions', 'Deep RL', 30, 'rl'],
+  ];
+  CARDS.forEach(([data, arch, topic, kind], k) => {
+    const x = (k % 4) * (W + G), y = Math.floor(k / 4) * (H + 30);
+    const g = el('g', { class: 'an-up', style: `--d:${(0.05 + k * 0.08).toFixed(2)}s` }, svg);
+    el('rect', { class: 'box', x, y, width: W, height: H, rx: 8, style: 'fill:var(--myst-color-bg)' }, g);
+    icon(g, kind, x + W / 2, y + 95);
+    el('text', { class: 'tx', x: x + W / 2, y: y + 208, 'text-anchor': 'middle', 'font-weight': 700, text: data }, g);
+    el('text', { class: 'txs', x: x + W / 2, y: y + 246, 'text-anchor': 'middle', 'font-weight': 600, style: 'fill:var(--c-a)', text: '→ ' + arch }, g);
+    el('text', { class: 'tk', x: x + W / 2, y: y + 282, 'text-anchor': 'middle', text: 'Topic ' + topic }, g);
+  });
+}
+/* icons centered at (cx, cy), about 300 × 130 */
+function icon(g, kind, cx, cy) {
+  const r = rng(cx + cy);
+  if (kind === 'table') {
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) el('rect', { x: cx - 125 + i * 50, y: cy - 60 + j * 30, width: 50, height: 30, class: j === 0 ? 'box-a' : 'box', style: 'stroke-width:1.5' }, g);
+  } else if (kind === 'image') {
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) el('rect', { x: cx - 77 + i * 22, y: cy - 77 + j * 22, width: 20, height: 20, class: 'fa', style: `opacity:${(0.15 + 0.7 * r()).toFixed(2)}` }, g);
+    el('rect', { x: cx - 35, y: cy - 35, width: 66, height: 66, style: 'fill:none;stroke:var(--c-b);stroke-width:5' }, g);
+  } else if (kind === 'seq') {
+    for (let i = 0; i < 5; i++) {
+      el('circle', { cx: cx - 120 + i * 60, cy: cy + 10, r: 20, class: 'fa' }, g);
+      if (i < 4) el('path', { class: 'wire', d: `M${cx - 98 + i * 60} ${cy + 10}H${cx - 84 + i * 60}`, 'marker-end': 'url(#ah)' }, g);
+      el('path', { class: 'wire', d: `M${cx - 132 + i * 60} ${cy - 12}C${cx - 150 + i * 60} ${cy - 60} ${cx - 90 + i * 60} ${cy - 60} ${cx - 108 + i * 60} ${cy - 14}`, 'marker-end': 'url(#ah)', style: 'stroke-width:2' }, g);
+    }
+  } else if (kind === 'text') {
+    const words = ['the', 'cat', 'sat', 'down'], xs = words.map((_, i) => cx - 120 + i * 80);
+    [[0, 1], [1, 2], [0, 2], [2, 3], [1, 3]].forEach(([a, b]) => el('path', { d: `M${xs[a]} ${cy}Q${(xs[a] + xs[b]) / 2} ${cy - 40 - 30 * (b - a)} ${xs[b]} ${cy}`, style: 'fill:none;stroke:var(--c-b);stroke-width:3;opacity:.8' }, g));
+    words.forEach((w, i) => { el('rect', { class: 'box-a', x: xs[i] - 36, y: cy, width: 72, height: 44, rx: 4 }, g); el('text', { class: 'txs', x: xs[i], y: cy + 31, 'text-anchor': 'middle', text: w }, g); });
+  } else if (kind === 'ae') {
+    el('path', { d: `M${cx - 130} ${cy - 70}L${cx - 20} ${cy - 18}V${cy + 18}L${cx - 130} ${cy + 70}Z`, class: 'box-a' }, g);
+    el('path', { d: `M${cx + 130} ${cy - 70}L${cx + 20} ${cy - 18}V${cy + 18}L${cx + 130} ${cy + 70}Z`, class: 'box-a' }, g);
+    el('rect', { x: cx - 16, y: cy - 18, width: 32, height: 36, class: 'fb' }, g);
+  } else if (kind === 'gan') {
+    for (let i = 0; i < 30; i++) el('circle', { cx: cx - 140 + 90 * r(), cy: cy - 55 + 110 * r(), r: 5, class: 'fh' }, g);
+    arrow(g, cx - 40, cy, cx + 20, cy, true);
+    el('circle', { cx: cx + 90, cy, r: 55, class: 'box-a' }, g);
+    el('circle', { cx: cx + 72, cy: cy - 14, r: 7, class: 'ink' }, g);
+    el('circle', { cx: cx + 108, cy: cy - 14, r: 7, class: 'ink' }, g);
+    el('path', { d: `M${cx + 66} ${cy + 18}Q${cx + 90} ${cy + 38} ${cx + 114} ${cy + 18}`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:4' }, g);
+  } else if (kind === 'tl') {
+    for (let i = 0; i < 3; i++) el('rect', { x: cx - 140 + i * 70, y: cy - 55, width: 54, height: 110, rx: 4, class: 'fa', style: 'opacity:.75' }, g);
+    el('rect', { x: cx + 80, y: cy - 55, width: 54, height: 110, rx: 4, class: 'fb' }, g);
+    el('path', { d: `M${cx - 140} ${cy + 72}H${cx + 64}`, style: 'stroke:var(--c-a);stroke-width:3' }, g);
+  } else if (kind === 'rl') {
+    el('rect', { class: 'box-a', x: cx - 140, y: cy - 30, width: 100, height: 60, rx: 6 }, g);
+    el('rect', { class: 'box-b', x: cx + 40, y: cy - 30, width: 100, height: 60, rx: 6 }, g);
+    el('path', { class: 'wire-a', d: `M${cx - 90} ${cy - 32}C${cx - 60} ${cy - 85} ${cx + 60} ${cy - 85} ${cx + 88} ${cy - 36}`, 'marker-end': 'url(#ah-a)' }, g);
+    el('path', { class: 'wire', d: `M${cx + 90} ${cy + 32}C${cx + 60} ${cy + 85} ${cx - 60} ${cy + 85} ${cx - 88} ${cy + 36}`, 'marker-end': 'url(#ah)' }, g);
+  }
+}
+
+function drawThumbs() {
+  let svg = $('th-nn');
+  miniNet(svg, [3, 4, 4, 2], 30, 170, 28, 38, 6);
+  svg = $('th-ad');
+  [[30, 'fa'], [100, 'fa'], [170, 'fb']].forEach(([x, c]) => el('circle', { cx: x, cy: 28, r: 12, class: c }, svg));
+  el('path', { class: 'wire', d: 'M44 22H86M114 22H156', style: 'stroke-width:2' }, svg);
+  el('path', { d: 'M156 36H114M86 36H44', style: 'fill:none;stroke:var(--c-b);stroke-width:2.5;stroke-dasharray:5 4' }, svg);
+  svg = $('th-cnn');
+  const r = rng(4);
+  for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) el('rect', { x: 14 + i * 16, y: 4 + j * 16, width: 14, height: 14, class: 'fa', style: `opacity:${(0.15 + 0.6 * r()).toFixed(2)}` }, svg);
+  el('rect', { x: 44, y: 3, width: 48, height: 48, style: 'fill:none;stroke:var(--c-b);stroke-width:3' }, svg);
+  el('path', { class: 'wire', d: 'M160 28H178', 'marker-end': 'url(#ah)', style: 'stroke-width:2' }, svg);
+  el('rect', { x: 182, y: 20, width: 14, height: 14, class: 'fb' }, svg);
+  svg = $('th-rnn');
+  for (let i = 0; i < 4; i++) {
+    el('circle', { cx: 30 + i * 46, cy: 36, r: 11, class: 'fa' }, svg);
+    if (i < 3) el('line', { x1: 41 + i * 46, x2: 65 + i * 46, y1: 36, y2: 36, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2.5' }, svg);
+    el('path', { d: `M${22 + i * 46} 27C${16 + i * 46} 6 ${44 + i * 46} 6 ${38 + i * 46} 27`, style: 'fill:none;stroke:var(--c-b);stroke-width:2.5' }, svg);
+  }
+  svg = $('th-ae');
+  el('path', { d: 'M30 6L92 22V34L30 50Z', class: 'fa', style: 'opacity:.7' }, svg);
+  el('path', { d: 'M170 6L108 22V34L170 50Z', class: 'fa', style: 'opacity:.7' }, svg);
+  el('rect', { x: 93, y: 20, width: 14, height: 16, class: 'fb' }, svg);
+  svg = $('th-gan');
+  el('rect', { x: 20, y: 12, width: 60, height: 32, rx: 4, class: 'fa' }, svg);
+  el('rect', { x: 120, y: 12, width: 60, height: 32, rx: 4, class: 'fb' }, svg);
+  el('path', { class: 'wire', d: 'M84 22H114', 'marker-end': 'url(#ah)', style: 'stroke-width:2' }, svg);
+  el('path', { class: 'wire', d: 'M116 36H86', 'marker-end': 'url(#ah)', style: 'stroke-width:2' }, svg);
+  svg = $('th-tl');
+  for (let i = 0; i < 3; i++) el('rect', { x: 24 + i * 38, y: 8, width: 28, height: 40, rx: 3, class: 'fa', style: 'opacity:.7' }, svg);
+  el('rect', { x: 148, y: 8, width: 28, height: 40, rx: 3, class: 'fb' }, svg);
+  svg = $('th-drl');
+  el('rect', { x: 20, y: 16, width: 54, height: 26, rx: 4, class: 'fa' }, svg);
+  el('rect', { x: 126, y: 16, width: 54, height: 26, rx: 4, class: 'fb' }, svg);
+  el('path', { d: 'M50 14C70 -2 130 -2 150 12', style: 'fill:none;stroke:var(--c-a);stroke-width:2.5' }, svg);
+  el('path', { d: 'M150 44C130 60 70 60 50 46', style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:2.5' }, svg);
+  svg = $('th-tr');
+  const xs = [30, 77, 124, 171];
+  [[0, 1], [0, 2], [1, 3], [0, 3], [2, 3]].forEach(([a, b]) => el('path', { d: `M${xs[a]} 38Q${(xs[a] + xs[b]) / 2} ${30 - 10 * (b - a)} ${xs[b]} 38`, style: 'fill:none;stroke:var(--c-b);stroke-width:2' }, svg));
+  xs.forEach((x) => el('rect', { x: x - 16, y: 38, width: 32, height: 14, rx: 2, class: 'fa' }, svg));
+}
+
+function drawLimits() {
+  /* (a) data and compute */
+  let svg = $('lim1-svg');
+  const r = rng(21);
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) el('rect', { x: 30 + i * 22, y: 70 + j * 22, width: 19, height: 19, class: 'fa', style: `opacity:${(0.2 + 0.6 * r()).toFixed(2)}` }, svg);
+  el('text', { class: 'tx', x: 228, y: 170, 'font-weight': 700, text: '+' }, svg);
+  el('rect', { class: 'box-a', x: 260, y: 100, width: 120, height: 120, rx: 6 }, svg);
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) el('rect', { x: 270 + i * 17, y: 110 + j * 17, width: 13, height: 13, class: 'fa', style: 'opacity:.7' }, svg);
+  el('text', { class: 'txs', x: 200, y: 310, 'text-anchor': 'middle', text: 'days of training' }, svg);
+  /* (b) black box */
+  svg = $('lim2-svg');
+  el('path', { class: 'wire', d: 'M20 160H92', 'marker-end': 'url(#ah)' }, svg);
+  el('rect', { x: 100, y: 60, width: 200, height: 200, rx: 8, class: 'ink', style: 'opacity:.85' }, svg);
+  el('text', { x: 200, y: 190, 'text-anchor': 'middle', style: 'font-size:96px;font-weight:700;fill:var(--myst-color-bg)', text: '?' }, svg);
+  el('path', { class: 'wire', d: 'M300 160H372', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: 40, y: 140, 'text-anchor': 'middle', text: 'x' }, svg);
+  el('text', { class: 'txs', x: 360, y: 140, 'text-anchor': 'middle', text: 'ŷ' }, svg);
+  el('text', { class: 'txs', x: 200, y: 310, 'text-anchor': 'middle', text: 'why this answer?' }, svg);
+  /* (c) bias */
+  svg = $('lim3-svg');
+  el('text', { class: 'ttl', x: 30, y: 50, text: 'training data' }, svg);
+  for (let i = 0; i < 18; i++) el('circle', { cx: 50 + (i % 6) * 44, cy: 90 + Math.floor(i / 6) * 44, r: 15, class: 'fa' }, svg);
+  el('circle', { cx: 50 + 6 * 44, cy: 90, r: 15, class: 'fb' }, svg);
+  el('text', { class: 'ttl', x: 30, y: 250, text: 'errors after training' }, svg);
+  el('rect', { x: 50, y: 270, width: 40, height: 22, class: 'fa' }, svg);
+  el('rect', { x: 50, y: 300, width: 220, height: 22, class: 'fb' }, svg);
+  el('text', { class: 'tk', x: 100, y: 290, text: 'common group' }, svg);
+  el('text', { class: 'tk', x: 280, y: 320, text: 'rare' }, svg);
+  /* (d) energy */
+  svg = $('lim4-svg');
+  el('path', { d: 'M215 30L120 180H190L165 310L280 140H205L240 30Z', style: 'fill:var(--c-b-soft);stroke:var(--c-b);stroke-width:5;stroke-linejoin:round' }, svg);
+  el('text', { class: 'txs', x: 200, y: 345, 'text-anchor': 'middle', text: 'power to train and to run' }, svg);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.chain = (() => {
+  const svg = $('chain-svg');
+  const Y = 90;
+  el('circle', { cx: 60, cy: Y, r: 40, class: 'box' }, svg);
+  el('text', { class: 'tx', x: 60, y: Y + 10, 'text-anchor': 'middle', 'font-weight': 700, text: 'x' }, svg);
+  [['f⁽¹⁾', '2x − 1', 180], ['f⁽²⁾', 'max(0, u)', 470], ['f⁽³⁾', '3v + 0.5', 760]].forEach(([a, b, x]) => box(svg, x, Y - 55, 220, 110, 'box-a', a, b));
+  el('circle', { cx: 1100, cy: Y, r: 44, class: 'box-b' }, svg);
+  el('text', { class: 'tx', x: 1100, y: Y + 10, 'text-anchor': 'middle', 'font-weight': 700, text: 'ŷ' }, svg);
+  [[100, 172], [400, 462], [690, 752], [980, 1048]].forEach(([a, b]) => arrow(svg, a, Y, b, Y));
+  const lab = [[60, 'x'], [430, 'u'], [720, 'v'], [1100, 'ŷ']].map(([x, n]) => el('text', { class: 'txs', x, y: Y + 98, 'text-anchor': 'middle', 'font-weight': 700, style: `fill:var(--c-${n === 'ŷ' ? 'b' : 'a'})`, text: '' }, svg));
+  const F = frame(svg, { W: 1160, H: 470, l: 96, r: 24, t: 240, b: 50, x: [-2, 3], y: [0, 16], xt: [-2, -1, 0, 1, 2, 3], yt: [0, 5, 10, 15], yl: 'ŷ' });
+  el('path', { class: 'curve-a', d: curvePath(chainOut, -2, 3, F.sx, F.sy) }, F.plot);
+  const guide = el('path', { class: 'curve-t', d: '' }, svg);
+  const dot = el('circle', { r: 12, class: 'fb pt' }, svg);
+  const inp = $('ch-in');
+  function draw() {
+    const x = +inp.value, u = CHAIN.f1(x), v = CHAIN.f2(u), y = CHAIN.f3(v);
+    [['x', x], ['u', u], ['v', v], ['ŷ', y]].forEach(([n, val], i) => { lab[i].textContent = `${n} = ${num(val)}`; });
+    dot.setAttribute('cx', F.sx(x)); dot.setAttribute('cy', F.sy(y));
+    guide.setAttribute('d', `M${F.sx(x)} ${F.sy(0)}V${F.sy(y)}H${F.L}`);
+    $('ch-val').textContent = num(x);
+    $('ch-y').textContent = num(y);
+  }
+  inp.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.depth = (() => {
+  const svg = $('depth-svg');
+  const net = el('g', {}, svg);
+  const F = frame(svg, { W: 1160, H: 700, l: 96, r: 24, t: 220, b: 80, x: [0, 1], y: [0, 1], xt: [0, 0.25, 0.5, 0.75, 1], yt: [0, 0.5, 1], xl: 'input x', yl: 'output' });
+  const curve = el('path', { class: 'curve-a', d: '' }, F.plot);
+  const tent = (x) => 2 * relu(x) - 4 * relu(x - 0.5);
+  const inp = $('dp-in');
+  function draw() {
+    const L = +inp.value;
+    clear(net);
+    const nodeX = [60, ...Array.from({ length: L }, (_, k) => 200 + ((k + 0.5) * 800) / L), 1100];
+    const nodeY = nodeX.map((_, i) => (i === 0 || i === L + 1 ? [100] : [60, 140]));
+    for (let i = 0; i < nodeX.length - 1; i++) nodeY[i].forEach((y1) => nodeY[i + 1].forEach((y2) => el('line', { x1: nodeX[i], y1, x2: nodeX[i + 1], y2, style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, net)));
+    nodeX.forEach((x, i) => nodeY[i].forEach((y) => el('circle', { cx: x, cy: y, r: i === 0 || i === L + 1 ? 26 : 18, class: i === 0 ? 'box' : i === L + 1 ? 'box-b' : 'fa' }, net)));
+    el('text', { class: 'txs', x: 60, y: 108, 'text-anchor': 'middle', 'font-weight': 700, text: 'x' }, net);
+    el('text', { class: 'txs', x: 1100, y: 108, 'text-anchor': 'middle', 'font-weight': 700, text: 'ŷ' }, net);
+    curve.setAttribute('d', curvePath((x) => { let v = x; for (let k = 0; k < L; k++) v = tent(v); return v; }, 0, 1, F.sx, F.sy, 2048));
+    $('dp-val').textContent = L;
+    $('dp-u').textContent = 2 * L;
+    $('dp-p').textContent = 2 ** L;
+    $('dp-w').textContent = 2 ** L - 1;
+  }
+  inp.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.gd = (() => {
+  const svg = $('gd-svg'), svj = $('gdj-svg');
+  const T0 = -0.5, KMAX = 30;
+  const F = frame(svg, { W: 1160, H: 470, l: 96, r: 24, t: 20, b: 80, x: [-1, 7], y: [0, 16], xt: [-1, 0, 1, 2, 3, 4, 5, 6, 7], yt: [0, 4, 8, 12, 16], xl: 'θ', yl: 'J(θ)' });
+  el('path', { class: 'curve-a', d: curvePath(JQ, -1, 7, F.sx, F.sy) }, F.plot);
+  const trail = el('path', { d: '', style: 'fill:none;stroke:var(--c-b);stroke-width:3;stroke-dasharray:8 6' }, F.plot);
+  const dots = el('g', {}, F.plot);
+  const ball = el('circle', { r: 18, class: 'fb pt', style: 'stroke-width:4' }, svg);
+  const msg = el('text', { class: 'txs', x: F.W - F.R - 12, y: F.T + 36, 'text-anchor': 'end', 'font-weight': 700, text: '' }, svg);
+  const G = frame(svj, { W: 1160, H: 220, l: 96, r: 24, t: 16, b: 50, x: [-0.6, KMAX + 0.6], y: [0, 16], xt: [0, 5, 10, 15, 20, 25, 30], yt: [0, 8, 16], yl: 'J' });
+  el('text', { class: 'tk', x: G.W - G.R, y: G.T + 24, 'text-anchor': 'end', text: 'cost after each step' }, svj);
+  const bars = el('g', {}, G.plot);
+  const inp = $('gd-in');
+  let path, timer = null;
+  const view = (t) => clamp(t, -1.3, 7.3);
+  function draw() {
+    const t = path[path.length - 1], k = path.length - 1;
+    const pts = path.map((p) => [F.sx(view(p)), F.sy(Math.min(17, JQ(p)))]);
+    trail.setAttribute('d', pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(''));
+    clear(dots);
+    pts.slice(0, -1).forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 7, class: 'fb', style: 'opacity:.5' }, dots));
+    ball.setAttribute('cx', pts[k][0]); ball.setAttribute('cy', pts[k][1]);
+    clear(bars);
+    path.forEach((p, i) => { const v = Math.min(16, JQ(p)); el('rect', { x: G.sx(i) - 12, y: G.sy(v), width: 24, height: G.sy(0) - G.sy(v), class: 'fb', style: 'opacity:.75' }, bars); });
+    const diverge = k > 1 && JQ(t) > JQ(path[k - 1]) + 1e-9;
+    msg.textContent = diverge ? 'diverging: J grows each step' : k && JQ(t) < 1e-4 ? 'reached the minimum' : '';
+    msg.style.fill = diverge ? 'var(--c-b)' : 'var(--c-c)';
+    $('gd-k').textContent = k;
+    $('gd-t').textContent = num(t);
+    $('gd-j').textContent = num(JQ(t));
+    $('gd-val').textContent = (+inp.value).toFixed(2);
+  }
+  function step() {
+    if (path.length > KMAX) return false;
+    const t = path[path.length - 1];
+    path.push(t - +inp.value * 2 * (t - 3));
+    draw();
+    return path.length <= KMAX;
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function reset() { stop(); path = [T0]; draw(); }
+  $('gd-step').addEventListener('click', () => { stop(); step(); });
+  $('gd-run').addEventListener('click', () => {
+    if (timer) return;
+    if (path.length > KMAX) reset();
+    if (REDUCED) { while (step()); return; }
+    timer = setInterval(() => { if (!step()) stop(); }, 200);
+  });
+  $('gd-reset').addEventListener('click', reset);
+  inp.addEventListener('input', reset);
+  reset();
+  for (let i = 0; i < 6; i++) step();
+  return {};
+})();
+
+DEMOS.fit = (() => {
+  const svg = $('fit-svg');
+  /* data: 160 points, blue inside a circle of radius 1.3 */
+  const r0 = rng(7), X = [], Y = [];
+  for (let i = 0; i < 160; i++) { const p = [r0() * 4 - 2, r0() * 4 - 2]; X.push(p); Y.push(p[0] ** 2 + p[1] ** 2 < 1.69 ? 1 : 0); }
+  const F = frame(svg, { W: 700, H: 700, l: 70, r: 20, t: 10, b: 64, x: [-2, 2], y: [-2, 2], xt: [-2, -1, 0, 1, 2], yt: [-2, -1, 0, 1, 2], grid: false });
+  const NG = 40, cells = [];
+  const cw = (F.W - F.R - F.L) / NG, ch = (F.H - F.B - F.T) / NG;
+  for (let i = 0; i < NG; i++) for (let j = 0; j < NG; j++) cells.push({ x: [-2 + (i + 0.5) * 4 / NG, 2 - (j + 0.5) * 4 / NG], el: el('rect', { x: F.L + i * cw, y: F.T + j * ch, width: cw, height: ch, 'shape-rendering': 'crispEdges' }, F.plot) });
+  el('circle', { cx: F.sx(0), cy: F.sy(0), r: F.sx(1.3) - F.sx(0), style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:6 6' }, F.plot);
+  X.forEach((p, i) => el('circle', { cx: F.sx(p[0]), cy: F.sy(p[1]), r: 8, class: (Y[i] ? 'fa' : 'fb') + ' pt' }, F.plot));
+  /* right panel: network sketch and cost curve */
+  el('text', { class: 'ttl', x: 740, y: 36, text: 'the network' }, svg);
+  const netG = el('g', {}, svg);
+  el('text', { class: 'ttl', x: 740, y: 430, text: 'cost J while training' }, svg);
+  const cx0 = 760, cx1 = 1140, cy0 = 450, cy1 = 630;
+  el('path', { class: 'ax', d: `M${cx0} ${cy0}V${cy1}H${cx1}` }, svg);
+  el('text', { class: 'tk', x: cx1, y: cy1 + 30, 'text-anchor': 'end', text: 'training steps' }, svg);
+  const jcurve = el('path', { class: 'curve-b', d: '', style: 'stroke-width:4' }, svg);
+
+  /* a small network: tanh hidden layers, sigmoid output, cross-entropy cost, Adam-style gradient steps */
+  function makeNet(sizes, seed) {
+    const r = rng(seed), L = sizes.length - 1, W = [], b = [];
+    for (let l = 0; l < L; l++) {
+      const m = sizes[l], n = sizes[l + 1];
+      W.push(Float64Array.from({ length: n * m }, () => (gauss(r) * 1.5) / Math.sqrt(m)));
+      b.push(Float64Array.from({ length: n }, () => 0.5 * gauss(r)));
+    }
+    const P = [...W, ...b], M = P.map((p) => new Float64Array(p.length)), V = P.map((p) => new Float64Array(p.length));
+    let t = 0;
+    function forward(x) {
+      const A = [x];
+      for (let l = 0; l < L; l++) {
+        const m = sizes[l], n = sizes[l + 1], a = A[l], out = new Float64Array(n);
+        for (let j = 0; j < n; j++) {
+          let z = b[l][j];
+          for (let k = 0; k < m; k++) z += W[l][j * m + k] * a[k];
+          out[j] = l < L - 1 ? Math.tanh(z) : 1 / (1 + Math.exp(-z));
+        }
+        A.push(out);
+      }
+      return A;
+    }
+    function train(lr) {
+      const Gr = P.map((p) => new Float64Array(p.length));
+      let J = 0;
+      X.forEach((x, i) => {
+        const A = forward(x), p = clamp(A[L][0], 1e-9, 1 - 1e-9);
+        J -= Y[i] ? Math.log(p) : Math.log(1 - p);
+        let d = [A[L][0] - Y[i]];
+        for (let l = L - 1; l >= 0; l--) {
+          const m = sizes[l], gw = Gr[l], gb = Gr[L + l];
+          d.forEach((dj, j) => { gb[j] += dj; for (let k = 0; k < m; k++) gw[j * m + k] += dj * A[l][k]; });
+          if (l > 0) {
+            const nd = new Array(m).fill(0);
+            d.forEach((dj, j) => { for (let k = 0; k < m; k++) nd[k] += W[l][j * m + k] * dj; });
+            d = nd.map((v, k) => v * (1 - A[l][k] ** 2));
+          }
+        }
+      });
+      t += 1;
+      const n = X.length, b1 = 0.9, b2 = 0.999;
+      P.forEach((p, q) => {
+        for (let i = 0; i < p.length; i++) {
+          const g = Gr[q][i] / n;
+          M[q][i] = b1 * M[q][i] + (1 - b1) * g;
+          V[q][i] = b2 * V[q][i] + (1 - b2) * g * g;
+          p[i] -= (lr * (M[q][i] / (1 - b1 ** t))) / (Math.sqrt(V[q][i] / (1 - b2 ** t)) + 1e-8);
+        }
+      });
+      return J / n;
+    }
+    return { forward, train, L, count: P.reduce((s, p) => s + p.length, 0) };
+  }
+
+  const ITERS = 1500, PER_FRAME = 25;
+  const hIn = $('fit-h'), lIn = $('fit-l');
+  let seed = 1, net, hist, it, anim = null;
+  function drawNet(h, nl) {
+    clear(netG);
+    const cols = [2, ...Array(nl).fill(h), 1];
+    const xs = cols.map((_, i) => 790 + (i * 320) / (cols.length - 1));
+    const ys = cols.map((n) => Array.from({ length: n }, (_, j) => 195 + (n === 1 ? 0 : -125 + (j * 250) / (n - 1))));
+    for (let i = 0; i < cols.length - 1; i++) ys[i].forEach((y1) => ys[i + 1].forEach((y2) => el('line', { x1: xs[i], y1, x2: xs[i + 1], y2, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, netG)));
+    ys.forEach((col, i) => col.forEach((y) => el('circle', { cx: xs[i], cy: y, r: 14, class: i === 0 ? 'box' : i === cols.length - 1 ? 'box-b' : 'fa' }, netG)));
+    el('text', { class: 'tk', x: xs[0], y: 362, 'text-anchor': 'middle', text: 'input' }, netG);
+    el('text', { class: 'tk', x: xs[cols.length - 1], y: 362, 'text-anchor': 'middle', text: 'output' }, netG);
+  }
+  function paint(J) {
+    cells.forEach((c) => {
+      const p = net.forward(c.x)[net.L][0];
+      c.el.setAttribute('class', p > 0.5 ? 'fa' : 'fb');
+      c.el.style.opacity = (0.06 + 0.4 * Math.abs(2 * p - 1)).toFixed(3);
+    });
+    const acc = X.filter((x, i) => (net.forward(x)[net.L][0] > 0.5 ? 1 : 0) === Y[i]).length / X.length;
+    $('fit-acc').textContent = Math.round(acc * 100) + '%';
+    $('fit-j').textContent = fmt(J, 3);
+    const sx = lin(0, ITERS, cx0, cx1), sy = lin(0, 0.8, cy1, cy0);
+    jcurve.setAttribute('d', hist.map((v, k) => (k ? 'L' : 'M') + sx(k * PER_FRAME).toFixed(1) + ' ' + sy(Math.min(0.8, v)).toFixed(1)).join(''));
+  }
+  function start(animate) {
+    if (anim) { cancelAnimationFrame(anim); anim = null; }
+    const h = +hIn.value, nl = +lIn.value;
+    $('fit-h-val').textContent = h; $('fit-l-val').textContent = nl;
+    net = makeNet([2, ...Array(nl).fill(h), 1], seed);
+    $('fit-p').textContent = net.count;
+    drawNet(h, nl);
+    hist = []; it = 0;
+    const chunk = () => { let J = 0; for (let k = 0; k < PER_FRAME; k++) J = net.train(0.05); it += PER_FRAME; hist.push(J); return J; };
+    if (!animate || REDUCED) { let J = 0; while (it < ITERS) J = chunk(); paint(J); return; }
+    const go = () => { const J = chunk(); paint(J); anim = it < ITERS ? requestAnimationFrame(go) : null; };
+    go();
+  }
+  hIn.addEventListener('input', () => start(true));
+  lIn.addEventListener('input', () => start(true));
+  $('fit-train').addEventListener('click', () => { seed += 1; start(true); });
+  start(false);
+  return {};
+})();
+
+drawPipes(); drawLayers(); drawLayer(); drawHistory(); drawNow(); drawCost(); drawStep(); drawOverfit(); drawArch(); drawThumbs(); drawLimits();
+})();
+</script>
+</body>
+</html>

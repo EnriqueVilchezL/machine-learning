@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logistic regression</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 11</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Logistic regression</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">A classifier that outputs a probability, and how to turn that probability into a decision</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 11 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why a straight line fails for yes/no answers</li>
+<li class="an-up" style="--d:.15s">The S-curve and how it is learned</li>
+<li class="an-up" style="--d:.25s">From probability to decision: the threshold</li>
+<li class="an-up" style="--d:.35s">Boundaries, weights and more classes</li>
+<li class="an-up" style="--d:.45s">When a straight boundary is not enough</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i \in \{0, 1\}</span></td><td>Its label: 1 for “yes”, 0 for “no”</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its predicted class</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\boldsymbol{\theta} = (\theta_0, \theta_1, \dots, \theta_d)</span></td><td>Weights: intercept <span class="tex">\theta_0</span> and one weight per feature</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">z = \boldsymbol{\theta}^\top \mathbf{x}</span></td><td>Score: the weighted sum of the features</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">p = \sigma(z) = P(y = 1 \mid \mathbf{x})</span></td><td>Probability of “yes”, given by the S-curve <span class="tex">\sigma</span></td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">J(\boldsymbol{\theta})</span></td><td>Cost: the average log-loss</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p><span class="tex">P(y = 1 \mid \mathbf{x})</span> reads “the probability that <span class="tex">y</span> is 1, given <span class="tex">\mathbf{x}</span>”.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">From scores to probabilities</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Squash any number into a value between 0 and 1.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A classifier">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>A classifier, despite the name</h2>
+<div class="fr">
+<div class="figbox"><svg id="pipe-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Linear regression (Topic 9) predicts a number. Logistic regression answers a yes/no question.</p>
+<p class="small frag up" style="margin:0">Its output is a <strong>probability</strong> of “yes”. A rule then turns it into the final answer.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>Two yes/no questions. The model gives a probability; 50% or more means “yes”.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Straight line fails">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>Why a straight line fails</h2>
+<div class="fr">
+<div class="figbox"><svg id="line-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Code the answer as 1 (pass) and 0 (fail) and fit a straight line. The line keeps going: it predicts more than 100% and less than 0%.</p>
+<p class="small frag up" style="margin:0">An <strong>S-curve</strong> stays between 0 and 1. It is flat where the answer is clear and bends where it changes.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>32 synthetic students. A straight line (orange) against an S-curve (blue).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The S-curve" data-demo="sig">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>The S-curve</h2>
+<div class="fr">
+<div class="figbox"><svg id="sig-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">The S-curve (sigmoid) turns a score into a probability:</p>
+<div class="small" style="text-align:center"><span class="tex">p = \dfrac{1}{1 + e^{-\text{score}}}</span></div>
+<div class="ctl"><label><span>Steepness</span><b id="sig-k-val">1.0</b></label><input type="range" id="sig-k" min="0.2" max="5" step="0.1" value="1"></div>
+<div class="ctl"><label><span>Position (50% point)</span><b id="sig-m-val">3.0 h</b></label><input type="range" id="sig-m" min="0" max="10" step="0.1" value="3"></div>
+<div class="ro"><span>Fit to the data</span><b id="sig-fit" class="a">0%</b></div>
+<div class="btns"><button class="bt" id="sig-best">Best fit</button><button class="bt chip" id="sig-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Students of Figure 2. Here the score is steepness × (hours − position).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Model formula">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>The model as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">First a linear score, as in linear regression:</p>
+<div class="eq"><div class="m tex-d">z = \theta_0 + \theta_1 x_1 + \cdots + \theta_d x_d = \boldsymbol{\theta}^\top \mathbf{x}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="m1" style="margin:0">Then the sigmoid squashes any score into a number between 0 and 1:</p>
+<div class="eq frag up" data-step="m1"><div class="m tex-d">\sigma(z) = \frac{1}{1 + e^{-z}}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="m2" style="margin:0">The result is read as the probability of “yes”:</p>
+<div class="eq frag up" data-step="m2"><div class="m tex-d">P(y = 1 \mid \mathbf{x}) = \sigma(\boldsymbol{\theta}^\top \mathbf{x})</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 3 with steepness 1 and position 3 is <span class="tex">\theta_0 = -3</span>, <span class="tex">\theta_1 = 1</span>.</p><p>A student who studies 5 hours:</p><p><span class="tex">z = -3 + 1 \cdot 5 = 2</span></p><p><span class="tex">\sigma(2) = \tfrac{1}{1 + e^{-2}} \approx 0.88</span></p></aside>
+<aside class="am frag up" data-step="m2"><div class="t">Shape</div><p><span class="tex">\sigma(0) = 0.5</span>. Large positive scores give values near 1, large negative scores near 0.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Learning the curve">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>Learning the curve</h2>
+<div class="figbox"><svg id="learn-svg" viewBox="0 0 1680 640"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 4:</b>Each gray segment is the gap between a student’s real result and the curve. Learning chooses the curve that makes the real results as likely as possible, so the gaps shrink.</p>
+</section>
+
+<section class="s ats-prose" data-label="Log-loss">
+<div class="hdr" data-s="Probabilities"></div>
+<h2>The log-loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">With <span class="tex">p_i = \sigma(\boldsymbol{\theta}^\top \mathbf{x}_i)</span>, the cost averages a penalty over the <span class="tex">n</span> examples:</p>
+<div class="eq"><div class="m tex-d">J(\boldsymbol{\theta}) = -\frac{1}{n} \sum_{i=1}^{n} \Big[ y_i \log p_i + (1 - y_i) \log (1 - p_i) \Big]</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="g1" style="margin:0">Only one term is active per example: <span class="tex">-\log p_i</span> when <span class="tex">y_i = 1</span>, and <span class="tex">-\log(1 - p_i)</span> when <span class="tex">y_i = 0</span>. A confident wrong answer costs a lot.</p>
+<p class="small frag up" data-step="g2" style="margin:16px 0 0">Gradient descent lowers <span class="tex">J</span> step by step. Each weight moves against the slope of the cost, with step size <span class="tex">\alpha</span>:</p>
+<div class="eq frag up" data-step="g2"><div class="m tex-d">\theta_j \leftarrow \theta_j - \alpha \, \frac{1}{n} \sum_{i=1}^{n} (p_i - y_i) \, x_{ij}</div><div class="n">(5)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A student who passed (<span class="tex">y = 1</span>), natural log:</p><p><span class="tex">p = 0.9: \ -\log 0.9 \approx 0.11</span></p><p><span class="tex">p = 0.1: \ -\log 0.1 \approx 2.30</span></p></aside>
+<aside class="am frag up" data-step="g2"><div class="t">In words</div><p><span class="tex">p_i - y_i</span> is the gap of Figure 4. Large gaps move the weights more; when all gaps are small, learning stops.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">From probability to decision</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A threshold turns a probability into a yes or a no.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing a threshold" data-demo="thr">
+<div class="hdr" data-s="Decisions"></div>
+<h2>Choosing a threshold</h2>
+<div class="fr">
+<div class="figbox"><svg id="thr-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">The test says “positive” when the probability reaches the threshold.</p>
+<div class="ctl"><label><span>Threshold</span><b id="thr-t-val">50%</b></label><input type="range" id="thr-t" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+<div class="ro"><span>Accuracy</span><b id="thr-acc">0%</b></div>
+<div class="ro"><span>Precision</span><b id="thr-prec" class="a">0%</b></div>
+<div class="ro"><span>Recall</span><b id="thr-rec" class="bb">0%</b></div>
+<p class="small" style="margin:0"><strong>Precision:</strong> of those flagged, how many are sick. <strong>Recall:</strong> of the sick, how many are flagged.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>60 synthetic patients, 20 sick. Bottom: the confusion matrix.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Decision rule">
+<div class="hdr" data-s="Decisions"></div>
+<h2>The decision rule</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">With a threshold <span class="tex">t</span>, the model answers “yes” when the probability reaches it:</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \begin{cases} 1 & \text{if } \sigma(z) \ge t \\ 0 & \text{otherwise} \end{cases}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="d1" style="margin:0">Since <span class="tex">\sigma(0) = 0.5</span>, the default threshold <span class="tex">t = 0.5</span> is the same as checking the sign of the score:</p>
+<div class="eq frag up" data-step="d1"><div class="m tex-d">\sigma(z) \ge 0.5 \iff z = \boldsymbol{\theta}^\top \mathbf{x} \ge 0</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="d2" style="margin:0">The points with <span class="tex">\boldsymbol{\theta}^\top \mathbf{x} = 0</span> form the <strong>decision boundary</strong>: a straight line with two features, as in Figure 6.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>With <span class="tex">z = -3 + x</span> (hours studied):</p><p><span class="tex">t = 0.5</span>: “pass” when <span class="tex">x \ge 3</span>.</p><p><span class="tex">t = 0.8</span>: <span class="tex">z \ge \log 4 \approx 1.39</span>, so “pass” when <span class="tex">x \ge 4.39</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Cost of mistakes">
+<div class="hdr" data-s="Decisions"></div>
+<h2>The cost of mistakes</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>The worse mistake decides where to put the threshold.</p>
+<table class="tb">
+<colgroup><col style="width:24%"><col style="width:42%"><col style="width:34%"></colgroup>
+<thead><tr><th>Task</th><th>Worse mistake</th><th>Threshold</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Medical screening</strong></td><td>Sending a sick patient home</td><td>Low, for high recall</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Spam filter</strong></td><td>Hiding a real email in the spam folder</td><td>High, for high precision</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Free tutoring offer</strong></td><td>Missing a student who will fail</td><td>Low: an extra offer is cheap</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Fraud alert</strong></td><td>Both cost money</td><td>In between, from the two costs</td></tr>
+</tbody>
+</table>
+<aside class="adm k-tip sm frag up" style="margin-top:32px"><div class="h"><i data-i="hint"></i><span>Rule of thumb</span></div><div class="b"><p>50% is only a default. Choose the threshold from the cost of each mistake, using validation data, never the test set.</p></div></aside>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Lower threshold</div><p>More “yes” answers. Recall goes up, and so do false alarms.</p></aside>
+<aside class="am"><div class="t">Higher threshold</div><p>Fewer, surer “yes” answers. Precision goes up, and more cases are missed.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Boundaries and beyond</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Several features, several classes, and the limits of a straight line.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Straight boundary" data-demo="train">
+<div class="hdr" data-s="Boundaries"></div>
+<h2>A straight boundary in 2D</h2>
+<div class="fr">
+<div class="figbox"><svg id="train-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">With two features the score is a weighted sum of both. Points with the same score form a straight line.</p>
+<div class="btns"><button class="bt" id="train-go">Train</button><button class="bt chip" id="train-reset">Reset</button></div>
+<div class="ro"><span>Training step</span><b id="train-iter">0</b></div>
+<div class="ro"><span>Accuracy</span><b id="train-acc" class="bb">—</b></div>
+<div class="ro"><span>Weight of hours</span><b id="train-w1" class="a">0.0</b></div>
+<div class="ro"><span>Weight of exercises</span><b id="train-w2" class="a">0.0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>70 synthetic students. Shading: chance of passing. Solid line 50%, dashed lines 10% and 90%.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reading the weights">
+<div class="hdr" data-s="Boundaries"></div>
+<h2>Reading the weights</h2>
+<div class="fr">
+<div class="figbox"><svg id="wt-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<aside class="am"><div class="t">Sign</div><p>A positive weight pushes toward “yes”, a negative one toward “no”.</p></aside>
+<aside class="am frag up"><div class="t">Size</div><p>A longer bar is a stronger push. Compare sizes only when the features share a scale (Topic 4).</p></aside>
+<aside class="am frag up"><div class="t">Near zero</div><p>The feature barely matters.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>A small spam filter, features on a common scale. Illustrative values.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Odds">
+<div class="hdr" data-s="Boundaries"></div>
+<h2>Odds and log-odds</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The <strong>odds</strong> compare the chance of “yes” with the chance of “no”:</p>
+<div class="eq"><div class="m tex-d">\text{odds} = \frac{p}{1 - p}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="o1" style="margin:0">Undoing the sigmoid shows that the score is the logarithm of the odds:</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">\log \frac{p}{1 - p} = z = \theta_0 + \theta_1 x_1 + \cdots + \theta_d x_d</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="o2" style="margin:0">So one more unit of <span class="tex">x_j</span> adds <span class="tex">\theta_j</span> to the log-odds and multiplies the odds by <span class="tex">e^{\theta_j}</span>, with the other features fixed.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">p = 0.8</span>: odds <span class="tex">= 0.8 / 0.2 = 4</span>, four to one.</p><p>Log-odds: <span class="tex">\log 4 \approx 1.39</span></p></aside>
+<aside class="am frag up" data-step="o2"><div class="t">Figure 7</div><p>“Contains free” has weight 1.2:</p><p><span class="tex">e^{1.2} \approx 3.32</span></p><p>The word multiplies the odds of spam by about 3.3.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="More classes">
+<div class="hdr" data-s="Boundaries"></div>
+<h2>More than two classes</h2>
+<div class="figbox"><svg id="ovr-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 8:</b>One-vs-rest. (a)–(c) One yes/no model per class, each with its own line. (d) A new point gets the class whose model gives the highest probability.</p>
+</section>
+
+<section class="s ats-prose" data-label="Limits" data-demo="ring">
+<div class="hdr" data-s="Boundaries"></div>
+<h2>When a line is not enough</h2>
+<div class="fr">
+<div class="figbox"><svg id="ring-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">The boundary is always a straight line, so an inner circle and an outer ring cannot be separated.</p>
+<p class="small" style="margin:0">Add squared features (Topic 3) and the same method draws a curved boundary.</p>
+<div class="btns"><button class="bt" id="ring-toggle">Add squared features</button></div>
+<div class="ro"><span>Features</span><b id="ring-feat" style="font-size:26px">x₁, x₂</b></div>
+<div class="ro"><span>Accuracy</span><b id="ring-acc" class="bb">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>120 synthetic points. Shading as in Figure 6; the solid line is the 50% boundary.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Logistic regression is a classifier: it outputs the probability of “yes”.</li>
+<li class="an-up" style="--d:.15s">The S-curve squashes a weighted score into a value between 0 and 1.</li>
+<li class="an-up" style="--d:.25s">Learning picks the weights that make the real answers as likely as possible.</li>
+<li class="an-up" style="--d:.35s">A threshold turns the probability into a decision; set it from the cost of each mistake.</li>
+<li class="an-up" style="--d:.45s">The boundary is a straight line: curved patterns need new features, and many classes need one-vs-rest.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers the S-curve, how the weights are learned, and how to read them.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 4. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 4. Springer.</li>
+<li style="margin:.4em 0">Hosmer, D. W., Lemeshow, S., &amp; Sturdivant, R. X. (2013). <em>Applied Logistic Regression</em> (3rd ed.). Wiley.</li>
+<li style="margin:.4em 0">Cox, D. R. (1958). The regression analysis of binary sequences. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, 20(2), 215–242.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 12: support vector machines.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const sig = (z) => 1 / (1 + Math.exp(-z));
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const signed = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1);
+
+/* Six probability bands: blue for "no", orange for "yes" */
+const BAND_CUTS = [0.1, 0.3, 0.5, 0.7, 0.9];
+const BANDS = [
+  'fill:var(--c-a);fill-opacity:.30', 'fill:var(--c-a);fill-opacity:.17', 'fill:var(--c-a);fill-opacity:.06',
+  'fill:var(--c-b);fill-opacity:.06', 'fill:var(--c-b);fill-opacity:.17', 'fill:var(--c-b);fill-opacity:.30',
+];
+const bandOf = (p) => BAND_CUTS.filter((c) => p >= c).length;
+
+/* Logistic regression trained step by step on standardized features (small ridge keeps weights finite) */
+function trainer(X, y) {
+  const n = X.length, d = X[0].length;
+  const mu = Array.from({ length: d }, (_, j) => mean(X.map((r) => r[j])));
+  const sd = mu.map((m, j) => Math.sqrt(mean(X.map((r) => (r[j] - m) ** 2))) || 1);
+  const Z = X.map((r) => r.map((v, j) => (v - mu[j]) / sd[j]));
+  let w = new Array(d + 1).fill(0), iter = 0;
+  const zOf = (r) => r.reduce((s, v, j) => s + w[j + 1] * v, w[0]);
+  return {
+    step(rate = 0.5, lam = 0.002) {
+      const g = new Array(d + 1).fill(0);
+      Z.forEach((r, i) => { const e = sig(zOf(r)) - y[i]; g[0] += e; r.forEach((v, j) => { g[j + 1] += e * v; }); });
+      w = w.map((v, k) => v - rate * (g[k] / n + (k ? lam * v : 0)));
+      iter++;
+    },
+    run(steps, rate) { for (let s = 0; s < steps; s++) this.step(rate); return this; },
+    reset() { w = new Array(d + 1).fill(0); iter = 0; },
+    get iter() { return iter; },
+    get w() { return w.slice(); },
+    /* coefficients on the raw features: score = c[0] + c[1] x1 + ... */
+    coef() {
+      const c = [w[0]];
+      for (let j = 0; j < d; j++) { c[0] -= (w[j + 1] * mu[j]) / sd[j]; c.push(w[j + 1] / sd[j]); }
+      return c;
+    },
+    prob(x) { const c = this.coef(); return sig(x.reduce((s, v, j) => s + c[j + 1] * v, c[0])); },
+  };
+}
+const accuracy = (pts, pred) => pts.filter((p) => pred(p) === p.y).length / pts.length;
+
+/* Clip a polygon (data coords) to the half-plane f(x, y) >= 0, f linear */
+function clipHalf(poly, f) {
+  const out = [];
+  poly.forEach((a, i) => {
+    const b = poly[(i + 1) % poly.length], fa = f(a), fb = f(b);
+    if (fa >= 0) out.push(a);
+    if ((fa >= 0) !== (fb >= 0)) { const t = fa / (fa - fb); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]); }
+  });
+  return out;
+}
+const polyD = (F, poly) => (poly.length < 3 ? '' : poly.map(([x, y], i) => (i ? 'L' : 'M') + F.sx(x).toFixed(1) + ' ' + F.sy(y).toFixed(1)).join('') + 'Z');
+/* Line c0 + c1 x + c2 y = level across the data box, as svg endpoints */
+function levelLine(F, c, level, box) {
+  const [x0, x1, y0, y1] = box;
+  if (Math.abs(c[2]) >= Math.abs(c[1])) {
+    if (Math.abs(c[2]) < 1e-9) return null;
+    const yAt = (x) => (level - c[0] - c[1] * x) / c[2];
+    return [F.sx(x0 - 1), F.sy(yAt(x0 - 1)), F.sx(x1 + 1), F.sy(yAt(x1 + 1))];
+  }
+  const xAt = (yy) => (level - c[0] - c[2] * yy) / c[1];
+  return [F.sx(xAt(y0 - 1)), F.sy(y0 - 1), F.sx(xAt(y1 + 1)), F.sy(y1 + 1)];
+}
+/* 50% contour of any probability function, by marching squares */
+function contour(F, pf, box, nx, ny) {
+  const [x0, x1, y0, y1] = box, dx = (x1 - x0) / nx, dy = (y1 - y0) / ny;
+  const v = [];
+  for (let i = 0; i <= nx; i++) { v.push([]); for (let j = 0; j <= ny; j++) v[i].push(pf(x0 + i * dx, y0 + j * dy) - 0.5); }
+  let d = '';
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    const c = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]], hits = [];
+    for (let k = 0; k < 4; k++) {
+      const [ai, aj] = c[k], [bi, bj] = c[(k + 1) % 4], va = v[ai][aj], vb = v[bi][bj];
+      if ((va >= 0) !== (vb >= 0)) {
+        const t = va / (va - vb);
+        hits.push([x0 + (ai + t * (bi - ai)) * dx, y0 + (aj + t * (bj - aj)) * dy]);
+      }
+    }
+    for (let k = 0; k + 1 < hits.length; k += 2) d += `M${F.sx(hits[k][0]).toFixed(1)} ${F.sy(hits[k][1]).toFixed(1)}L${F.sx(hits[k + 1][0]).toFixed(1)} ${F.sy(hits[k + 1][1]).toFixed(1)}`;
+  }
+  return d;
+}
+/* Shade a grid of cells by probability band */
+function shadeCells(F, g, pf, box, nx, ny) {
+  /* one path per band, so neighbouring cells never overlap twice */
+  const [x0, x1, y0, y1] = box, dx = (x1 - x0) / nx, dy = (y1 - y0) / ny;
+  const paths = BANDS.map((st) => el('path', { style: st }, g));
+  const paint = (p) => {
+    const d = BANDS.map(() => []);
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const xa = x0 + i * dx, ya = y0 + j * dy, X = F.sx(xa), Y = F.sy(ya + dy);
+      d[bandOf(p(xa + dx / 2, ya + dy / 2))].push(`M${X.toFixed(1)} ${Y.toFixed(1)}h${(F.sx(xa + dx) - X + 0.8).toFixed(1)}v${(F.sy(ya) - Y + 0.8).toFixed(1)}h${-(F.sx(xa + dx) - X + 0.8).toFixed(1)}z`);
+    }
+    paths.forEach((pa, k) => pa.setAttribute('d', d[k].join('')));
+  };
+  paint(pf);
+  return paint;
+}
+/* Vertical key of the six bands */
+function bandKey(svg, x, y, title) {
+  const g = el('g', {}, svg);
+  title.forEach((t, i) => el('text', { class: 'ttl', x, y: y + i * 28, text: t }, g));
+  const labs = ['> 90%', '70–90%', '50–70%', '30–50%', '10–30%', '< 10%'];
+  labs.forEach((t, i) => {
+    const yy = y + 30 + i * 54;
+    el('rect', { x, y: yy, width: 34, height: 50, style: BANDS[5 - i] }, g);
+    el('rect', { x, y: yy, width: 34, height: 50, style: 'fill:none;stroke:var(--myst-color-border)' }, g);
+    el('text', { class: 'tk', x: x + 46, y: yy + 33, text: t }, g);
+  });
+  return g;
+}
+
+/* 32 students: hours studied and pass (1) or fail (0) */
+const STU = (() => {
+  const r = rng(31), pts = [];
+  for (let i = 0; i < 30; i++) {
+    const x = 0.5 + 9 * ((i + r()) / 30);
+    pts.push({ x, y: r() < sig(1.3 * (x - 5)) ? 1 : 0 });
+  }
+  return pts;
+})();
+const STU_EXTRA = STU.concat([{ x: 12.4, y: 1 }, { x: 13.4, y: 1 }]);
+const STU_FIT = (() => {
+  const t = trainer(STU.map((p) => [p.x]), STU.map((p) => p.y)).run(4000, 0.5);
+  const c = t.coef();
+  return { k: c[1], m: -c[0] / c[1] };
+})();
+const typical = (pts, f) => Math.exp(mean(pts.map((p) => Math.log(clamp(p.y ? f(p.x) : 1 - f(p.x), 1e-6, 1)))));
+
+/* ───────── static figures ───────── */
+function drawPipe() {
+  const svg = document.getElementById('pipe-svg');
+  const ROWS = [
+    { y: 110, title: 'will a student pass?', inp: ['hours studied', '6.5 h'], q: 'probability of pass', p: 0.82, out: 'pass', yes: true },
+    { y: 420, title: 'is this email spam?', inp: ['email with', '1 link, no “free”'], q: 'probability of spam', p: 0.12, out: 'not spam', yes: false },
+  ];
+  ROWS.forEach((R, k) => {
+    const g = el('g', { class: k ? 'frag up' : 'an-up' }, svg), y = R.y;
+    el('text', { class: 'ttl', x: 0, y: y - 30, text: R.title }, g);
+    el('rect', { class: 'box', x: 0, y, width: 270, height: 130, rx: 6 }, g);
+    el('text', { class: 'txs', x: 135, y: y + 52, 'text-anchor': 'middle', text: R.inp[0] }, g);
+    el('text', { class: 'tx', x: 135, y: y + 92, 'text-anchor': 'middle', 'font-weight': 600, text: R.inp[1] }, g);
+    el('rect', { class: 'box-a', x: 330, y, width: 230, height: 130, rx: 6 }, g);
+    el('text', { class: 'tx', x: 445, y: y + 56, 'text-anchor': 'middle', text: 'logistic' }, g);
+    el('text', { class: 'tx', x: 445, y: y + 92, 'text-anchor': 'middle', text: 'regression' }, g);
+    el('text', { class: 'txs', x: 620, y: y + 30, text: R.q }, g);
+    el('rect', { x: 620, y: y + 52, width: 260, height: 40, rx: 4, style: 'fill:var(--myst-color-surface);stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+    el('rect', { class: (R.yes ? 'fb' : 'fa') + ' an-grow', x: 620, y: y + 52, width: 260 * R.p, height: 40, rx: 4, style: '--d:.4s' }, g);
+    el('line', { x1: 750, x2: 750, y1: y + 44, y2: y + 100, style: 'stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:5 4' }, g);
+    el('text', { class: 'tx', x: 750, y: y + 132, 'text-anchor': 'middle', 'font-weight': 700, text: pct(R.p) }, g);
+    el('rect', { class: R.yes ? 'box-b' : 'box', x: 950, y: y + 22, width: 210, height: 86, rx: 6 }, g);
+    el('text', { class: 'tx', x: 1055, y: y + 75, 'text-anchor': 'middle', 'font-weight': 600, text: R.out }, g);
+    [[270, 322], [560, 612], [884, 942]].forEach(([a, b]) => {
+      const d = `M${a + 4} ${y + 65}H${b}`;
+      el('path', { class: 'wire', d, 'marker-end': 'url(#ah)' }, g);
+      const dot = el('circle', { r: 7, class: 'dot' }, g);
+      el('animateMotion', { dur: '2.4s', repeatCount: 'indefinite', path: d }, dot);
+    });
+  });
+  el('text', { class: 'tk', x: 750, y: 640, 'text-anchor': 'middle', text: 'dashed mark: 50%' }, svg);
+}
+
+function drawLine() {
+  const svg = document.getElementById('line-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 110, x: [0, 14], y: [-0.45, 1.45], xt: [0, 2, 4, 6, 8, 10, 12, 14], yt: [0, 0.5, 1], fy: pct, xl: 'hours studied', yl: 'predicted chance of passing' });
+  el('rect', { class: 'zone', x: F.L, y: F.T, width: F.W - F.R - F.L, height: F.sy(1) - F.T }, F.plot);
+  el('rect', { class: 'zone', x: F.L, y: F.sy(0), width: F.W - F.R - F.L, height: F.H - F.B - F.sy(0) }, F.plot);
+  el('text', { class: 'txs', x: F.L + 20, y: F.T + 40, text: 'above 100%: impossible' }, svg);
+  el('text', { class: 'txs', x: F.W - F.R - 20, y: F.H - F.B - 24, 'text-anchor': 'end', text: 'below 0%: impossible' }, svg);
+  const c = polyfit(STU_EXTRA.map((p) => p.x), STU_EXTRA.map((p) => p.y), 1);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d: curvePath((x) => polyval(c, x), 0, 14, F.sx, F.sy, 2) }, F.plot);
+  const t = trainer(STU_EXTRA.map((p) => [p.x]), STU_EXTRA.map((p) => p.y)).run(4000, 0.5), cc = t.coef();
+  const sg = el('g', { class: 'frag' }, F.plot);
+  el('path', { class: 'curve-a', d: curvePath((x) => sig(cc[0] + cc[1] * x), 0, 14, F.sx, F.sy) }, sg);
+  STU_EXTRA.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 10 }, F.plot));
+  legend(svg, 780, 352, [['dot', 'fb', 'passed (1)'], ['dot', 'fa', 'failed (0)'], ['line', 'curve-b', 'straight line']]);
+  const lg = legend(svg, 780, 460, [['line', 'curve-a', 'S-curve']]);
+  lg.setAttribute('class', 'frag');
+}
+
+function drawLearn() {
+  const svg = document.getElementById('learn-svg');
+  const PANELS = [
+    { id: 'learn-a', W: 800, l: 100, k: 0.3, m: 7.8, title: '(a) a poor curve' },
+    { id: 'learn-b', W: 1680, l: 980, k: STU_FIT.k, m: STU_FIT.m, title: '(b) the learned curve' },
+  ];
+  PANELS.forEach((P, i) => {
+    const g = el('g', { id: P.id, class: i ? 'frag' : '' }, svg);
+    const F = frame(g, { W: P.W, H: 560, l: P.l, t: 60, b: 84, x: [0, 10], y: [-0.04, 1.04], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.5, 1], fy: pct, xl: 'hours studied', yl: i ? '' : 'chance of passing' });
+    const f = (x) => sig(P.k * (x - P.m));
+    STU.forEach((p) => el('line', { x1: F.sx(p.x), x2: F.sx(p.x), y1: F.sy(p.y), y2: F.sy(f(p.x)), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:3;opacity:.7' }, F.plot));
+    el('path', { class: 'curve-a', d: curvePath(f, 0, 10, F.sx, F.sy) }, F.plot);
+    STU.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 9 }, F.plot));
+    el('text', { class: 'ttl', x: P.l, y: 30, text: P.title }, g);
+    el('text', { class: 'tx', x: (P.l + P.W - 24) / 2, y: 625, 'text-anchor': 'middle', text: `typical chance given to the real result: ${pct(typical(STU, f))}` }, g);
+  });
+}
+
+function drawWeights() {
+  const svg = document.getElementById('wt-svg');
+  const W = [['number of links', 1.6], ['contains “free”', 1.2], ['share of capitals', 0.8], ['message length', 0.1], ['replied to sender before', -1.3], ['sender in contacts', -2.0]];
+  const AX = 800, S = 150, Y0 = 110, RH = 92;
+  el('text', { class: 'txs', x: AX - 16, y: 50, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: '← toward “not spam”' }, svg);
+  el('text', { class: 'txs', x: AX + 16, y: 50, style: 'fill:var(--c-b)', text: 'toward “spam” →' }, svg);
+  W.forEach(([name, v], i) => {
+    const y = Y0 + i * RH, g = el('g', { class: 'an-up', style: `--d:${0.1 + i * 0.1}s` }, svg);
+    el('text', { class: 'tx', x: 370, y: y + 38, 'text-anchor': 'end', text: name }, g);
+    const x = v >= 0 ? AX : AX + v * S, w = Math.max(4, Math.abs(v) * S);
+    el('rect', { class: (v >= 0 ? 'fb' : 'fa') + (v >= 0 ? ' an-grow' : ''), x, y: y + 8, width: w, height: 44, rx: 3, style: `--d:${0.3 + i * 0.1}s` }, g);
+    el('text', { class: 'tx', x: v >= 0 ? AX + w + 14 : x - 14, y: y + 40, 'text-anchor': v >= 0 ? 'start' : 'end', 'font-weight': 600, text: signed(v) }, g);
+  });
+  el('line', { x1: AX, x2: AX, y1: 80, y2: Y0 + W.length * RH, style: 'stroke:var(--myst-color-text);stroke-width:2' }, svg);
+  el('text', { class: 'tk', x: AX, y: Y0 + W.length * RH + 32, 'text-anchor': 'middle', text: '0' }, svg);
+}
+
+function drawOvr() {
+  const svg = document.getElementById('ovr-svg');
+  const r = rng(41), C = [[3, 7.2], [7.2, 6.8], [5, 2.8]], CL = ['fa', 'fb', 'fc'], COL = ['var(--c-a)', 'var(--c-b)', 'var(--c-c)'];
+  const pts = [];
+  C.forEach(([cx, cy], k) => { for (let i = 0; i < 22; i++) pts.push({ x1: clamp(cx + 1.15 * gauss(r), 0.3, 9.7), x2: clamp(cy + 1.15 * gauss(r), 0.3, 9.7), c: k }); });
+  const models = [0, 1, 2].map((k) => trainer(pts.map((p) => [p.x1, p.x2]), pts.map((p) => (p.c === k ? 1 : 0))).run(1500, 0.5));
+  const BOX = [0, 10, 0, 10], RECT = [[0, 0], [10, 0], [10, 10], [0, 10]];
+  const NAMES = ['A', 'B', 'C'];
+  for (let k = 0; k < 4; k++) {
+    const x0 = k * 430, g = el('g', { id: 'ovr-' + k, class: k === 3 ? 'frag' : 'an-fade', style: `--d:${k * 0.25}s` }, svg);
+    const F = frame(g, { W: x0 + 390, H: 500, l: x0, r: 0, t: 60, b: 10, x: [0, 10], y: [0, 10], xt: [], yt: [], grid: false });
+    if (k < 3) {
+      const c = models[k].coef(), f = ([x, y]) => c[0] + c[1] * x + c[2] * y;
+      el('path', { d: polyD(F, clipHalf(RECT, f)), style: `fill:${COL[k]};fill-opacity:.14` }, F.plot);
+      const L = levelLine(F, c, 0, BOX);
+      if (L) el('line', { x1: L[0], y1: L[1], x2: L[2], y2: L[3], style: `stroke:${COL[k]};stroke-width:4` }, F.plot);
+      pts.forEach((p) => el('circle', { class: p.c === k ? `pt ${CL[k]}` : 'pt', cx: F.sx(p.x1), cy: F.sy(p.x2), r: 8, style: p.c === k ? '' : 'fill:var(--myst-color-text-tertiary);opacity:.45' }, F.plot));
+      el('text', { class: 'ttl', x: x0, y: 34, text: `(${'abc'[k]}) ${NAMES[k]} vs rest` }, g);
+      el('text', { class: 'txs', x: x0 + 195, y: 548, 'text-anchor': 'middle', text: `“is it ${NAMES[k]}?”` }, g);
+    } else {
+      const N = 60, d = 10 / N, parts = [[], [], []];
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+        const x = (i + 0.5) * d, y = (j + 0.5) * d, ps = models.map((m) => m.prob([x, y]));
+        const X = F.sx(i * d), Y = F.sy((j + 1) * d), w = F.sx(d) - F.sx(0) + 0.8, h = F.sy(0) - F.sy(d) + 0.8;
+        parts[ps.indexOf(Math.max(...ps))].push(`M${X.toFixed(1)} ${Y.toFixed(1)}h${w.toFixed(1)}v${h.toFixed(1)}h${-w.toFixed(1)}z`);
+      }
+      parts.forEach((pp, c) => el('path', { d: pp.join(''), style: `fill:${COL[c]};fill-opacity:.16` }, F.plot));
+      pts.forEach((p) => el('circle', { class: `pt ${CL[p.c]}`, cx: F.sx(p.x1), cy: F.sy(p.x2), r: 8 }, F.plot));
+      el('text', { class: 'ttl', x: x0, y: 34, text: '(d) combined' }, g);
+      el('text', { class: 'txs', x: x0 + 195, y: 548, 'text-anchor': 'middle', text: 'highest probability wins' }, g);
+    }
+    el('rect', { x: x0, y: 60, width: 390, height: 430, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+  }
+  legend(svg, 0, 588, [['dot', 'fa', 'class A']]);
+  legend(svg, 190, 588, [['dot', 'fb', 'class B']]);
+  legend(svg, 380, 588, [['dot', 'fc', 'class C']]);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.sig = (() => {
+  const svg = document.getElementById('sig-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 110, x: [0, 10], y: [-0.04, 1.04], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.25, 0.5, 0.75, 1], fy: pct, xl: 'hours studied', yl: 'chance of passing' });
+  el('line', { class: 'curve-t', x1: F.L, x2: F.W - F.R, y1: F.sy(0.5), y2: F.sy(0.5) }, F.plot);
+  const mark = el('line', { y1: F.sy(0.5), y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:6 6' }, F.plot);
+  const curve = el('path', { class: 'curve-a' }, F.plot);
+  const dot = el('circle', { r: 12, style: 'fill:var(--myst-color-bg);stroke:var(--c-a);stroke-width:4' }, F.plot);
+  STU.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 10 }, F.plot));
+  const markLab = el('text', { class: 'txs', text: '' }, svg);
+  legend(svg, F.L + 24, F.T + 110, [['dot', 'fb', 'passed'], ['dot', 'fa', 'failed']]);
+  const ks = document.getElementById('sig-k'), ms = document.getElementById('sig-m');
+  let k = 1, m = 3, timer = null;
+  function draw() {
+    const f = (x) => sig(k * (x - m));
+    curve.setAttribute('d', curvePath(f, 0, 10, F.sx, F.sy, 300));
+    mark.setAttribute('x1', F.sx(m)); mark.setAttribute('x2', F.sx(m));
+    dot.setAttribute('cx', F.sx(m)); dot.setAttribute('cy', F.sy(0.5));
+    markLab.setAttribute('x', F.sx(m) + (m > 7 ? -22 : 22));
+    markLab.setAttribute('text-anchor', m > 7 ? 'end' : 'start');
+    markLab.setAttribute('y', F.sy(0.5) + (m > 7 ? -22 : 42));
+    markLab.textContent = `50% at ${m.toFixed(1)} h`;
+    document.getElementById('sig-k-val').textContent = k.toFixed(1);
+    document.getElementById('sig-m-val').textContent = m.toFixed(1) + ' h';
+    document.getElementById('sig-fit').textContent = pct(typical(STU, f));
+  }
+  function stop() { clearInterval(timer); timer = null; }
+  function animateTo(k1, m1) {
+    stop();
+    const k0 = k, m0 = m;
+    let i = 0;
+    const N = REDUCED ? 1 : 40;
+    timer = setInterval(() => {
+      i++;
+      const t = i / N, e = 1 - (1 - t) ** 3;
+      k = k0 + (k1 - k0) * e; m = m0 + (m1 - m0) * e;
+      ks.value = k; ms.value = m;
+      draw();
+      if (i >= N) stop();
+    }, 25);
+  }
+  ks.addEventListener('input', () => { stop(); k = +ks.value; draw(); });
+  ms.addEventListener('input', () => { stop(); m = +ms.value; draw(); });
+  document.getElementById('sig-best').addEventListener('click', () => animateTo(clamp(STU_FIT.k, 0.2, 5), clamp(STU_FIT.m, 0, 10)));
+  document.getElementById('sig-reset').addEventListener('click', () => { stop(); k = 1; m = 3; ks.value = 1; ms.value = 3; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.thr = (() => {
+  const svg = document.getElementById('thr-svg');
+  const r = rng(8), pts = [];
+  for (let i = 0; i < 60; i++) {
+    const sick = i < 20 ? 1 : 0;
+    pts.push({ p: clamp(sig(sick ? 1.2 + 1.3 * gauss(r) : -1.5 + 1.3 * gauss(r)), 0.01, 0.99), y: sick, j: r() });
+  }
+  const F = frame(svg, { W: 1160, H: 370, l: 150, t: 20, b: 80, x: [0, 1], y: [0, 2], xt: [0, 0.25, 0.5, 0.75, 1], yt: [], fx: pct, xl: 'predicted probability of disease' });
+  const zone = el('rect', { y: F.T, height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.08' }, F.plot);
+  el('line', { class: 'gl', x1: F.L, x2: F.W - F.R, y1: F.sy(1), y2: F.sy(1) }, F.plot);
+  const dots = pts.map((p) => el('circle', { cx: F.sx(p.p), cy: F.sy((p.y ? 1.15 : 0.15) + 0.7 * p.j), r: 10 }, F.plot));
+  const line = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8' }, F.plot);
+  el('text', { class: 'tx', x: F.L - 16, y: F.sy(1.5) + 10, 'text-anchor': 'end', text: 'sick' }, svg);
+  el('text', { class: 'tx', x: F.L - 16, y: F.sy(0.5) + 10, 'text-anchor': 'end', text: 'healthy' }, svg);
+  const zl = el('text', { class: 'txs', y: F.T + 28, text: 'test positive' }, svg);
+  /* confusion matrix */
+  const MX = 300, MY = 456, CW = 250, CH = 110;
+  el('text', { class: 'ttl', x: MX + CW / 2, y: MY - 16, 'text-anchor': 'middle', text: 'test positive' }, svg);
+  el('text', { class: 'ttl', x: MX + CW * 1.5, y: MY - 16, 'text-anchor': 'middle', text: 'test negative' }, svg);
+  el('text', { class: 'tx', x: MX - 18, y: MY + CH / 2 + 10, 'text-anchor': 'end', text: 'sick' }, svg);
+  el('text', { class: 'tx', x: MX - 18, y: MY + CH * 1.5 + 10, 'text-anchor': 'end', text: 'healthy' }, svg);
+  const NAMES = [['caught', 'missed'], ['false alarm', 'cleared']];
+  const cnt = [[], []];
+  for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+    const x = MX + b * CW, y = MY + a * CH, ok = a === b;
+    el('rect', { class: ok ? 'box-a' : 'box-b', x: x + 3, y: y + 3, width: CW - 6, height: CH - 6, rx: 4 }, svg);
+    cnt[a][b] = el('text', { class: 'tx', x: x + CW / 2, y: y + 52, 'text-anchor': 'middle', 'font-weight': 700, style: 'font-size:40px', text: '0' }, svg);
+    el('text', { class: 'txs', x: x + CW / 2, y: y + 88, 'text-anchor': 'middle', text: NAMES[a][b] }, svg);
+  }
+  const note1 = el('text', { class: 'txs', x: 850, y: MY + 60, style: 'fill:var(--c-b);font-weight:600', text: '' }, svg);
+  const note2 = el('text', { class: 'txs', x: 850, y: MY + 100, text: '' }, svg);
+  const note3 = el('text', { class: 'txs', x: 850, y: MY + 170, text: '' }, svg);
+  const note4 = el('text', { class: 'txs', x: 850, y: MY + 206, text: '' }, svg);
+  const slider = document.getElementById('thr-t');
+  function draw() {
+    const t = +slider.value;
+    let tp = 0, fn = 0, fp = 0, tn = 0;
+    pts.forEach((p, i) => {
+      const pos = p.p >= t;
+      if (p.y && pos) tp++; else if (p.y) fn++; else if (pos) fp++; else tn++;
+      dots[i].setAttribute('class', `pt ${p.y ? 'fb' : 'fa'}`);
+      dots[i].setAttribute('style', pos ? '' : 'opacity:.45');
+    });
+    zone.setAttribute('x', F.sx(t)); zone.setAttribute('width', Math.max(0, F.W - F.R - F.sx(t)));
+    line.setAttribute('x1', F.sx(t)); line.setAttribute('x2', F.sx(t));
+    zl.setAttribute('x', F.sx(t) + 14); zl.setAttribute('text-anchor', t > 0.75 ? 'end' : 'start');
+    if (t > 0.75) zl.setAttribute('x', F.W - F.R - 10);
+    cnt[0][0].textContent = tp; cnt[0][1].textContent = fn; cnt[1][0].textContent = fp; cnt[1][1].textContent = tn;
+    note1.textContent = `missed: ${fn} of 20 sick`;
+    note2.textContent = 'sent home untreated';
+    note3.textContent = `false alarms: ${fp} of 40`;
+    note4.textContent = 'healthy, sent to more tests';
+    document.getElementById('thr-t-val').textContent = pct(t);
+    document.getElementById('thr-acc').textContent = pct((tp + tn) / 60);
+    document.getElementById('thr-prec').textContent = tp + fp ? pct(tp / (tp + fp)) : '—';
+    document.getElementById('thr-rec').textContent = pct(tp / 20);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.train = (() => {
+  const svg = document.getElementById('train-svg');
+  const r = rng(17), pts = [];
+  for (let i = 0; i < 70; i++) {
+    const y = i % 2;
+    pts.push({ x1: clamp((y ? 6.2 : 3.8) + 1.6 * gauss(r), 0.3, 9.7), x2: clamp((y ? 12.5 : 7.5) + 3.6 * gauss(r), 0.5, 19.5), y });
+  }
+  const F = frame(svg, { W: 1160, H: 700, l: 100, r: 190, x: [0, 10], y: [0, 20], xt: [0, 2, 4, 6, 8, 10], yt: [0, 5, 10, 15, 20], xl: 'hours studied per week', yl: 'practice exercises done' });
+  const BOX = [0, 10, 0, 20], RECT = [[0, 0], [10, 0], [10, 20], [0, 20]];
+  const bands = BANDS.map((s) => el('path', { style: s }, F.plot));
+  const l10 = el('line', { class: 'curve-t' }, F.plot), l90 = el('line', { class: 'curve-t' }, F.plot);
+  const l50 = el('line', { style: 'stroke:var(--myst-color-text);stroke-width:4' }, F.plot);
+  pts.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x1), cy: F.sy(p.x2), r: 10 }, F.plot));
+  bandKey(svg, 1000, 40, ['chance of', 'passing']);
+  const start = el('g', {}, svg);
+  el('rect', { x: F.L + 24, y: F.T + 16, width: 470, height: 52, rx: 4, style: 'fill:var(--myst-color-bg);opacity:.9' }, start);
+  el('text', { class: 'txs', x: F.L + 40, y: F.T + 50, text: 'before training: 50% everywhere' }, start);
+  legend(svg, 1000, 450, [['dot', 'fb', 'passed'], ['dot', 'fa', 'failed']]);
+  const T = trainer(pts.map((p) => [p.x1, p.x2]), pts.map((p) => p.y));
+  const LOG = BAND_CUTS.map((p) => Math.log(p / (1 - p)));
+  let timer = null;
+  const setLine = (ln, c, lev) => {
+    const L = levelLine(F, c, lev, BOX);
+    if (!L) { ln.style.display = 'none'; return; }
+    ln.style.display = '';
+    ln.setAttribute('x1', L[0]); ln.setAttribute('y1', L[1]); ln.setAttribute('x2', L[2]); ln.setAttribute('y2', L[3]);
+  };
+  function draw() {
+    const c = T.coef(), z = ([x, y]) => c[0] + c[1] * x + c[2] * y;
+    start.style.display = T.iter ? 'none' : '';
+    bands.forEach((b, i) => {
+      if (!T.iter) { b.setAttribute('d', ''); return; }
+      let poly = RECT;
+      if (i > 0) poly = clipHalf(poly, (q) => z(q) - LOG[i - 1]);
+      if (i < 5) poly = clipHalf(poly, (q) => LOG[i] - z(q) - 1e-12);
+      b.setAttribute('d', polyD(F, poly));
+    });
+    [[l10, LOG[0]], [l50, 0], [l90, LOG[4]]].forEach(([ln, lev]) => (T.iter ? setLine(ln, c, lev) : (ln.style.display = 'none')));
+    const w = T.w;
+    document.getElementById('train-iter').textContent = T.iter;
+    document.getElementById('train-acc').textContent = T.iter ? pct(accuracy(pts, (p) => (T.prob([p.x1, p.x2]) >= 0.5 ? 1 : 0))) : '—';
+    document.getElementById('train-w1').textContent = signed(w[1]);
+    document.getElementById('train-w2').textContent = signed(w[2]);
+  }
+  function reset() { clearInterval(timer); timer = null; T.reset(); draw(); }
+  document.getElementById('train-go').addEventListener('click', () => {
+    if (timer) return;
+    if (T.iter >= 150) reset();
+    if (REDUCED) { T.run(150, 0.5); draw(); return; }
+    timer = setInterval(() => {
+      T.step(0.5); draw();
+      if (T.iter >= 150) { clearInterval(timer); timer = null; }
+    }, 30);
+  });
+  document.getElementById('train-reset').addEventListener('click', reset);
+  draw();
+  return {};
+})();
+
+DEMOS.ring = (() => {
+  const svg = document.getElementById('ring-svg');
+  const r = rng(5), pts = [];
+  for (let i = 0; i < 120; i++) {
+    const y = i % 2, a = 2 * Math.PI * r(), rad = y ? Math.abs(0.9 + 0.4 * gauss(r)) : 2.3 + 0.35 * gauss(r);
+    pts.push({ x1: 0.5 + rad * Math.cos(a), x2: 0.2 + rad * Math.sin(a), y });
+  }
+  const F = frame(svg, { W: 1160, H: 700, l: 96, r: 24, x: [-5.2, 5.2], y: [-3.2, 3.2], xt: [-4, -2, 0, 2, 4], yt: [-3, 0, 3], xl: 'feature x₁', yl: 'feature x₂' });
+  const BOX = [-5.2, 5.2, -3.2, 3.2];
+  const lin2 = trainer(pts.map((p) => [p.x1, p.x2]), pts.map((p) => p.y)).run(3000, 0.5);
+  const sq = trainer(pts.map((p) => [p.x1, p.x2, p.x1 ** 2, p.x2 ** 2]), pts.map((p) => p.y)).run(4000, 0.5);
+  const M = [(x, y) => lin2.prob([x, y]), (x, y) => sq.prob([x, y, x * x, y * y])];
+  const ACC = M.map((f) => accuracy(pts, (p) => (f(p.x1, p.x2) >= 0.5 ? 1 : 0)));
+  const cellG = el('g', {}, F.plot);
+  const paint = shadeCells(F, cellG, M[0], BOX, 78, 48);
+  const edge = el('path', { style: 'fill:none;stroke:var(--myst-color-text);stroke-width:4' }, F.plot);
+  pts.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x1), cy: F.sy(p.x2), r: 9 }, F.plot));
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.L + 12, y: F.T + 10, width: 200, height: 92, rx: 4, style: 'fill:var(--myst-color-bg);opacity:.85' }, lg);
+  legend(lg, F.L + 24, F.T + 36, [['dot', 'fb', 'inner class'], ['dot', 'fa', 'outer class']]);
+  const btn = document.getElementById('ring-toggle');
+  let mode = 0;
+  function draw() {
+    paint(M[mode]);
+    edge.setAttribute('d', contour(F, M[mode], BOX, 104, 64));
+    btn.textContent = mode ? 'Straight line only' : 'Add squared features';
+    document.getElementById('ring-feat').textContent = mode ? 'x₁, x₂, x₁², x₂²' : 'x₁, x₂';
+    document.getElementById('ring-acc').textContent = pct(ACC[mode]);
+  }
+  btn.addEventListener('click', () => { mode = 1 - mode; draw(); });
+  draw();
+  return {};
+})();
+
+drawPipe(); drawLine(); drawLearn(); drawWeights(); drawOvr();
+})();
+</script>
+</body>
+</html>

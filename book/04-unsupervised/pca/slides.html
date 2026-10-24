@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Principal component analysis</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+#rot-svg{cursor:default}
+.ats-prose table.tb.cmp td,.ats-prose table.tb.cmp th{padding:.28em .6em}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 18</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Principal component analysis</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Replace many related features with a few new ones that keep most of the spread of the data</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 18 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why reduce dimensions</li>
+<li class="an-up" style="--d:.15s">Center and scale the data</li>
+<li class="an-up" style="--d:.25s">The direction of largest variance</li>
+<li class="an-up" style="--d:.35s">Scores and reconstruction</li>
+<li class="an-up" style="--d:.45s">How many components to keep</li>
+<li class="an-up" style="--d:.55s">Limits of PCA</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb cmp">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{\mathbf{x}_i\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> examples and no labels</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">\mathbf{x}_i \in \mathbb{R}^d</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">\bar{\mathbf{x}}</span></td><td>Mean vector: the average of each feature</td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">\mathbf{X}</span></td><td>Centered data matrix, <span class="tex">n \times d</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">\mathbf{S}</span></td><td>Covariance matrix, <span class="tex">d \times d</span></td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">\mathbf{w}_1, \mathbf{w}_2, \dots</span></td><td>Principal directions, unit vectors</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">z_{ik}</span></td><td>Score of example <span class="tex">i</span> on component <span class="tex">k</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\lambda_k</span></td><td>Variance of component <span class="tex">k</span> (eigenvalue)</td></tr>
+<tr class="an-up" style="--d:.45s"><td><span class="tex">q</span></td><td>Number of components kept</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors or matrices.</p><p>Subscript <span class="tex">i</span> picks an example, <span class="tex">j</span> a feature and <span class="tex">k</span> a component.</p><p>A tilde marks centered data: <span class="tex">\tilde{\mathbf{x}}_i</span>. A hat marks a reconstruction: <span class="tex">\hat{\mathbf{x}}_i</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why reduce dimensions</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Many features often repeat the same information.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Too many features">
+<div class="hdr" data-s="Why reduce"></div>
+<h2>Too many, too similar</h2>
+<div class="fr">
+<div class="figbox"><svg id="many-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Data often has many features: pixels of an image, thousands of genes, dozens of survey answers.</p>
+<p class="small frag up" data-step="m1" style="margin:0">Many features move together and repeat the same information.</p>
+<p class="small frag up" data-step="m2" style="margin:0">We cannot plot 50 features. Two or three new ones that keep most of the spread can be plotted.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) Two columns rise and fall together. (b) One number along the line describes both features.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Shadows">
+<div class="hdr" data-s="Why reduce"></div>
+<h2>Shadows of a cloud</h2>
+<div class="fr">
+<div class="figbox"><svg id="shadow-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Projecting points onto a line is like casting their shadow on it. Each point becomes one number: its position on the line.</p>
+<p class="small frag up" data-step="sh" style="margin:0">Some lines give a wide shadow and keep points apart. Others squeeze them together and lose the shape.</p>
+<p class="small frag up" data-step="sh2" style="margin:0"><strong>PCA</strong> looks for the line with the widest shadow, then the next one, and so on.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>The same 30 points projected onto two lines. Orange marks are the shadows.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Finding the components</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Directions of largest variance, one after another.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Center and scale">
+<div class="hdr" data-s="Components"></div>
+<h2>Center and scale first</h2>
+<p class="small" style="margin:-8px 0 8px">PCA measures spread around the mean, so we move the mean to the origin. Features in different units are also standardized (Topic 4).</p>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:64px;row-gap:8px">
+<div class="figbox"><svg id="raw-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox frag" data-step="c1"><svg id="cen-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox frag" data-step="c2"><svg id="std-svg" viewBox="0 0 520 520"></svg></div>
+<div class="subcap">(a) Raw data, far from the origin</div>
+<div class="subcap frag" data-step="c1">(b) Centered: weight dominates</div>
+<div class="subcap frag" data-step="c2">(c) Standardized: both spreads equal 1</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 3:</b>Height in meters and weight in kilograms for 60 people. In (b) the height spread is tiny next to the weight spread, so the widest direction would only follow weight.</p>
+</section>
+
+<section class="s ats-prose" data-label="Centering formula">
+<div class="hdr" data-s="Components"></div>
+<h2>Centering as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The mean vector averages each feature over the <span class="tex">n</span> examples:</p>
+<div class="eq"><div class="m tex-d">\bar{\mathbf{x}} = \frac{1}{n} \sum_{i=1}^{n} \mathbf{x}_i</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="e1" style="margin:0">Centering subtracts it from every example, so each feature now has mean zero:</p>
+<div class="eq frag up" data-step="e1"><div class="m tex-d">\tilde{\mathbf{x}}_i = \mathbf{x}_i - \bar{\mathbf{x}}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="e2" style="margin:0">To standardize, also divide feature <span class="tex">j</span> by its standard deviation <span class="tex">s_j</span>:</p>
+<div class="eq frag up" data-step="e2"><div class="m tex-d">\tilde{x}_{ij} = \frac{x_{ij} - \bar{x}_j}{s_j}</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Points <span class="tex">(2, 1)</span>, <span class="tex">(4, 3)</span>, <span class="tex">(6, 8)</span>.</p><p><span class="tex">\bar{\mathbf{x}} = \big(\tfrac{12}{3}, \tfrac{12}{3}\big) = (4, 4)</span></p><p>Centered: <span class="tex">(-2, -3)</span>, <span class="tex">(0, -1)</span>, <span class="tex">(2, 4)</span>. Each column sums to 0.</p></aside>
+<aside class="am"><div class="t">The rows of X</div><p>Stacking the centered examples as rows gives the <span class="tex">n \times d</span> matrix <span class="tex">\mathbf{X}</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Largest variance" data-demo="rot">
+<div class="hdr" data-s="Components"></div>
+<h2>The widest direction</h2>
+<div class="fr">
+<div class="figbox"><svg id="rot-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Turn the line and watch the shadows. The <strong>first principal component</strong> is the angle where their variance is largest.</p>
+<div class="ctl"><label><span>Angle of the line</span><b id="rot-a-val">0°</b></label><input type="range" id="rot-a" min="0" max="179" step="1" value="100"></div>
+<div class="ro"><span>Variance of shadows</span><b id="rot-v" class="bb">0</b></div>
+<div class="ro"><span>Largest possible</span><b id="rot-max" class="a">0</b></div>
+<div class="btns"><button class="bt chip" id="rot-go">Go to the maximum</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>40 centered points. Right: variance of the shadows for every angle; the peak is the first component.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="First component formula">
+<div class="hdr" data-s="Components"></div>
+<h2>Scores and the first component</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The score of example <span class="tex">i</span> is its position along the unit vector <span class="tex">\mathbf{w}_1</span>: multiply feature by feature and add.</p>
+<div class="eq"><div class="m tex-d">z_{i1} = \mathbf{w}_1^\top \tilde{\mathbf{x}}_i = \sum_{j=1}^{d} w_{j1}\, \tilde{x}_{ij}, \qquad \lVert \mathbf{w}_1 \rVert = 1</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="f1" style="margin:0">The first component is the unit direction whose scores have the largest variance. The data is centered, so the scores have mean 0 and their variance is the average square:</p>
+<div class="eq frag up" data-step="f1"><div class="m tex-d">\mathbf{w}_1 = \underset{\lVert \mathbf{w} \rVert = 1}{\arg\max} \ \frac{1}{n} \sum_{i=1}^{n} \big(\mathbf{w}^\top \tilde{\mathbf{x}}_i\big)^2</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="f2" style="margin:0">The length is fixed at 1: a longer <span class="tex">\mathbf{w}</span> would make the variance as large as we like.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{w}_1 = (0.6, 0.8)</span> has length <span class="tex">\sqrt{0.36 + 0.64} = 1</span>.</p><p>For <span class="tex">\tilde{\mathbf{x}}_i = (2, 1)</span>:</p><p><span class="tex">z_{i1} = 0.6 \cdot 2 + 0.8 \cdot 1 = 2.0</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="New coordinates">
+<div class="hdr" data-s="Components"></div>
+<h2>Scores as new coordinates</h2>
+<div class="fr">
+<div class="figbox"><svg id="axes-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The <strong>second component</strong> <span class="tex">\mathbf{w}_2</span> is perpendicular to <span class="tex">\mathbf{w}_1</span> and takes the largest remaining variance.</p>
+<p class="small frag up" data-step="ax" style="margin:0">The scores <span class="tex">(z_{i1}, z_{i2})</span> are the coordinates in the new axes. The cloud is only rotated, and the new features are uncorrelated.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>(a) Data of Figure 4; arrow length shows the spread. (b) The same points in score coordinates.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Covariance and eigenvectors">
+<div class="hdr" data-s="Components"></div>
+<h2>Covariance and eigenvectors</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The covariance matrix collects the variance of each feature (diagonal) and how each pair of features varies together (off the diagonal):</p>
+<div class="eq"><div class="m tex-d">\mathbf{S} = \frac{1}{n} \mathbf{X}^\top \mathbf{X}, \qquad s_{jl} = \frac{1}{n} \sum_{i=1}^{n} \tilde{x}_{ij}\, \tilde{x}_{il}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="g1" style="margin:0">A known result from linear algebra: the components are the <strong>eigenvectors</strong> of <span class="tex">\mathbf{S}</span>. Multiplying by <span class="tex">\mathbf{S}</span> only stretches them, by the eigenvalue <span class="tex">\lambda_k</span>:</p>
+<div class="eq frag up" data-step="g1"><div class="m tex-d">\mathbf{S}\,\mathbf{w}_k = \lambda_k\, \mathbf{w}_k, \qquad \lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_d \ge 0</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="g2" style="margin:0">The eigenvalue <span class="tex">\lambda_k</span> is the variance of the scores on component <span class="tex">k</span>. Sorting by eigenvalue sorts the components by importance.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{S} = \begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix}</span></p><p><span class="tex">\mathbf{w}_1 = \tfrac{1}{\sqrt{2}}(1, 1)</span>:</p><p><span class="tex">\mathbf{S}\mathbf{w}_1 = \tfrac{1}{\sqrt{2}}(3, 3) = 3\,\mathbf{w}_1</span></p><p>so <span class="tex">\lambda_1 = 3</span>.</p><p><span class="tex">\mathbf{w}_2 = \tfrac{1}{\sqrt{2}}(1, -1)</span> gives <span class="tex">\lambda_2 = 1</span>.</p><p>Total variance:</p><p><span class="tex">2 + 2 = 3 + 1 = 4</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reconstruction" data-demo="rec">
+<div class="hdr" data-s="Components"></div>
+<h2>Keeping fewer components</h2>
+<div class="fr">
+<div class="figbox"><svg id="rec-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Keep one score per point and rebuild the point from it. The rebuilt points fall on the kept line.</p>
+<div class="btns"><button class="bt chip" id="rec-2">Keep both</button><button class="bt chip" id="rec-1">Keep PC1</button><button class="bt chip" id="rec-b">Keep PC2</button></div>
+<div class="ro"><span>Variance kept</span><b id="rec-kept" class="a">100%</b></div>
+<div class="ro"><span>Average squared error</span><b id="rec-err" class="bb">0</b></div>
+<p class="small" style="margin:0">The error equals the variance of the dropped component.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The data of Figure 4. Gray rings: original points. Lines: what each point loses.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reconstruction formula">
+<div class="hdr" data-s="Components"></div>
+<h2>Reconstruction as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Start at the mean and walk <span class="tex">z_{ik}</span> steps along each kept direction:</p>
+<div class="eq"><div class="m tex-d">\hat{\mathbf{x}}_i = \bar{\mathbf{x}} + \sum_{k=1}^{q} z_{ik}\, \mathbf{w}_k</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="r1" style="margin:0">With <span class="tex">q = d</span> the reconstruction is exact. With fewer components, the average squared error is the variance left out:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">\frac{1}{n} \sum_{i=1}^{n} \lVert \mathbf{x}_i - \hat{\mathbf{x}}_i \rVert^2 = \sum_{k=q+1}^{d} \lambda_k</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="r2" style="margin:0">So the components with the largest variance are also the ones that rebuild the data with the smallest error.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\bar{\mathbf{x}} = (5, 3)</span>, <span class="tex">\mathbf{w}_1 = (0.6, 0.8)</span>,</p><p><span class="tex">z_{i1} = 2</span>:</p><p><span class="tex">\hat{\mathbf{x}}_i = (5 + 1.2,\ 3 + 1.6)</span></p><p><span class="tex">\phantom{\hat{\mathbf{x}}_i} = (6.2, 4.6)</span></p></aside>
+<aside class="am"><div class="t">With the 2 × 2 example</div><p>Keeping only <span class="tex">\mathbf{w}_1</span> leaves an error of <span class="tex">\lambda_2 = 1</span>, a quarter of the total 4.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">How many components</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Explained variance, reconstruction error and the limits of PCA.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Scree plot" data-demo="scree">
+<div class="hdr" data-s="How many"></div>
+<h2>The scree plot</h2>
+<div class="fr">
+<div class="figbox"><svg id="scree-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each bar is the share of the total variance one component explains. The line adds them up.</p>
+<div class="ctl"><label><span>Components kept <span class="tex">q</span></span><b id="scree-q-val">2</b></label><input type="range" id="scree-q" min="1" max="8" step="1" value="2"></div>
+<div class="ro"><span>Component q alone</span><b id="scree-one" class="a">0%</b></div>
+<div class="ro"><span>Cumulative</span><b id="scree-cum" class="bb">0%</b></div>
+<div><span class="tag" id="scree-tag">Below 80%</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>A made-up data set with 8 standardized features. The bars drop fast, then flatten: the elbow.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Explained variance">
+<div class="hdr" data-s="How many"></div>
+<h2>Explained variance</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The share of the total variance explained by component <span class="tex">k</span>:</p>
+<div class="eq"><div class="m tex-d">\text{PVE}_k = \frac{\lambda_k}{\sum_{j=1}^{d} \lambda_j}</div><div class="n">(10)</div></div>
+<p class="small frag up" data-step="p1" style="margin:0">The cumulative share of the first <span class="tex">q</span> components. One minus it is the relative reconstruction error of equation (9):</p>
+<div class="eq frag up" data-step="p1"><div class="m tex-d">\text{CPVE}_q = \frac{\sum_{k=1}^{q} \lambda_k}{\sum_{j=1}^{d} \lambda_j}</div><div class="n">(11)</div></div>
+<p class="small frag up" data-step="p2" style="margin:0">Choose <span class="tex">q</span> at the elbow, at a target such as 80% or 90%, or by cross-validation when PCA feeds a supervised model.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 7: eigenvalues 3.6, 1.9, 0.9, 0.6, 0.4, 0.3, 0.2, 0.1. They add to 8.</p><p><span class="tex">\text{PVE}_1 = 3.6 / 8 = 45\%</span></p><p><span class="tex">3.6 + 1.9 + 0.9 = 6.4</span></p><p><span class="tex">\text{CPVE}_3 = 6.4/8 = 80\%</span></p></aside>
+<aside class="am"><div class="t">Why 8</div><p>Each standardized feature has variance 1, so the total is <span class="tex">d</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Compress a picture" data-demo="img">
+<div class="hdr" data-s="How many"></div>
+<h2>Compress a picture</h2>
+<div class="fr">
+<div class="figbox"><svg id="img-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each of the 32 rows of the picture is an example with 32 features: the brightness of its pixels.</p>
+<div class="ctl"><label><span>Components kept <span class="tex">q</span></span><b id="img-q-val">3</b></label><input type="range" id="img-q" min="0" max="32" step="1" value="3"></div>
+<div class="ro"><span>Variance kept</span><b id="img-kept" class="a">0%</b></div>
+<div class="ro"><span>Average squared error</span><b id="img-err" class="bb">0</b></div>
+<div class="ro"><span>Numbers stored</span><b id="img-n">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>A 32 × 32 picture rebuilt from <span class="tex">q</span> components. Stored: the mean row, <span class="tex">q</span> directions and <span class="tex">q</span> scores per row.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Limits">
+<div class="hdr" data-s="How many"></div>
+<h2>Where PCA falls short</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:64px;row-gap:8px">
+<div class="figbox"><svg id="lim-a" viewBox="0 0 520 520"></svg></div>
+<div class="figbox frag" data-step="l1"><svg id="lim-b" viewBox="0 0 520 520"></svg></div>
+<div class="figbox frag" data-step="l2"><svg id="lim-c" viewBox="0 0 520 520"></svg></div>
+<div class="subcap">(a) Only straight directions</div>
+<div class="subcap frag" data-step="l1">(b) Raw units decide the answer</div>
+<div class="subcap frag" data-step="l2">(c) Labels are ignored</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 9:</b>(a) Points on an arc: one straight line misses the curve. (b) Unscaled, PC1 follows the feature with the largest numbers. (c) PC1 runs along both classes and mixes them; PC2 separates them. Also, each component mixes all features, which makes it harder to interpret.</p>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="How many"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>PCA at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Fewer features, little information lost</td><td>Finds only straight (linear) directions</td></tr>
+<tr class="an-up" style="--d:.15s"><td>New features are uncorrelated</td><td>Results change with units: scale first</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Plots many-feature data in 2-D or 3-D</td><td>Components mix all features, hard to interpret</td></tr>
+<tr class="an-up" style="--d:.35s"><td>One exact answer, no random start</td><td>Ignores labels: top variance may not separate classes</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Removes noise and speeds up later models</td><td>Squared distances make it sensitive to outliers</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>Many related numeric features, to plot the data or as a step before a supervised model.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">PCA replaces many related features with a few new ones, the scores.</li>
+<li class="an-up" style="--d:.15s">Center the data, and standardize it when features use different units.</li>
+<li class="an-up" style="--d:.25s">Each component is the direction of largest remaining variance, perpendicular to the earlier ones.</li>
+<li class="an-up" style="--d:.35s">The components are eigenvectors of the covariance matrix; eigenvalues are their variances.</li>
+<li class="an-up" style="--d:.45s">Choose q with the scree plot or cumulative explained variance. The dropped variance is the reconstruction error.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">Kernel PCA and autoencoders find curved low-dimensional structure that plain PCA misses.</p>
+<section style="margin-top:48px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Pearson, K. (1901). On lines and planes of closest fit to systems of points in space. <em>Philosophical Magazine</em>, 2(11), 559-572.</li>
+<li style="margin:.4em 0">Hotelling, H. (1933). Analysis of a complex of statistical variables into principal components. <em>Journal of Educational Psychology</em>, 24(6), 417-441.</li>
+<li style="margin:.4em 0">Jolliffe, I. T., &amp; Cadima, J. (2016). Principal component analysis: a review and recent developments. <em>Philosophical Transactions of the Royal Society A</em>, 374(2065), 20150202.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Section 12.2. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Section 14.5.1. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 19: reinforcement learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, clamp, mean, fmt, frame, legend } = window.Deck;
+
+/* ───────── shared data and PCA helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const DEG = Math.PI / 180;
+/* 2-D cloud: long axis at about 32 degrees, centered exactly */
+function cloud(seed, n, s1, s2, ang) {
+  const r = rng(seed), c = Math.cos(ang * DEG), s = Math.sin(ang * DEG);
+  const P = Array.from({ length: n }, () => { const a = s1 * gauss(r), b = s2 * gauss(r); return [a * c - b * s, a * s + b * c]; });
+  const m = [mean(P.map((p) => p[0])), mean(P.map((p) => p[1]))];
+  return P.map((p) => [p[0] - m[0], p[1] - m[1]]);
+}
+function cov2(P) {
+  const n = P.length;
+  return [P.reduce((s, p) => s + p[0] * p[0], 0) / n, P.reduce((s, p) => s + p[0] * p[1], 0) / n, P.reduce((s, p) => s + p[1] * p[1], 0) / n];
+}
+/* Eigen-decomposition of a 2×2 covariance [a, b; b, c] */
+function eig2([a, b, c]) {
+  const th = 0.5 * Math.atan2(2 * b, a - c), w1 = [Math.cos(th), Math.sin(th)], w2 = [-Math.sin(th), Math.cos(th)];
+  const v = (w) => a * w[0] * w[0] + 2 * b * w[0] * w[1] + c * w[1] * w[1];
+  return { th, w1, w2, l1: v(w1), l2: v(w2) };
+}
+const varAt = ([a, b, c], th) => a * Math.cos(th) ** 2 + 2 * b * Math.cos(th) * Math.sin(th) + c * Math.sin(th) ** 2;
+/* Jacobi eigenvalue method for a symmetric matrix; returns eigenpairs sorted by eigenvalue */
+function jacobi(A0) {
+  const n = A0.length, A = A0.map((r) => r.slice()), V = A.map((_, i) => A.map((__, j) => (i === j ? 1 : 0)));
+  for (let sweep = 0; sweep < 60; sweep++) {
+    let off = 0;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) off += A[p][q] ** 2;
+    if (off < 1e-18) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+      if (Math.abs(A[p][q]) < 1e-14) continue;
+      const th = 0.5 * Math.atan2(2 * A[p][q], A[q][q] - A[p][p]), c = Math.cos(th), s = Math.sin(th);
+      for (let k = 0; k < n; k++) { const akp = A[k][p], akq = A[k][q]; A[k][p] = c * akp - s * akq; A[k][q] = s * akp + c * akq; }
+      for (let k = 0; k < n; k++) { const apk = A[p][k], aqk = A[q][k]; A[p][k] = c * apk - s * aqk; A[q][k] = s * apk + c * aqk; }
+      for (let k = 0; k < n; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq; }
+    }
+  }
+  return [...Array(n).keys()].map((i) => ({ l: Math.max(A[i][i], 0), w: V.map((r) => r[i]) })).sort((x, y) => y.l - x.l);
+}
+const CLOUD = cloud(3, 40, 1.9, 0.65, 32);
+const COV = cov2(CLOUD), EIG = eig2(COV);
+
+/* A square scatter panel with its own clip: unit = pixels per data unit */
+function panel(svg, cx, cy, half, unit, id) {
+  const cp = el('clipPath', { id }, svg);
+  el('rect', { x: cx - half, y: cy - half, width: 2 * half, height: 2 * half }, cp);
+  const g = el('g', { 'clip-path': `url(#${id})` }, svg);
+  el('rect', { x: cx - half, y: cy - half, width: 2 * half, height: 2 * half, style: 'fill:none;stroke:var(--myst-color-border);stroke-width:2' }, svg);
+  el('line', { class: 'gl', x1: cx - half, x2: cx + half, y1: cy, y2: cy }, g);
+  el('line', { class: 'gl', x1: cx, x2: cx, y1: cy - half, y2: cy + half }, g);
+  return { g, X: (v) => cx + v * unit, Y: (v) => cy - v * unit };
+}
+
+/* ───────── static figures ───────── */
+function drawMany() {
+  const svg = document.getElementById('many-svg');
+  /* (a) table of shaded cells; columns 2 and 3 move together */
+  const r = rng(11), ROWS = 9, COLS = 7, CW = 62, CH = 50, X0 = 30, Y0 = 130;
+  el('text', { class: 'ttl', x: 0, y: 40, text: '(a) n examples × d features' }, svg);
+  const shared = Array.from({ length: ROWS }, () => r());
+  const head = ['x₁', 'x₂', 'x₃', 'x₄', 'x₅', '…', 'x'];
+  head.forEach((t, j) => {
+    const tx = el('text', { class: 'txs', x: X0 + j * CW + CW / 2, y: Y0 - 16, 'text-anchor': 'middle', text: t }, svg);
+    if (j === COLS - 1) el('tspan', { dy: 8, style: 'font-size:18px', text: 'd' }, tx);
+  });
+  for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) {
+    let v = r();
+    if (j === 1) v = shared[i];
+    if (j === 2) v = clamp(shared[i] + 0.08 * (r() - 0.5), 0, 1);
+    el('rect', { class: 'an-fade', x: X0 + j * CW + 2, y: Y0 + i * CH + 2, width: CW - 4, height: CH - 4, rx: 4, style: `fill:var(--c-a);fill-opacity:${(0.12 + 0.8 * v).toFixed(2)};--d:${(0.02 * (i + j)).toFixed(2)}s` }, svg);
+  }
+  const hl = el('g', { class: 'frag', 'data-step': 'm1' }, svg);
+  el('rect', { x: X0 + CW - 4, y: Y0 - 50, width: 2 * CW + 8, height: ROWS * CH + 58, rx: 8, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, hl);
+  el('text', { class: 'txs', x: X0 + 2 * CW, y: Y0 + ROWS * CH + 44, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'move together' }, hl);
+  /* (b) two correlated features */
+  const F = frame(svg, { W: 1160, H: 700, l: 640, t: 70, r: 10, b: 90, x: [150, 200], y: [150, 205], xt: [150, 175, 200], yt: [150, 175, 200], xl: 'height (cm)', yl: 'arm span (cm)' });
+  el('text', { class: 'ttl', x: 574, y: 40, text: '(b) two related features' }, svg);
+  const r2 = rng(5);
+  const P = Array.from({ length: 36 }, () => { const h = 175 + 9 * gauss(r2); return [h, h + 1.5 + 2.2 * gauss(r2)]; });
+  el('path', { class: 'curve-a frag', 'data-step': 'm1', d: `M${F.sx(150)} ${F.sy(151.5)}L${F.sx(200)} ${F.sy(201.5)}`, style: 'stroke-width:4;opacity:.8' }, F.plot);
+  P.forEach(([a, b], i) => el('circle', { class: 'pt fb an-pop', cx: F.sx(a), cy: F.sy(b), r: 10, style: `--d:${(0.3 + i * 0.02).toFixed(2)}s` }, F.plot));
+}
+
+function drawShadow() {
+  const svg = document.getElementById('shadow-svg');
+  const P = cloud(8, 30, 1.8, 0.55, 30);
+  [[290, '(a) along the cloud: wide shadow', 30, null], [870, '(b) across the cloud: narrow shadow', 120, 'sh']].forEach(([cx, title, ang, step]) => {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : { class: 'an-fade' }, svg);
+    el('text', { class: 'ttl', x: cx, y: 40, 'text-anchor': 'middle', text: title }, g);
+    const U = 62, cy = 380, X = (v) => cx + v * U, Y = (v) => cy - v * U;
+    const w = [Math.cos(ang * DEG), Math.sin(ang * DEG)];
+    el('line', { x1: X(-4.3 * w[0]), y1: Y(-4.3 * w[1]), x2: X(4.3 * w[0]), y2: Y(4.3 * w[1]), class: 'curve-a', style: 'stroke-width:4' }, g);
+    const zs = P.map((p) => p[0] * w[0] + p[1] * w[1]);
+    P.forEach((p, i) => {
+      const f = [zs[i] * w[0], zs[i] * w[1]];
+      el('line', { x1: X(p[0]), y1: Y(p[1]), x2: X(f[0]), y2: Y(f[1]), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5;stroke-dasharray:4 4' }, g);
+    });
+    P.forEach((p) => el('circle', { class: 'pt', cx: X(p[0]), cy: Y(p[1]), r: 9, style: 'fill:var(--myst-color-border-strong)' }, g));
+    P.forEach((p, i) => el('circle', { class: 'fb', cx: X(zs[i] * w[0]), cy: Y(zs[i] * w[1]), r: 6 }, g));
+    const sd = Math.sqrt(mean(zs.map((z) => z * z)));
+    el('text', { class: 'tx', x: cx, y: 680, 'text-anchor': 'middle', text: `spread of shadow: ${fmt(sd, 2)}` }, g);
+  });
+}
+
+function drawCenter() {
+  const r = rng(21);
+  const P = Array.from({ length: 60 }, () => { const a = gauss(r), b = gauss(r); return [1.70 + 0.09 * a, 68 + 11 * (0.7 * a + 0.71 * b)]; });
+  const m = [mean(P.map((p) => p[0])), mean(P.map((p) => p[1]))];
+  const C = P.map((p) => [p[0] - m[0], p[1] - m[1]]);
+  const sd = [0, 1].map((j) => Math.sqrt(mean(C.map((p) => p[j] * p[j]))));
+  const Z = C.map((p) => [p[0] / sd[0], p[1] / sd[1]]);
+  const opt = { W: 520, H: 520, l: 96, t: 20, r: 20, b: 84 };
+  const dots = (F, pts) => pts.forEach(([a, b]) => el('circle', { class: 'pt fa', cx: F.sx(a), cy: F.sy(b), r: 8 }, F.plot));
+  const cross = (F, a, b) => {
+    el('path', { d: `M${F.sx(a) - 14} ${F.sy(b)}h28M${F.sx(a)} ${F.sy(b) - 14}v28`, style: 'stroke:var(--c-b);stroke-width:5' }, F.plot);
+  };
+  const A = frame(document.getElementById('raw-svg'), { ...opt, x: [0, 2.2], y: [0, 120], xt: [0, 1, 2], yt: [0, 60, 120], xl: 'height (m)', yl: 'weight (kg)' });
+  dots(A, P); cross(A, m[0], m[1]);
+  el('circle', { cx: A.sx(0), cy: A.sy(0), r: 9, style: 'fill:var(--myst-color-text)' }, A.plot);
+  el('text', { class: 'txs', x: A.sx(m[0]) - 70, y: A.sy(m[1]) + 8, 'text-anchor': 'end', style: 'fill:var(--c-b)', text: 'mean' }, document.getElementById('raw-svg'));
+  const B = frame(document.getElementById('cen-svg'), { ...opt, x: [-40, 40], y: [-40, 40], xt: [-40, 0, 40], yt: [-40, 0, 40], xl: 'height (m), centered', yl: 'weight (kg), centered' });
+  dots(B, C); cross(B, 0, 0);
+  const Cc = frame(document.getElementById('std-svg'), { ...opt, x: [-3.5, 3.5], y: [-3.5, 3.5], xt: [-3, 0, 3], yt: [-3, 0, 3], xl: 'height, standardized', yl: 'weight, standardized' });
+  dots(Cc, Z); cross(Cc, 0, 0);
+}
+
+function drawAxes() {
+  const svg = document.getElementById('axes-svg');
+  const U = 70;
+  /* (a) original axes with both components */
+  const A = panel(svg, 290, 380, 270, U, 'axes-a-clip');
+  el('text', { class: 'ttl', x: 290, y: 70, 'text-anchor': 'middle', text: '(a) original features' }, svg);
+  CLOUD.forEach((p) => el('circle', { class: 'pt fa', cx: A.X(p[0]), cy: A.Y(p[1]), r: 9, style: 'opacity:.7' }, A.g));
+  [[EIG.w1, EIG.l1, 'wire-a', 'url(#ah-a)', 'w₁', 'var(--c-a)'], [EIG.w2, EIG.l2, '', 'url(#ah-b)', 'w₂', 'var(--c-b)']].forEach(([w, l, cls, mk, t, col]) => {
+    const L = 2 * Math.sqrt(l);
+    el('line', { x1: A.X(0), y1: A.Y(0), x2: A.X(L * w[0]), y2: A.Y(L * w[1]), class: cls, style: `stroke:${col};stroke-width:6`, 'marker-end': mk }, svg);
+    el('text', { class: 'tx', x: A.X((L + 0.45) * w[0]), y: A.Y((L + 0.45) * w[1]) + 10, 'text-anchor': 'middle', 'font-weight': 700, style: `fill:${col}`, text: t }, svg);
+  });
+  el('text', { class: 'txs', x: 290, y: 680, 'text-anchor': 'middle', text: 'axes: feature 1, feature 2' }, svg);
+  /* (b) the same points in score coordinates */
+  const g = el('g', { class: 'frag', 'data-step': 'ax' }, svg);
+  const B = panel(g, 870, 380, 270, U, 'axes-b-clip');
+  el('text', { class: 'ttl', x: 870, y: 70, 'text-anchor': 'middle', text: '(b) scores' }, g);
+  CLOUD.forEach((p) => {
+    const z1 = p[0] * EIG.w1[0] + p[1] * EIG.w1[1], z2 = p[0] * EIG.w2[0] + p[1] * EIG.w2[1];
+    el('circle', { class: 'pt fa', cx: B.X(z1), cy: B.Y(z2), r: 9, style: 'opacity:.7' }, B.g);
+  });
+  el('text', { class: 'tx', x: 1130, y: 370, 'text-anchor': 'end', 'font-weight': 700, style: 'fill:var(--c-a)', text: 'z₁' }, g);
+  el('text', { class: 'tx', x: 885, y: 140, 'font-weight': 700, style: 'fill:var(--c-b)', text: 'z₂' }, g);
+  el('text', { class: 'txs', x: 870, y: 680, 'text-anchor': 'middle', text: `variances ${fmt(EIG.l1, 2)} and ${fmt(EIG.l2, 2)}` }, g);
+}
+
+function drawLimits() {
+  const opt = { W: 520, H: 520, l: 70, t: 20, r: 20, b: 84 };
+  /* (a) an arc */
+  const sa = document.getElementById('lim-a');
+  const A = frame(sa, { ...opt, x: [-1.4, 1.4], y: [-0.6, 1.4], xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const r = rng(4);
+  const arc = Array.from({ length: 40 }, () => { const t = Math.PI * r(); return [Math.cos(t) + 0.05 * gauss(r), Math.sin(t) + 0.05 * gauss(r)]; });
+  const am = [mean(arc.map((p) => p[0])), mean(arc.map((p) => p[1]))];
+  const ea = eig2(cov2(arc.map((p) => [p[0] - am[0], p[1] - am[1]])));
+  el('line', { class: 'curve-a', x1: A.sx(am[0] - 2 * ea.w1[0]), y1: A.sy(am[1] - 2 * ea.w1[1]), x2: A.sx(am[0] + 2 * ea.w1[0]), y2: A.sy(am[1] + 2 * ea.w1[1]), style: 'stroke-width:4' }, A.plot);
+  arc.forEach((p) => el('circle', { class: 'pt fb', cx: A.sx(p[0]), cy: A.sy(p[1]), r: 8 }, A.plot));
+  el('text', { class: 'txs', x: A.sx(1.3), y: A.sy(am[1]) - 14, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: 'PC1' }, sa);
+  /* (b) one feature with big numbers: PC1 follows it */
+  const sb = document.getElementById('lim-b');
+  const B = frame(sb, { ...opt, l: 96, x: [-1200, 1200], y: [-1200, 1200], xt: [-1000, 0, 1000], yt: [-1000, 0, 1000], xl: 'income ($)', yl: 'age (years)' });
+  const r2 = rng(9);
+  const inc = Array.from({ length: 40 }, () => [420 * gauss(r2), 0]);
+  inc.forEach((p) => { p[1] = 12 * gauss(r2); });
+  el('path', { class: 'wire-a', d: `M${B.sx(0)} ${B.sy(0)}H${B.sx(950)}`, 'marker-end': 'url(#ah-a)', style: 'stroke-width:5' }, B.plot);
+  inc.forEach((p) => el('circle', { class: 'pt fb', cx: B.sx(p[0]), cy: B.sy(p[1]), r: 8 }, B.plot));
+  el('text', { class: 'txs', x: B.sx(980), y: B.sy(0) - 24, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: 'PC1' }, sb);
+  el('text', { class: 'txs', x: B.sx(-1100), y: B.sy(900), text: 'age spread: 12' }, sb);
+  el('text', { class: 'txs', x: B.sx(-1100), y: B.sy(700), text: 'income spread: 420' }, sb);
+  /* (c) two classes side by side along the short direction */
+  const sc = document.getElementById('lim-c');
+  const C = frame(sc, { ...opt, x: [-3, 3], y: [-3, 3], xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const r3 = rng(6), cls = [];
+  for (let k = 0; k < 2; k++) for (let i = 0; i < 22; i++) { const a = 1.2 * gauss(r3), b = 0.12 * gauss(r3) + (k ? 0.55 : -0.55); cls.push([a * 0.8 - b * 0.6, a * 0.6 + b * 0.8, k]); }
+  const ec = eig2(cov2(cls.map((p) => [p[0], p[1]])));
+  el('line', { class: 'curve-a', x1: C.sx(-3 * ec.w1[0]), y1: C.sy(-3 * ec.w1[1]), x2: C.sx(3 * ec.w1[0]), y2: C.sy(3 * ec.w1[1]), style: 'stroke-width:4' }, C.plot);
+  el('line', { class: 'curve-t', x1: C.sx(-3 * ec.w2[0]), y1: C.sy(-3 * ec.w2[1]), x2: C.sx(3 * ec.w2[0]), y2: C.sy(3 * ec.w2[1]) }, C.plot);
+  cls.forEach((p) => el('circle', { class: `pt ${p[2] ? 'fb' : 'fa'}`, cx: C.sx(p[0]), cy: C.sy(p[1]), r: 8 }, C.plot));
+  el('text', { class: 'txs', x: C.sx(2.4 * ec.w1[0]) + 10, y: C.sy(2.4 * ec.w1[1]) + 34, style: 'fill:var(--c-a)', text: 'PC1' }, sc);
+  el('text', { class: 'txs', x: C.sx(-2.2 * ec.w2[0]) + 14, y: C.sy(-2.2 * ec.w2[1]), style: 'fill:var(--myst-color-text-tertiary)', text: 'PC2' }, sc);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.rot = (() => {
+  const svg = document.getElementById('rot-svg');
+  const S = panel(svg, 340, 350, 330, 78, 'rot-sc-clip');
+  const F = frame(svg, { W: 1160, H: 700, l: 830, r: 20, t: 40, b: 84, x: [0, 180], y: [0, 4.5], xt: [0, 45, 90, 135, 180], yt: [0, 1, 2, 3, 4], fx: (v) => v + '°', xl: 'angle', yl: 'variance of shadows' });
+  let d = '';
+  for (let a = 0; a <= 180; a++) d += (a ? 'L' : 'M') + F.sx(a).toFixed(1) + ' ' + F.sy(varAt(COV, a * DEG)).toFixed(1);
+  el('path', { class: 'curve-b', d, style: 'stroke-width:4' }, F.plot);
+  const best = ((EIG.th / DEG) % 180 + 180) % 180;
+  el('line', { class: 'curve-t', x1: F.sx(best), x2: F.sx(best), y1: F.T, y2: F.H - F.B }, F.plot);
+  el('text', { class: 'txs', x: F.sx(best) + 10, y: F.T + 24, text: 'max' }, svg);
+  const now = el('circle', { r: 11, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:5' }, F.plot);
+  const line = el('line', { class: 'curve-a', style: 'stroke-width:4' }, S.g);
+  const drops = el('g', {}, S.g);
+  const segs = CLOUD.map(() => el('line', { style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5;stroke-dasharray:4 4' }, drops));
+  CLOUD.forEach((p) => el('circle', { class: 'pt fa', cx: S.X(p[0]), cy: S.Y(p[1]), r: 9 }, S.g));
+  const feet = CLOUD.map(() => el('circle', { class: 'fb', r: 6.5 }, S.g));
+  legend(svg, 24, 50, [['dot', 'fa', 'points'], ['dot', 'fb', 'shadows']]);
+  const slider = document.getElementById('rot-a');
+  function draw() {
+    const a = +slider.value, th = a * DEG, w = [Math.cos(th), Math.sin(th)];
+    line.setAttribute('x1', S.X(-8 * w[0])); line.setAttribute('y1', S.Y(-8 * w[1]));
+    line.setAttribute('x2', S.X(8 * w[0])); line.setAttribute('y2', S.Y(8 * w[1]));
+    let v = 0;
+    CLOUD.forEach((p, i) => {
+      const z = p[0] * w[0] + p[1] * w[1];
+      v += z * z;
+      feet[i].setAttribute('cx', S.X(z * w[0])); feet[i].setAttribute('cy', S.Y(z * w[1]));
+      segs[i].setAttribute('x1', S.X(p[0])); segs[i].setAttribute('y1', S.Y(p[1]));
+      segs[i].setAttribute('x2', S.X(z * w[0])); segs[i].setAttribute('y2', S.Y(z * w[1]));
+    });
+    v /= CLOUD.length;
+    now.setAttribute('cx', F.sx(a)); now.setAttribute('cy', F.sy(v));
+    document.getElementById('rot-a-val').textContent = a + '°';
+    document.getElementById('rot-v').textContent = fmt(v, 2);
+  }
+  document.getElementById('rot-max').textContent = fmt(EIG.l1, 2);
+  document.getElementById('rot-go').addEventListener('click', () => { slider.value = Math.round(best) % 180; draw(); });
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.rec = (() => {
+  const svg = document.getElementById('rec-svg');
+  const S = panel(svg, 580, 350, 340, 78, 'rec-clip');
+  [[EIG.w1, 'curve-a', 'PC1'], [EIG.w2, 'curve-t', 'PC2']].forEach(([w, cls]) => el('line', { class: cls, x1: S.X(-9 * w[0]), y1: S.Y(-9 * w[1]), x2: S.X(9 * w[0]), y2: S.Y(9 * w[1]), style: cls === 'curve-a' ? 'stroke-width:4' : '' }, S.g));
+  el('text', { class: 'txs', x: S.X(4.6 * EIG.w1[0]), y: S.Y(4.6 * EIG.w1[1]) + 40, style: 'fill:var(--c-a)', text: 'PC1' }, svg);
+  el('text', { class: 'txs', x: S.X(-3.4 * EIG.w2[0]) + 14, y: S.Y(-3.4 * EIG.w2[1]), style: 'fill:var(--myst-color-text-tertiary)', text: 'PC2' }, svg);
+  CLOUD.forEach((p) => el('circle', { cx: S.X(p[0]), cy: S.Y(p[1]), r: 9, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2.5' }, S.g));
+  const segs = CLOUD.map(() => el('line', { style: 'stroke:var(--c-b);stroke-width:2.5;opacity:.8' }, S.g));
+  const dots = CLOUD.map(() => el('circle', { class: 'pt fb', r: 9 }, S.g));
+  const total = EIG.l1 + EIG.l2;
+  const recon = (keep) => CLOUD.map((p) => {
+    let x = [0, 0];
+    keep.forEach((w) => { const z = p[0] * w[0] + p[1] * w[1]; x = [x[0] + z * w[0], x[1] + z * w[1]]; });
+    return x;
+  });
+  const TARGET = { both: recon([EIG.w1, EIG.w2]), one: recon([EIG.w1]), two: recon([EIG.w2]) };
+  let cur = TARGET.both.map((p) => p.slice()), anim = 0;
+  function place(P) {
+    P.forEach((q, i) => {
+      dots[i].setAttribute('cx', S.X(q[0])); dots[i].setAttribute('cy', S.Y(q[1]));
+      segs[i].setAttribute('x1', S.X(CLOUD[i][0])); segs[i].setAttribute('y1', S.Y(CLOUD[i][1]));
+      segs[i].setAttribute('x2', S.X(q[0])); segs[i].setAttribute('y2', S.Y(q[1]));
+    });
+  }
+  function go(key) {
+    const T = TARGET[key], from = cur.map((p) => p.slice()), t0 = performance.now(), dur = REDUCED ? 0 : 600;
+    const err = mean(T.map((q, i) => (q[0] - CLOUD[i][0]) ** 2 + (q[1] - CLOUD[i][1]) ** 2));
+    document.getElementById('rec-kept').textContent = pct(1 - err / total);
+    document.getElementById('rec-err').textContent = fmt(err, 2);
+    ['rec-2', 'rec-1', 'rec-b'].forEach((id, k) => { document.getElementById(id).style.outline = ['both', 'one', 'two'][k] === key ? '3px solid var(--c-a)' : ''; });
+    cancelAnimationFrame(anim);
+    const step = (t) => {
+      const u = dur ? clamp((t - t0) / dur, 0, 1) : 1, e = 1 - (1 - u) ** 3;
+      cur = from.map((p, i) => [p[0] + (T[i][0] - p[0]) * e, p[1] + (T[i][1] - p[1]) * e]);
+      place(cur);
+      if (u < 1) anim = requestAnimationFrame(step);
+    };
+    anim = requestAnimationFrame(step);
+  }
+  document.getElementById('rec-2').addEventListener('click', () => go('both'));
+  document.getElementById('rec-1').addEventListener('click', () => go('one'));
+  document.getElementById('rec-b').addEventListener('click', () => go('two'));
+  place(cur);
+  go(new URLSearchParams(location.search).has('all') ? 'one' : 'both');
+  return {};
+})();
+
+DEMOS.scree = (() => {
+  const svg = document.getElementById('scree-svg');
+  const L = [3.6, 1.9, 0.9, 0.6, 0.4, 0.3, 0.2, 0.1], T = L.reduce((s, v) => s + v, 0);
+  const R = L.map((v) => v / T), C = R.map((_, i) => R.slice(0, i + 1).reduce((s, v) => s + v, 0));
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0.4, 8.6], y: [0, 1], xt: [1, 2, 3, 4, 5, 6, 7, 8], yt: [0, 0.2, 0.4, 0.6, 0.8, 1], fy: pct, xl: 'component', yl: 'share of total variance' });
+  el('line', { class: 'curve-t', x1: F.sx(0.4), x2: F.sx(8.6), y1: F.sy(0.8), y2: F.sy(0.8) }, F.plot);
+  el('text', { class: 'tk', x: F.sx(8.55), y: F.sy(0.8) + 28, 'text-anchor': 'end', text: '80% target' }, svg);
+  const BW = F.sx(1) - F.sx(0);
+  const bars = R.map((v, i) => el('rect', { x: F.sx(i + 1) - BW * 0.32, width: BW * 0.64, y: F.sy(v), height: F.sy(0) - F.sy(v), rx: 3, class: 'fa an-growy', style: `--d:${(i * 0.06).toFixed(2)}s` }, F.plot));
+  R.forEach((v, i) => el('text', { class: 'tk', x: F.sx(i + 1), y: i < 2 ? F.sy(v) + 34 : F.sy(v) - 10, 'text-anchor': 'middle', style: i < 2 ? 'fill:#fff;font-weight:700' : '', text: pct(v) }, svg));
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.5s', d: C.map((v, i) => (i ? 'L' : 'M') + F.sx(i + 1) + ' ' + F.sy(v)).join('') }, F.plot);
+  const marks = C.map((v, i) => el('circle', { class: 'fb', cx: F.sx(i + 1), cy: F.sy(v), r: 8 }, F.plot));
+  const cut = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6' }, F.plot);
+  legend(svg, F.sx(4.6), F.sy(0.55), [['dot', 'fa', 'one component'], ['line', 'curve-b', 'cumulative']]);
+  const slider = document.getElementById('scree-q'), tag = document.getElementById('scree-tag');
+  function draw() {
+    const q = +slider.value;
+    bars.forEach((b, i) => { b.style.fillOpacity = i < q ? '1' : '.3'; });
+    marks.forEach((m, i) => m.setAttribute('r', i === q - 1 ? 14 : 8));
+    cut.setAttribute('x1', F.sx(q + 0.5)); cut.setAttribute('x2', F.sx(q + 0.5));
+    document.getElementById('scree-q-val').textContent = q;
+    document.getElementById('scree-one').textContent = (R[q - 1] * 100).toFixed(1).replace('.0', '') + '%';
+    document.getElementById('scree-cum').textContent = (C[q - 1] * 100).toFixed(1).replace('.0', '') + '%';
+    const ok = C[q - 1] >= 0.8 - 1e-9;
+    tag.textContent = ok ? 'Reaches the 80% target' : 'Below the 80% target';
+    tag.style.color = ok ? 'var(--c-c)' : 'var(--c-b)';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.img = (() => {
+  const svg = document.getElementById('img-svg');
+  const N = 32;
+  /* A small scene: sky gradient, sun, hills, a house */
+  const IMG = Array.from({ length: N }, (_, i) => Array.from({ length: N }, (__, j) => {
+    let v = 0.55 + 0.4 * (i / N);
+    if ((j - 24) ** 2 + (i - 7) ** 2 < 18) v = 0.98;
+    if (i > 22 - 3 * Math.sin(j / 5)) v = 0.32;
+    if (j >= 6 && j <= 16 && i >= 17 && i <= 27) v = 0.15;
+    if (i >= 10 && i < 17 && Math.abs(j - 11) <= (i - 10) * 0.9) v = 0.05;
+    if (j >= 10 && j <= 12 && i >= 22 && i <= 27) v = 0.7;
+    if (j >= 13 && j <= 15 && i >= 19 && i <= 20) v = 0.9;
+    return v;
+  }));
+  const mu = Array.from({ length: N }, (_, j) => mean(IMG.map((r) => r[j])));
+  const Xc = IMG.map((r) => r.map((v, j) => v - mu[j]));
+  const Sm = mu.map((_, a) => mu.map((__, b) => mean(Xc.map((r) => r[a] * r[b]))));
+  const E = jacobi(Sm), TOT = E.reduce((s, e) => s + e.l, 0);
+  const Z = Xc.map((r) => E.map((e) => r.reduce((s, v, j) => s + v * e.w[j], 0)));
+  const CELL = 16, OX = [40, 620], OY = 110;
+  const shade = (v) => { const g = Math.round(255 * clamp(v, 0, 1)); return `rgb(${g},${g},${g})`; };
+  el('text', { class: 'ttl', x: OX[0], y: 80, text: '(a) original' }, svg);
+  const ttlB = el('text', { class: 'ttl', x: OX[1], y: 80, text: '(b) rebuilt' }, svg);
+  IMG.forEach((r, i) => r.forEach((v, j) => el('rect', { x: OX[0] + j * CELL, y: OY + i * CELL, width: CELL, height: CELL, 'shape-rendering': 'crispEdges', style: `fill:${shade(v)}` }, svg)));
+  const cells = IMG.map((r, i) => r.map((_, j) => el('rect', { x: OX[1] + j * CELL, y: OY + i * CELL, width: CELL, height: CELL, 'shape-rendering': 'crispEdges' }, svg)));
+  [0, 1].forEach((k) => el('rect', { x: OX[k], y: OY, width: N * CELL, height: N * CELL, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, svg));
+  const slider = document.getElementById('img-q');
+  function draw() {
+    const q = +slider.value;
+    let err = 0, kept = 0;
+    for (let k = 0; k < q; k++) kept += E[k].l;
+    IMG.forEach((r, i) => r.forEach((v, j) => {
+      let x = mu[j];
+      for (let k = 0; k < q; k++) x += Z[i][k] * E[k].w[j];
+      err += (x - v) ** 2;
+      cells[i][j].style.fill = shade(x);
+    }));
+    ttlB.textContent = `(b) rebuilt with q = ${q}`;
+    document.getElementById('img-q-val').textContent = q;
+    document.getElementById('img-kept').textContent = (100 * kept / TOT).toFixed(1) + '%';
+    document.getElementById('img-err').textContent = fmt(err / N, 3);
+    document.getElementById('img-n').textContent = `${N + q * (N + N)} of ${N * N}`;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawMany(); drawShadow(); drawCenter(); drawAxes(); drawLimits();
+})();
+</script>
+</body>
+</html>

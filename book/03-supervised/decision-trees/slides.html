@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision trees</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 10</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Decision trees</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Predicting with a chain of yes/no questions learned from the data</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 10 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">A tree is a series of questions</li>
+<li class="an-up" style="--d:.15s">How a split cuts the feature space</li>
+<li class="an-up" style="--d:.25s">Choosing the best question</li>
+<li class="an-up" style="--d:.35s">Regression trees</li>
+<li class="an-up" style="--d:.45s">Depth, overfitting and pruning</li>
+<li class="an-up" style="--d:.55s">Strengths and weaknesses</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one value per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: one of <span class="tex">K</span> classes, or a number</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">x_j \le s</span></td><td>A question: is feature <span class="tex">j</span> at most the threshold <span class="tex">s</span>?</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">m, \ n_m</span></td><td>A node and the number of training examples in it</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">p_k</span></td><td>Share of the examples in the node that have class <span class="tex">k</span></td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">n_L, \ n_R</span></td><td>Examples sent to the left and right child</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature, subscript <span class="tex">k</span> picks a class.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Trees are questions</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Ask, follow the answer, ask again, until a decision is reached.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A game of questions">
+<div class="hdr" data-s="Trees are questions"></div>
+<h2>A game of questions</h2>
+<div class="fr">
+<div class="figbox"><svg id="loan-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Like the game of 20 questions: each question has a yes or no answer, and the answers lead to a decision.</p>
+<p class="small" style="margin:0"><strong>Ana</strong> earns $2,100 a month, her debt is 55% of her income, and she paid her past loans on time.</p>
+<p class="small frag up" data-step="p3" style="margin:0">Three questions, and the bank approves her loan.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>A small loan approval tree. Press the arrow to follow Ana's answers from the top.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Anatomy">
+<div class="hdr" data-s="Trees are questions"></div>
+<h2>Parts of a tree</h2>
+<div class="fr">
+<div class="figbox"><svg id="anat-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Trees in computer science grow upside down: the root is at the top and the leaves at the bottom.</p>
+<p class="small" style="margin:0">A new example enters at the root and goes down one branch per question until it lands in a leaf. The leaf gives the prediction.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Should I take the bus or walk? The longest path asks three questions, so the tree has depth 3.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Splits make rectangles" data-demo="grow">
+<div class="hdr" data-s="Trees are questions"></div>
+<h2>Splits make rectangles</h2>
+<div class="fr">
+<div class="figbox"><svg id="grow-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each question compares one feature with a threshold, so it draws a vertical or horizontal line inside one region.</p>
+<div class="btns"><button class="bt" id="grow-next">Next split</button><button class="bt chip" id="grow-reset">Reset</button></div>
+<div class="ro"><span>Splits</span><b id="grow-n">0</b></div>
+<div class="ro"><span>Leaves (regions)</span><b id="grow-leaves">1</b></div>
+<div class="ro"><span>Training accuracy</span><b id="grow-acc" class="bb">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>60 training points. Left: the tree; right: its regions, colored by the majority class. The newest split is highlighted.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Choosing the best question</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A good question leaves each side as pure as possible.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Purity">
+<div class="hdr" data-s="Best question"></div>
+<h2>Pure and mixed nodes</h2>
+<div class="fr">
+<div class="figbox"><svg id="pur-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A node is <strong>pure</strong> when all its points have the same class. The Gini impurity measures how mixed it is:</p>
+<div class="small" style="text-align:center"><span class="tex">\text{Gini} = 1 - \left(p_{\text{blue}}^2 + p_{\text{orange}}^2\right)</span></div>
+<p class="small" style="margin:0">Here <span class="tex">p</span> is the share of each class. Entropy is another score with the same shape.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Three nodes of 10 points and their impurity. Both scores are 0 for a pure node and highest at a 50/50 mix.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Impurity formulas">
+<div class="hdr" data-s="Best question"></div>
+<h2>Impurity formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">In a node with <span class="tex">n_m</span> examples, <span class="tex">n_k</span> of them of class <span class="tex">k</span>, the share of class <span class="tex">k</span> is</p>
+<div class="eq"><div class="m tex-d">p_k = \frac{n_k}{n_m}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="i1" style="margin:0">Gini impurity: the chance that two points drawn at random from the node have different classes.</p>
+<div class="eq frag up" data-step="i1"><div class="m tex-d">G = 1 - \sum_{k=1}^{K} p_k^2</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="i2" style="margin:0">Entropy: how surprising the class of a random point is, measured in bits.</p>
+<div class="eq frag up" data-step="i2"><div class="m tex-d">H = -\sum_{k=1}^{K} p_k \log_2 p_k</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The middle node of Figure 4: 7 blue, 3 orange.</p><p><span class="tex">p_{\text{blue}} = 0.7, \ p_{\text{orange}} = 0.3</span></p><p><span class="tex">G = 1 - (0.49 + 0.09) = 0.42</span></p><p><span class="tex">H = -(0.7 \log_2 0.7 + 0.3 \log_2 0.3)</span></p><p><span class="tex">\phantom{H} \approx 0.36 + 0.52 \approx 0.88</span></p></aside>
+<aside class="am frag up" data-step="i2"><div class="t">Extremes</div><p>Pure node: <span class="tex">G = H = 0</span>. A 50/50 mix: <span class="tex">G = 0.5</span>, <span class="tex">H = 1</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Best threshold" data-demo="thresh">
+<div class="hdr" data-s="Best question"></div>
+<h2>Finding the best threshold</h2>
+<div class="fr">
+<div class="figbox"><svg id="th-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<div class="ctl"><label><span>Threshold on income</span><b id="th-t-val">3.5</b></label><input type="range" id="th-t" min="0" max="10" step="0.1" value="3.5"></div>
+<div class="ro"><span>Left impurity</span><b id="th-gl">0</b></div>
+<div class="ro"><span>Right impurity</span><b id="th-gr">0</b></div>
+<div class="ro"><span>Weighted total</span><b id="th-w" class="bb">0</b></div>
+<div><span class="tag" id="th-tag">Not the lowest</span></div>
+<p class="small" style="margin:0">Each side counts in proportion to its number of points.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>20 past loans. The tree tries every threshold, on every feature, and keeps the lowest weighted total (green).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Scoring a split">
+<div class="hdr" data-s="Best question"></div>
+<h2>Scoring a split</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A question sends <span class="tex">n_L</span> points left and <span class="tex">n_R</span> right. Each side's impurity counts in proportion to its size:</p>
+<div class="eq"><div class="m tex-d">G_{\text{split}} = \frac{n_L}{n_m} \, G_L + \frac{n_R}{n_m} \, G_R</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="g1" style="margin:0">The <strong>impurity decrease</strong> compares the parent node with its two children:</p>
+<div class="eq frag up" data-step="g1"><div class="m tex-d">\Delta G = G_{\text{parent}} - G_{\text{split}}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="g2" style="margin:0">The tree keeps the feature and threshold with the largest decrease. With entropy in place of Gini, the decrease is called the <strong>information gain</strong>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Parent: 5 blue, 5 orange, <span class="tex">G = 0.5</span>.</p><p>Left: 4 blue, so <span class="tex">G_L = 0</span>.</p><p>Right: 1 blue, 5 orange:</p><p><span class="tex">G_R = 1 - \tfrac{1 + 25}{36} \approx 0.28</span></p><p><span class="tex">G_{\text{split}} = 0.4 \cdot 0 + 0.6 \cdot 0.28 \approx 0.17</span></p><p><span class="tex">\Delta G \approx 0.5 - 0.17 = 0.33</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Regression trees" data-demo="reg">
+<div class="hdr" data-s="Best question"></div>
+<h2>Regression trees</h2>
+<div class="fr">
+<div class="figbox"><svg id="reg-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">When the label is a number, each leaf predicts the <strong>average</strong> of its training points. A good split makes the points on each side close to their average.</p>
+<div class="label">Maximum depth</div>
+<div class="btns" id="reg-btns"><button class="bt chip" data-d="1">1</button><button class="bt" data-d="2">2</button><button class="bt chip" data-d="3">3</button><button class="bt chip" data-d="6">6</button></div>
+<div class="ro"><span>Leaves (steps)</span><b id="reg-leaves">4</b></div>
+<div class="ro"><span>Average error</span><b id="reg-err" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>40 students. The prediction is a staircase, one flat step per leaf.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Leaf predictions">
+<div class="hdr" data-s="Best question"></div>
+<h2>Leaf predictions</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Classification: a leaf predicts its most common class.</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \underset{k}{\arg\max} \ p_k</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="p1" style="margin:0">Regression: a leaf <span class="tex">m</span> predicts the average label of its training points.</p>
+<div class="eq frag up" data-step="p1"><div class="m tex-d">\hat{y}_m = \frac{1}{n_m} \sum_{i \in m} y_i</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="p2" style="margin:0">For regression the impurity of a node is the mean squared error around that average. Splits are scored as in (4), with this error in place of <span class="tex">G</span>.</p>
+<div class="eq frag up" data-step="p2"><div class="m tex-d">\text{MSE}_m = \frac{1}{n_m} \sum_{i \in m} \big(y_i - \hat{y}_m\big)^2</div><div class="n">(8)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A leaf with 7 blue and 3 orange points predicts blue.</p><p>A leaf with labels 6, 8 and 10:</p><p><span class="tex">\hat{y}_m = \tfrac{6 + 8 + 10}{3} = 8</span></p><p><span class="tex">\text{MSE}_m = \tfrac{4 + 0 + 4}{3} \approx 2.67</span></p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Depth and its limits</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A tree can keep asking until it memorizes the data.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Depth and overfitting" data-demo="depth">
+<div class="hdr" data-s="Depth and limits"></div>
+<h2>Depth and overfitting</h2>
+<div class="fr">
+<div class="figbox"><svg id="dep-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<div class="ctl"><label><span>Maximum depth</span><b id="dep-d-val">3</b></label><input type="range" id="dep-d" min="1" max="10" step="1" value="3"></div>
+<div class="ro"><span>Training accuracy</span><b id="dep-tr" class="a">0%</b></div>
+<div class="ro"><span>Test accuracy</span><b id="dep-te" class="bb">0%</b></div>
+<div class="ro"><span>Leaves</span><b id="dep-leaves">0</b></div>
+<div><span class="tag" id="dep-diag">Good fit</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>100 training points (shown) and 400 test points from the same source. A deep tree draws tiny boxes around single points.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Stopping and pruning">
+<div class="hdr" data-s="Depth and limits"></div>
+<h2>Stopping and pruning</h2>
+<div class="two">
+<div>
+<p style="margin:0 0 12px"><strong>Stop early</strong>, while growing:</p>
+<ul>
+<li>limit the maximum depth;</li>
+<li>ask for a minimum number of points per leaf, for example 5;</li>
+<li>skip splits that barely improve purity.</li>
+</ul>
+<p class="frag up" data-step="cut" style="margin:24px 0 12px"><strong>Prune</strong>, after growing: build a large tree, then cut the branches that do not improve the score on validation data.</p>
+<aside class="adm k-note sm frag up" data-step="cut"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>The depth, the minimum leaf size and the amount of pruning are hyperparameters, chosen with cross-validation (Topic 6).</p></div></aside>
+</div>
+<div class="col">
+<div class="figbox"><svg id="prune-svg" viewBox="0 0 792 640"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>A large tree. Press the arrow to prune two branches; each pruned node becomes a leaf.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Depth and limits"></div>
+<h2>Strengths and weaknesses</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>What decision trees do well and where they struggle.</p>
+<table class="tb">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Readable:</strong> the rules can be checked by a person</td><td><strong>Unstable:</strong> a small change in the data can give another tree</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>No scaling needed:</strong> each question looks at one feature</td><td><strong>Axis-aligned:</strong> a diagonal boundary needs many small steps</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Mixed features:</strong> numbers and categories in one tree</td><td><strong>Overfits</strong> easily when grown deep (Figure 7)</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Fast</strong> to train and to predict</td><td><strong>Steps:</strong> a regression tree cannot predict outside the range it saw</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Why no scaling</div><p>"Income ≤ 3" and "income in colones ≤ 1 500 000" split the points the same way. Changing units moves the threshold, not the tree.</p></aside>
+<aside class="am"><div class="t">Categories</div><p>A question can also be "is the color red?", with no need to turn categories into numbers first.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Small changes, new tree" data-demo="boot">
+<div class="hdr" data-s="Depth and limits"></div>
+<h2>Small changes, new tree</h2>
+<div class="fr">
+<div class="figbox"><svg id="boot-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Same source, same depth (4). Only the random sample of 100 points changes.</p>
+<div class="btns"><button class="bt" id="boot-new">New sample</button></div>
+<div class="ro"><span>Area where they disagree</span><b id="boot-dis" class="bb">0%</b></div>
+<aside class="am frag up" data-step="ens"><div class="t">Topic 14</div><p>Ensembles grow many trees on different samples and let them vote. The vote is much more stable.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>(a) The training points of Figure 7. (b) A new sample from the same source.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A tree predicts with yes/no questions, from the root down to a leaf.</li>
+<li class="an-up" style="--d:.15s">Each split cuts a region in two with a vertical or horizontal line.</li>
+<li class="an-up" style="--d:.25s">The best split leaves the two sides purest (Gini or entropy).</li>
+<li class="an-up" style="--d:.35s">Leaves predict the majority class, or the average for regression.</li>
+<li class="an-up" style="--d:.45s">Deep trees overfit: limit the depth, set a minimum leaf size, or prune.</li>
+<li class="an-up" style="--d:.55s">Trees are readable but unstable; ensembles combine many of them.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic explains how a tree is grown step by step, with entropy, Gini impurity and pruning in more detail.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Breiman, L., Friedman, J. H., Olshen, R. A., &amp; Stone, C. J. (1984). <em>Classification and Regression Trees</em>. Wadsworth.</li>
+<li style="margin:.4em 0">Quinlan, J. R. (1986). Induction of decision trees. <em>Machine Learning</em>, 1(1), 81–106.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 8. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Section 9.2. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 11: logistic regression.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const FEAT = ['x₁', 'x₂'];
+const CLASS_FILL = ['var(--c-a)', 'var(--c-b)'];
+const gini = (c) => { const n = c[0] + c[1]; return n ? 1 - (c[0] / n) ** 2 - (c[1] / n) ** 2 : 0; };
+
+/* Classification tree (CART with Gini) on points {x:[x1,x2], y:0|1} in the square [0,10]² */
+function bestSplit(P, idx, minLeaf) {
+  let best = null;
+  const n = idx.length;
+  for (let f = 0; f < 2; f++) {
+    const s = idx.slice().sort((a, b) => P[a].x[f] - P[b].x[f]);
+    const cl = [0, 0], ct = [0, 0];
+    s.forEach((i) => ct[P[i].y]++);
+    for (let k = 1; k < n; k++) {
+      cl[P[s[k - 1]].y]++;
+      const a = P[s[k - 1]].x[f], b = P[s[k]].x[f];
+      if (k < minLeaf || n - k < minLeaf || a === b) continue;
+      const score = (k * gini(cl) + (n - k) * gini([ct[0] - cl[0], ct[1] - cl[1]])) / n;
+      if (!best || score < best.score - 1e-12) best = { f, t: +((a + b) / 2).toFixed(2), score };
+    }
+  }
+  return best;
+}
+function growTree(P, idx, o, depth = 0, box = [0, 10, 0, 10]) {
+  const c = [0, 0];
+  idx.forEach((i) => c[P[i].y]++);
+  const node = { n: idx.length, c, y: c[1] > c[0] ? 1 : 0, depth, box };
+  if (depth >= o.maxDepth || !c[0] || !c[1] || idx.length < 2 * o.minLeaf) return node;
+  const s = bestSplit(P, idx, o.minLeaf);
+  if (!s || s.score >= gini(c) - 1e-9) return node;
+  node.f = s.f; node.t = s.t;
+  const bl = box.slice(), br = box.slice();
+  if (s.f === 0) { bl[1] = s.t; br[0] = s.t; } else { bl[3] = s.t; br[2] = s.t; }
+  node.l = growTree(P, idx.filter((i) => P[i].x[s.f] <= s.t), o, depth + 1, bl);
+  node.r = growTree(P, idx.filter((i) => P[i].x[s.f] > s.t), o, depth + 1, br);
+  return node;
+}
+const isLeaf = (t) => t.f === undefined;
+const predict = (t, x) => (isLeaf(t) ? t.y : predict(x[t.f] <= t.t ? t.l : t.r, x));
+const leavesOf = (t) => (isLeaf(t) ? [t] : [...leavesOf(t.l), ...leavesOf(t.r)]);
+const accuracy = (t, P) => P.filter((p) => predict(t, p.x) === p.y).length / P.length;
+const allIdx = (P) => P.map((_, i) => i);
+
+/* Draw leaf regions and split lines of a tree inside a frame */
+function drawRegions(g, F, t, opt = {}) {
+  leavesOf(t).forEach((lf) => {
+    const [x0, x1, y0, y1] = lf.box;
+    el('rect', { x: F.sx(x0), y: F.sy(y1), width: F.sx(x1) - F.sx(x0), height: F.sy(y0) - F.sy(y1), style: `fill:${CLASS_FILL[lf.y]};fill-opacity:.16` }, g);
+  });
+  (function lines(n) {
+    if (isLeaf(n)) return;
+    const [x0, x1, y0, y1] = n.box;
+    const d = n.f === 0 ? `M${F.sx(n.t)} ${F.sy(y0)}V${F.sy(y1)}` : `M${F.sx(x0)} ${F.sy(n.t)}H${F.sx(x1)}`;
+    el('path', { d, style: `fill:none;stroke:var(--myst-color-text-secondary);stroke-width:${opt.thin ? 1.5 : 2.5}` }, g);
+    lines(n.l); lines(n.r);
+  })(t);
+}
+
+/* Generic tree diagram: spec = {q, yes, no} or {leaf, cls}. Leaves get in-order slots. */
+function layoutTree(spec, x0, width, y0, dy) {
+  const nodes = [];
+  let slot = 0;
+  const leaves = (s) => (s.leaf !== undefined ? 1 : leaves(s.yes) + leaves(s.no));
+  const total = leaves(spec), sw = width / total;
+  (function walk(s, depth, path) {
+    const nd = { s, depth, path, y: y0 + depth * dy };
+    if (s.leaf !== undefined) { nd.x = x0 + sw * (slot + 0.5); slot++; }
+    else { nd.kids = [walk(s.yes, depth + 1, path + 'L'), walk(s.no, depth + 1, path + 'R')]; nd.x = (nd.kids[0].x + nd.kids[1].x) / 2; }
+    nodes.push(nd);
+    return nd;
+  })(spec, 0, '');
+  return nodes;
+}
+function drawTree(svg, spec, o) {
+  const nodes = layoutTree(spec, o.x0, o.width, o.y0, o.dy);
+  const byPath = Object.fromEntries(nodes.map((n) => [n.path, n]));
+  const gE = el('g', {}, svg), gN = el('g', {}, svg);
+  nodes.forEach((n) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${n.depth * 0.25}s` }, gN);
+    n.g = g;
+    if (n.s.leaf !== undefined) {
+      el('rect', { class: n.s.cls ? 'box-b' : 'box-a', x: n.x - o.leafW / 2, y: n.y - o.h / 2, width: o.leafW, height: o.h, rx: o.h / 2 }, g);
+      el('text', { class: o.font || 'txs', x: n.x, y: n.y + 8, 'text-anchor': 'middle', 'font-weight': 600, text: n.s.leaf }, g);
+    } else {
+      const w = o.nodeW || Math.max(120, n.s.q.length * 12.5 + 40);
+      el('rect', { class: 'box', x: n.x - w / 2, y: n.y - o.h / 2, width: w, height: o.h, rx: 6 }, g);
+      el('text', { class: o.font || 'txs', x: n.x, y: n.y + 8, 'text-anchor': 'middle', text: n.s.q }, g);
+      n.kids.forEach((k, j) => {
+        const ge = el('g', { class: 'an-fade', style: `--d:${n.depth * 0.25 + 0.15}s` }, gE);
+        el('path', { class: 'wire', d: `M${n.x} ${n.y + o.h / 2}L${k.x} ${k.y - o.h / 2}` }, ge);
+        if (o.yesno !== false) {
+          const mx = (n.x + k.x) / 2, my = (n.y + k.y) / 2;
+          el('text', { class: 'tk', x: mx + (j ? 14 : -14), y: my + 6, 'text-anchor': j ? 'start' : 'end', text: j ? 'no' : 'yes' }, ge);
+        }
+      });
+    }
+  });
+  return byPath;
+}
+
+/* ───────── static figures ───────── */
+function drawLoan() {
+  const svg = document.getElementById('loan-svg');
+  const spec = {
+    q: 'Income over $1,500 a month?',
+    yes: { q: 'Debt under 40% of income?', yes: { leaf: 'Approve', cls: 0 }, no: { q: 'Paid past loans on time?', yes: { leaf: 'Approve', cls: 0 }, no: { leaf: 'Reject', cls: 1 } } },
+    no: { q: 'Has a guarantor?', yes: { leaf: 'Approve', cls: 0 }, no: { leaf: 'Reject', cls: 1 } },
+  };
+  const P = drawTree(svg, spec, { x0: 0, width: 1160, y0: 70, dy: 180, h: 64, leafW: 170, nodeW: 360 });
+  const path = ['', 'L', 'LR', 'LRL'];
+  for (let i = 1; i < path.length; i++) {
+    const a = P[path[i - 1]], b = P[path[i]], g = el('g', { class: 'frag', 'data-step': i === 3 ? 'p3' : 'p' + i }, svg);
+    el('path', { d: `M${a.x} ${a.y + 32}L${b.x} ${b.y - 32}`, style: 'fill:none;stroke:var(--c-a);stroke-width:7;stroke-linecap:round' }, g);
+    const w = b.s.leaf !== undefined ? 170 : 360;
+    el('rect', { x: b.x - w / 2 - 6, y: b.y - 38, width: w + 12, height: 76, rx: b.s.leaf !== undefined ? 38 : 10, style: 'fill:none;stroke:var(--c-a);stroke-width:4' }, g);
+    const ans = ['', '$2,100', '55%', 'on time'][i], left = b.x < a.x;
+    el('text', { class: 'lb', x: (a.x + b.x) / 2 + (left ? 30 : -30), y: (a.y + b.y) / 2 + 44, 'text-anchor': left ? 'start' : 'end', style: 'fill:var(--c-a);font-weight:600', text: ans }, g);
+  }
+  const g0 = el('g', { class: 'an-fade', style: '--d:.9s' }, svg);
+  el('rect', { x: P[''].x - 186, y: P[''].y - 38, width: 372, height: 76, rx: 10, style: 'fill:none;stroke:var(--c-a);stroke-width:4' }, g0);
+}
+
+function drawAnatomy() {
+  const svg = document.getElementById('anat-svg');
+  const spec = { q: 'Is it raining?', yes: { leaf: 'Bus', cls: 0 }, no: { q: 'Farther than 2 km?', yes: { leaf: 'Bus', cls: 0 }, no: { q: 'Running late?', yes: { leaf: 'Bus', cls: 0 }, no: { leaf: 'Walk', cls: 1 } } } };
+  const X0 = 170, P = drawTree(svg, spec, { x0: X0, width: 700, y0: 90, dy: 170, h: 60, leafW: 130, nodeW: 250 });
+  // depth ruler
+  [0, 1, 2, 3].forEach((d) => {
+    const y = 90 + d * 170;
+    el('text', { class: 'tk', x: 0, y: y + 8, text: `depth ${d}` }, svg);
+  });
+  const call = (x, y, tx, ty, label, sub, d) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${d}s` }, svg);
+    el('path', { d: `M${x} ${y}L${tx - 12} ${ty - 8}`, style: 'fill:none;stroke:var(--c-b);stroke-width:2.5' }, g);
+    el('circle', { cx: x, cy: y, r: 6, class: 'fb' }, g);
+    el('text', { class: 'tx', x: tx, y: ty, 'font-weight': 600, style: 'fill:var(--c-b)', text: label }, g);
+    el('text', { class: 'txs', x: tx, y: ty + 32, text: sub }, g);
+  };
+  const r = P[''], f = P['R'], late = P['RR'], walk = P['RRR'], bus = P['L'];
+  call(r.x + 125, r.y, 920, 70, 'root node', 'the first question', 1.0);
+  call(f.x + 125, f.y, 920, 250, 'internal node', 'a later question', 1.2);
+  call(late.x + 0.72 * (walk.x - late.x), late.y + 30 + 0.72 * (walk.y - late.y - 60), 920, 470, 'branch', 'one answer', 1.4);
+  call(walk.x + 65, walk.y, 920, 620, 'leaf', 'the final decision', 1.6);
+  const g = el('g', { class: 'an-fade', style: '--d:1.8s' }, svg);
+  el('text', { class: 'tk', x: bus.x, y: bus.y + 64, 'text-anchor': 'middle', text: 'also a leaf' }, g);
+}
+
+function drawPurity() {
+  const svg = document.getElementById('pur-svg');
+  const SETS = [[10, 0, '10 blue, 0 orange'], [7, 3, '7 blue, 3 orange'], [5, 5, '5 blue, 5 orange']];
+  SETS.forEach(([b, o, label], k) => {
+    const x = 110 + k * 360, g = el('g', { class: 'an-up', style: `--d:${k * 0.2}s` }, svg);
+    el('rect', { class: 'box', x, y: 20, width: 320, height: 130, rx: 6 }, g);
+    for (let i = 0; i < 10; i++) {
+      el('circle', { class: `pt ${i < b ? 'fa' : 'fb'}`, cx: x + 48 + (i % 5) * 56, cy: 20 + 40 + Math.floor(i / 5) * 50, r: 17 }, g);
+    }
+    const gv = gini([b, o]);
+    el('text', { class: 'txs', x: x + 160, y: 190, 'text-anchor': 'middle', text: label }, g);
+    el('text', { class: 'tx', x: x + 160, y: 230, 'text-anchor': 'middle', 'font-weight': 600, text: `Gini ${fmt(gv, 2)}${k === 0 ? ', pure' : ''}` }, g);
+  });
+  const gC = el('g', { id: 'pur-c' }, svg);
+  const F = frame(gC, { W: 1160, H: 700, l: 110, t: 290, b: 84, x: [0, 1], y: [0, 1.05], xt: [0, 0.25, 0.5, 0.75, 1], yt: [0, 0.5, 1], fx: pct, xl: 'share of orange points in the node', yl: 'impurity' });
+  const ent = (p) => (p <= 0 || p >= 1 ? 0 : -p * Math.log2(p) - (1 - p) * Math.log2(1 - p));
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.5s', d: curvePath(ent, 0, 1, F.sx, F.sy, 200) }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, style: '--d:.3s', d: curvePath((p) => 2 * p * (1 - p), 0, 1, F.sx, F.sy) }, F.plot);
+  [0, 0.3, 0.5].forEach((p, k) => {
+    el('circle', { class: 'fa an-pop', cx: F.sx(p), cy: F.sy(2 * p * (1 - p)), r: 10, style: `--d:${1 + k * 0.2}s;stroke:var(--myst-color-bg);stroke-width:3` }, svg);
+  });
+  legend(svg, F.sx(0.4), F.sy(0.3), [['line', 'curve-a', 'Gini impurity'], ['line', 'curve-b', 'entropy']]);
+}
+
+function drawPrune() {
+  const svg = document.getElementById('prune-svg');
+  const L = (c) => ({ leaf: c ? 'B' : 'A', cls: c });
+  const spec = {
+    q: 'x₁ ≤ 5', yes: { q: 'x₂ ≤ 3', yes: L(0), no: { q: 'x₁ ≤ 2', yes: { q: 'x₂ ≤ 7', yes: L(1), no: L(0) }, no: L(1) } },
+    no: { q: 'x₂ ≤ 6', yes: { q: 'x₁ ≤ 8', yes: L(0), no: { q: 'x₂ ≤ 2', yes: L(1), no: L(0) } }, no: L(1) },
+  };
+  const P = drawTree(svg, spec, { x0: 0, width: 792, y0: 40, dy: 120, h: 52, leafW: 64, nodeW: 116, yesno: false });
+  const prune = (path, cls, step) => {
+    const n = P[path], g = el('g', { class: 'frag', 'data-step': step }, svg);
+    const sub = Object.values(P).filter((m) => m.path.startsWith(path));
+    const xs = sub.map((m) => m.x), ys = sub.map((m) => m.y);
+    const x0 = Math.min(...xs) - 66, x1 = Math.max(...xs) + 66, y0 = n.y - 34, y1 = Math.max(...ys) + 34;
+    el('rect', { x: x0, y: n.y + 30, width: x1 - x0, height: y1 - n.y - 30, class: 'bgf', style: 'opacity:.86' }, g);
+    el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 10, style: 'fill:none;stroke:var(--c-b);stroke-width:3;stroke-dasharray:10 8' }, g);
+    el('rect', { class: 'bgf', x: n.x - 62, y: n.y - 28, width: 124, height: 56 }, g);
+    el('rect', { class: cls ? 'box-b' : 'box-a', x: n.x - 32, y: n.y - 26, width: 64, height: 52, rx: 26 }, g);
+    el('text', { class: 'txs', x: n.x, y: n.y + 8, 'text-anchor': 'middle', 'font-weight': 600, text: cls ? 'B' : 'A' }, g);
+    el('text', { class: 'lb', x: (x0 + x1) / 2, y: y1 + 34, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'pruned' }, g);
+  };
+  prune('LR', 1, 'cut');
+  prune('RLR', 0, 'cut2');
+  legend(svg, 20, 624, [['dot', 'fa', 'leaf predicts A']]);
+  legend(svg, 300, 624, [['dot', 'fb', 'leaf predicts B']]);
+}
+
+/* ───────── datasets ───────── */
+const GROW_DATA = (() => {
+  const r = rng(8), P = [];
+  for (let i = 0; i < 60; i++) {
+    const x = [0.3 + 9.4 * r(), 0.3 + 9.4 * r()];
+    const y = (x[0] > 6 && x[1] < 5) || (x[0] < 4 && x[1] > 6.5) || (x[0] > 7.5 && x[1] > 8) ? 1 : 0;
+    P.push({ x, y });
+  }
+  return P;
+})();
+function circleData(n, seed, noise = 0.18) {
+  const r = rng(seed), P = [];
+  for (let i = 0; i < n; i++) {
+    const x = [0.2 + 9.6 * r(), 0.2 + 9.6 * r()];
+    let y = (x[0] - 5) ** 2 + (x[1] - 5) ** 2 < 9.5 ? 1 : 0;
+    if (r() < noise) y = 1 - y;
+    P.push({ x, y });
+  }
+  return P;
+}
+const CIRC_TRAIN = circleData(100, 9), CIRC_TEST = circleData(400, 57);
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.grow = (() => {
+  const svg = document.getElementById('grow-svg');
+  const full = growTree(GROW_DATA, allIdx(GROW_DATA), { maxDepth: 3, minLeaf: 2 });
+  // stable layout from the full tree: leaves get in-order slots
+  const TW = 600, Y0 = 70, DY = 170, H = 56;
+  let slot = 0;
+  const nLeaves = leavesOf(full).length;
+  (function place(n) {
+    if (isLeaf(n)) { n.px = (slot + 0.5) * (TW / nLeaves); slot++; }
+    else { place(n.l); place(n.r); n.px = (n.l.px + n.r.px) / 2; }
+    n.py = Y0 + n.depth * DY;
+  })(full);
+  const order = [], q = [full];
+  while (q.length) { const n = q.shift(); if (!isLeaf(n)) { order.push(n); q.push(n.l, n.r); } }
+  const gT = el('g', {}, svg), gR = el('g', { id: 'grow-r' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 24, text: 'the tree' }, svg);
+  el('text', { class: 'ttl', x: 690, y: 24, text: 'the regions' }, svg);
+  const F = frame(gR, { W: 1160, H: 640, l: 690, t: 50, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], grid: false, xl: 'x₁' });
+  el('text', { class: 'lb', x: 630, y: (50 + 570) / 2 + 8, 'text-anchor': 'middle', text: 'x₂' }, svg);
+  const gReg = el('g', {}, F.plot), gPts = el('g', {}, F.plot), gHi = el('g', {}, F.plot);
+  GROW_DATA.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x[0]), cy: F.sy(p.x[1]), r: 9 }, gPts));
+  legend(svg, 20, 660, [['dot', 'fa', 'class A']]);
+  legend(svg, 200, 660, [['dot', 'fb', 'class B']]);
+  let k = 0;
+  function draw() {
+    clear(gT); clear(gReg); clear(gHi);
+    const split = new Set(order.slice(0, k)), newest = order[k - 1];
+    const leaves = [];
+    (function walk(n) {
+      const inner = split.has(n);
+      if (inner) {
+        [n.l, n.r].forEach((c, j) => {
+          el('path', { class: 'wire', d: `M${n.px} ${n.py + H / 2}L${c.px} ${c.py - H / 2}` }, gT);
+          el('text', { class: 'tk', x: (n.px + c.px) / 2 + (j ? 12 : -12), y: (n.py + c.py) / 2 + 6, 'text-anchor': j ? 'start' : 'end', text: j ? 'no' : 'yes' }, gT);
+        });
+        const g = el('g', n === newest ? { class: 'an-fade' } : {}, gT);
+        el('rect', { class: n === newest ? 'box-a' : 'box', x: n.px - 75, y: n.py - H / 2, width: 150, height: H, rx: 6 }, g);
+        el('text', { class: 'txs', x: n.px, y: n.py + 8, 'text-anchor': 'middle', text: `${FEAT[n.f]} ≤ ${fmt(n.t, 1)}` }, g);
+        walk(n.l); walk(n.r);
+      } else {
+        leaves.push(n);
+        const g = el('g', n.depth && split.has(newest) && (newest.l === n || newest.r === n) ? { class: 'an-pop' } : {}, gT);
+        el('rect', { class: n.y ? 'box-b' : 'box-a', x: n.px - 46, y: n.py - H / 2, width: 92, height: H, rx: H / 2 }, g);
+        el('text', { class: 'txs', x: n.px, y: n.py + 8, 'text-anchor': 'middle', text: `${n.c[0]} | ${n.c[1]}` }, g);
+      }
+    })(full);
+    leaves.forEach((lf) => {
+      const [x0, x1, y0, y1] = lf.box;
+      el('rect', { x: F.sx(x0), y: F.sy(y1), width: F.sx(x1) - F.sx(x0), height: F.sy(y0) - F.sy(y1), style: `fill:${CLASS_FILL[lf.y]};fill-opacity:.16` }, gReg);
+    });
+    order.slice(0, k).forEach((n) => {
+      const [x0, x1, y0, y1] = n.box;
+      const d = n.f === 0 ? `M${F.sx(n.t)} ${F.sy(y0)}V${F.sy(y1)}` : `M${F.sx(x0)} ${F.sy(n.t)}H${F.sx(x1)}`;
+      el('path', { d, class: n === newest ? 'an-draw' : '', pathLength: 1, style: n === newest ? 'fill:none;stroke:var(--c-a);stroke-width:5' : 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:2.5' }, n === newest ? gHi : gReg);
+    });
+    const correct = leaves.reduce((s, lf) => s + lf.c[lf.y], 0);
+    el('text', { class: 'tk', x: 600, y: 668, 'text-anchor': 'end', text: 'leaf shows: class A | class B' }, gT);
+    document.getElementById('grow-n').textContent = `${k} of ${order.length}`;
+    document.getElementById('grow-leaves').textContent = leaves.length;
+    document.getElementById('grow-acc').textContent = pct(correct / GROW_DATA.length);
+  }
+  document.getElementById('grow-next').addEventListener('click', () => { k = k >= order.length ? 0 : k + 1; draw(); });
+  document.getElementById('grow-reset').addEventListener('click', () => { k = 0; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.thresh = (() => {
+  const svg = document.getElementById('th-svg');
+  const ORANGE = [0.6, 1.2, 1.9, 2.4, 3.1, 3.8, 4.6, 6.3], BLUE = [2.8, 4.2, 5.1, 5.5, 5.9, 6.8, 7.2, 7.7, 8.1, 8.6, 9.0, 9.4];
+  const PTS = [...ORANGE.map((x) => ({ x, y: 1 })), ...BLUE.map((x) => ({ x, y: 0 }))];
+  const N = PTS.length, L = 110, R = 40, sx = lin(0, 10, L, 1160 - R);
+  const sides = (t) => {
+    const cl = [0, 0], cr = [0, 0];
+    PTS.forEach((p) => (p.x <= t ? cl : cr)[p.y]++);
+    const nl = cl[0] + cl[1], nr = cr[0] + cr[1];
+    return { cl, cr, nl, nr, gl: gini(cl), gr: gini(cr), w: (nl * gini(cl) + nr * gini(cr)) / N };
+  };
+  const xs = PTS.map((p) => p.x).sort((a, b) => a - b);
+  let best = null;
+  for (let i = 1; i < N; i++) { const t = (xs[i - 1] + xs[i]) / 2, s = sides(t); if (!best || s.w < best.w - 1e-12) best = { t, w: s.w }; }
+  // top strip: points on a line
+  el('text', { class: 'ttl', x: L, y: 30, text: '20 past loans, by monthly income' }, svg);
+  legend(svg, 640, 24, [['dot', 'fa', 'repaid']]);
+  legend(svg, 820, 24, [['dot', 'fb', 'did not repay']]);
+  const shade = el('rect', { y: 80, height: 110, class: 'zone' }, svg);
+  el('path', { class: 'ax', d: `M${L} 190H${1160 - R}` }, svg);
+  for (let v = 0; v <= 10; v += 2) el('text', { class: 'tk', x: sx(v), y: 222, 'text-anchor': 'middle', text: v }, svg);
+  el('text', { class: 'tk', x: 1160 - R, y: 252, 'text-anchor': 'end', text: 'income ($1,000s)' }, svg);
+  PTS.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'} an-pop`, cx: sx(p.x), cy: 140, r: 15, style: `--d:${p.x * 0.05}s` }, svg));
+  // two side panels
+  const panel = (x0) => {
+    const g = el('g', {}, svg);
+    const title = el('text', { class: 'txs', x: x0, y: 300 }, g);
+    const bar = el('g', {}, g);
+    const val = el('text', { class: 'tx', x: x0, y: 395, 'font-weight': 600 }, g);
+    return { title, bar, val, x0 };
+  };
+  const PL = panel(L), PR = panel(640);
+  function fillPanel(Pn, c, n, g, side) {
+    Pn.title.textContent = `${side}: ${n} points (${c[0]} blue, ${c[1]} orange)`;
+    clear(Pn.bar);
+    const W = 460;
+    if (n) {
+      el('rect', { x: Pn.x0, y: 318, width: (W * c[0]) / n, height: 30, class: 'fa' }, Pn.bar);
+      el('rect', { x: Pn.x0 + (W * c[0]) / n, y: 318, width: (W * c[1]) / n, height: 30, class: 'fb' }, Pn.bar);
+    } else el('rect', { x: Pn.x0, y: 318, width: W, height: 30, class: 'zone' }, Pn.bar);
+    Pn.val.textContent = `Gini ${fmt(g, 2)}`;
+  }
+  // bottom chart: weighted impurity for every threshold
+  const gC = el('g', { id: 'th-c' }, svg);
+  const F = frame(gC, { W: 1160, H: 700, l: L, r: R, t: 450, b: 50, x: [0, 10], y: [0, 0.55], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.25, 0.5] });
+  el('text', { class: 'lb', transform: `translate(${L - 70} ${(450 + 650) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'weighted total' }, svg);
+  let d = '';
+  for (let i = 0; i <= 1000; i++) { const t = i / 100, w = sides(t).w; d += (i ? 'L' : 'M') + F.sx(t).toFixed(1) + ' ' + F.sy(w).toFixed(1); }
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d }, F.plot);
+  const gb = el('g', { class: 'an-fade', style: '--d:1.2s' }, svg);
+  el('circle', { cx: F.sx(best.t), cy: F.sy(best.w), r: 12, class: 'fc', style: 'stroke:var(--myst-color-bg);stroke-width:3' }, gb);
+  el('text', { class: 'txs', x: F.sx(best.t), y: F.sy(best.w) + 44, 'text-anchor': 'middle', style: 'fill:var(--c-c);font-weight:600', text: `best: ${fmt(best.t, 2)}` }, gb);
+  const line2 = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:6 8' }, svg);
+  const line = el('line', { y1: 70, y2: 200, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8' }, svg);
+  const lineLab = el('text', { class: 'lb', y: 66, 'text-anchor': 'middle', text: 'threshold' }, svg);
+  const cur = el('circle', { r: 10, style: 'fill:var(--myst-color-text);stroke:var(--myst-color-bg);stroke-width:3' }, svg);
+  const slider = document.getElementById('th-t'), tag = document.getElementById('th-tag');
+  function draw() {
+    const t = +slider.value, s = sides(t);
+    document.getElementById('th-t-val').textContent = fmt(t, 1);
+    shade.setAttribute('x', sx(0)); shade.setAttribute('width', Math.max(0, sx(t) - sx(0)));
+    line.setAttribute('x1', sx(t)); line.setAttribute('x2', sx(t));
+    line2.setAttribute('x1', sx(t)); line2.setAttribute('x2', sx(t));
+    lineLab.setAttribute('x', clamp(sx(t), L + 60, 1100));
+    cur.setAttribute('cx', F.sx(t)); cur.setAttribute('cy', F.sy(s.w));
+    fillPanel(PL, s.cl, s.nl, s.gl, 'left, at most ' + fmt(t, 1));
+    fillPanel(PR, s.cr, s.nr, s.gr, 'right');
+    document.getElementById('th-gl').textContent = fmt(s.gl, 2);
+    document.getElementById('th-gr').textContent = fmt(s.gr, 2);
+    document.getElementById('th-w').textContent = fmt(s.w, 3);
+    const atBest = Math.abs(s.w - best.w) < 1e-9;
+    tag.textContent = atBest ? 'Lowest total: best split' : 'Not the lowest';
+    tag.style.color = atBest ? 'var(--c-c)' : 'var(--myst-color-text)';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.reg = (() => {
+  const svg = document.getElementById('reg-svg');
+  const r = rng(12);
+  const D = Array.from({ length: 40 }, () => { const x = 0.2 + 9.6 * r(); return [x, clamp(42 + 48 / (1 + Math.exp(-(x - 5) * 1.1)) + 5 * gauss(r), 30, 100)]; }).sort((a, b) => a[0] - b[0]);
+  const sse = (a) => { const m = mean(a); return a.reduce((s, v) => s + (v - m) ** 2, 0); };
+  function build(pts, depth, max, lo, hi) {
+    const ys = pts.map((p) => p[1]), node = { lo, hi, m: mean(ys) };
+    if (depth >= max || pts.length < 4) return [node];
+    let best = null;
+    for (let k = 2; k <= pts.length - 2; k++) {
+      const s = sse(ys.slice(0, k)) + sse(ys.slice(k));
+      if (!best || s < best.s) best = { k, s, t: (pts[k - 1][0] + pts[k][0]) / 2 };
+    }
+    if (!best || best.s >= sse(ys) - 1e-9) return [node];
+    return [...build(pts.slice(0, best.k), depth + 1, max, lo, best.t), ...build(pts.slice(best.k), depth + 1, max, best.t, hi)];
+  }
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [0, 10], y: [30, 100], xt: [0, 2, 4, 6, 8, 10], yt: [40, 60, 80, 100], xl: 'hours of study', yl: 'exam score' });
+  const gSplit = el('g', {}, F.plot), gStep = el('g', {}, F.plot), gLab = el('g', {}, svg);
+  D.forEach(([x, y]) => el('circle', { class: 'pt fb', cx: F.sx(x), cy: F.sy(y), r: 9 }, F.plot));
+  legend(svg, F.L + 30, F.T + 30, [['line', 'curve-a', 'tree prediction'], ['dot', 'fb', 'student']]);
+  const btns = [...document.querySelectorAll('#reg-btns button')];
+  function draw(depth) {
+    clear(gSplit); clear(gStep); clear(gLab);
+    const leaves = build(D, 0, depth, 0, 10);
+    let d = '';
+    leaves.forEach((lf, i) => {
+      d += (i ? 'L' : 'M') + F.sx(lf.lo) + ' ' + F.sy(lf.m) + 'H' + F.sx(lf.hi);
+      if (i) el('line', { x1: F.sx(lf.lo), x2: F.sx(lf.lo), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:6 8' }, gSplit);
+      if (leaves.length <= 4) el('text', { class: 'tk an-fade', x: F.sx((lf.lo + lf.hi) / 2), y: F.sy(lf.m) - 16, 'text-anchor': 'middle', style: 'paint-order:stroke;stroke:var(--myst-color-bg);stroke-width:8px;stroke-linejoin:round', text: `average ${fmt(lf.m, 0)}` }, gLab);
+    });
+    el('path', { class: 'curve-a an-fade', d }, gStep);
+    const err = mean(D.map(([x, y]) => Math.abs(y - leaves.find((lf) => x <= lf.hi).m)));
+    document.getElementById('reg-leaves').textContent = leaves.length;
+    document.getElementById('reg-err').textContent = fmt(err, 1) + ' points';
+    btns.forEach((b) => { b.className = +b.dataset.d === depth ? 'bt' : 'bt chip'; });
+  }
+  btns.forEach((b) => b.addEventListener('click', () => draw(+b.dataset.d)));
+  draw(2);
+  return {};
+})();
+
+DEMOS.depth = (() => {
+  const svg = document.getElementById('dep-svg');
+  const DEP = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const trees = {}, tr = {}, te = {};
+  DEP.forEach((d) => { trees[d] = growTree(CIRC_TRAIN, allIdx(CIRC_TRAIN), { maxDepth: d, minLeaf: 1 }); tr[d] = accuracy(trees[d], CIRC_TRAIN); te[d] = accuracy(trees[d], CIRC_TEST); });
+  const best = DEP.reduce((a, b) => (te[b] > te[a] ? b : a));
+  const gL = el('g', { id: 'dep-l' }, svg), gR = el('g', { id: 'dep-r' }, svg);
+  const FL = frame(gL, { W: 600, H: 640, l: 90, t: 64, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], grid: false, xl: 'x₁' });
+  const FR = frame(gR, { W: 1160, H: 700, l: 750, t: 64, x: [0.5, 10.5], y: [0.4, 1.02], xt: DEP, yt: [0.5, 0.75, 1], fy: pct, xl: 'maximum depth', yl: 'accuracy' });
+  el('text', { class: 'lb', x: 30, y: (64 + 570) / 2 + 8, 'text-anchor': 'middle', text: 'x₂' }, svg);
+  el('text', { class: 'ttl', x: 90, y: 36, text: 'regions of the tree' }, svg);
+  el('text', { class: 'ttl', x: 750, y: 36, text: 'accuracy for each depth' }, svg);
+  const gReg = el('g', {}, FL.plot);
+  el('circle', { cx: FL.sx(5), cy: FL.sy(5), r: FL.sx(5 + Math.sqrt(9.5)) - FL.sx(5), class: 'curve-t', style: 'stroke-width:2.5' }, FL.plot);
+  CIRC_TRAIN.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: FL.sx(p.x[0]), cy: FL.sy(p.x[1]), r: 8 }, FL.plot));
+  const sel = el('line', { y1: FR.T, y2: FR.H - FR.B, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:8 8' }, FR.plot);
+  [[tr, 'curve-a', 'fa', 0], [te, 'curve-b', 'fb', 0.6]].forEach(([e, cc, fc, dl]) => {
+    el('path', { class: `${cc} an-draw`, pathLength: 1, style: `--d:${dl}s`, d: DEP.map((d, i) => (i ? 'L' : 'M') + FR.sx(d) + ' ' + FR.sy(e[d])).join('') }, FR.plot);
+    DEP.forEach((d, i) => el('circle', { class: `${fc} an-pop`, cx: FR.sx(d), cy: FR.sy(e[d]), r: 8, style: `--d:${dl + i * 0.08}s` }, FR.plot));
+  });
+  const bg = el('g', { class: 'an-fade', style: '--d:1.6s' }, svg);
+  el('circle', { cx: FR.sx(best), cy: FR.sy(te[best]), r: 17, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, bg);
+  el('text', { class: 'txs', x: FR.sx(best) + 26, y: FR.sy(te[best]) - 22, text: `best: ${best}` }, bg);
+  legend(svg, FR.sx(5.5), FR.sy(0.6), [['line', 'curve-a', 'training'], ['line', 'curve-b', 'test']]);
+  const slider = document.getElementById('dep-d'), diag = document.getElementById('dep-diag');
+  function draw() {
+    const d = +slider.value;
+    clear(gReg);
+    drawRegions(gReg, FL, trees[d], { thin: d > 5 });
+    sel.setAttribute('x1', FR.sx(d)); sel.setAttribute('x2', FR.sx(d));
+    document.getElementById('dep-d-val').textContent = d;
+    document.getElementById('dep-tr').textContent = pct(tr[d]);
+    document.getElementById('dep-te').textContent = pct(te[d]);
+    document.getElementById('dep-leaves').textContent = leavesOf(trees[d]).length;
+    let label = 'Good fit', col = 'var(--c-c)';
+    if (te[d] < te[best] - 0.03 && d < best) { label = 'Too simple'; col = 'var(--c-b)'; }
+    if (te[d] < te[best] - 0.03 && d > best) { label = 'Overfitting'; col = 'var(--c-d)'; }
+    diag.textContent = label; diag.style.color = col;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.boot = (() => {
+  const svg = document.getElementById('boot-svg');
+  const O = { maxDepth: 4, minLeaf: 1 };
+  const tA = growTree(CIRC_TRAIN, allIdx(CIRC_TRAIN), O);
+  const gA = el('g', { id: 'boot-a' }, svg), gB = el('g', { id: 'boot-b' }, svg);
+  const FA = frame(gA, { W: 540, H: 600, l: 20, r: 0, t: 60, b: 20, x: [0, 10], y: [0, 10], xt: [], yt: [], grid: false });
+  const FB = frame(gB, { W: 1160, H: 600, l: 640, r: 0, t: 60, b: 20, x: [0, 10], y: [0, 10], xt: [], yt: [], grid: false });
+  el('text', { class: 'ttl', x: 20, y: 36, text: '(a) original sample' }, svg);
+  el('text', { class: 'ttl', x: 640, y: 36, text: '(b) new sample' }, svg);
+  const rootText = (t) => `first question: ${FEAT[t.f]} ≤ ${fmt(t.t, 1)}`;
+  const g1 = el('g', {}, FA.plot);
+  drawRegions(g1, FA, tA);
+  CIRC_TRAIN.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: FA.sx(p.x[0]), cy: FA.sy(p.x[1]), r: 7 }, FA.plot));
+  el('text', { class: 'txs', x: 20, y: 650, text: rootText(tA) }, svg);
+  el('text', { class: 'tk', x: 20, y: 688, text: `${leavesOf(tA).length} leaves` }, svg);
+  const gReg = el('g', {}, FB.plot), gPts = el('g', {}, FB.plot);
+  const tB1 = el('text', { class: 'txs', x: 640, y: 650 }, svg), tB2 = el('text', { class: 'tk', x: 640, y: 688 }, svg);
+  let seed = 101;
+  function draw() {
+    const P = circleData(100, seed);
+    const tB = growTree(P, allIdx(P), O);
+    clear(gReg); clear(gPts);
+    const g = el('g', { class: 'an-fade' }, gReg);
+    drawRegions(g, FB, tB);
+    P.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: FB.sx(p.x[0]), cy: FB.sy(p.x[1]), r: 7 }, gPts));
+    tB1.textContent = rootText(tB);
+    tB2.textContent = `${leavesOf(tB).length} leaves`;
+    let dis = 0;
+    for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) {
+      const x = [(i + 0.5) / 6, (j + 0.5) / 6];
+      if (predict(tA, x) !== predict(tB, x)) dis++;
+    }
+    document.getElementById('boot-dis').textContent = pct(dis / 3600);
+  }
+  document.getElementById('boot-new').addEventListener('click', () => { seed += 1; draw(); });
+  draw();
+  return {};
+})();
+
+drawLoan(); drawAnatomy(); drawPurity(); drawPrune();
+})();
+</script>
+</body>
+</html>

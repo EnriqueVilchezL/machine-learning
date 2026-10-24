@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automatic differentiation</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+svg .tk{font-size:24px}
+.halo{paint-order:stroke;stroke:var(--myst-color-bg);stroke-width:8px;stroke-linejoin:round}
+.bt:disabled{opacity:.4;cursor:default}
+.side .tex-line{margin:0;font-size:26px;line-height:1.5}
+.ats-prose table.tb.tr td{padding:.3em .6em}
+.cell{stroke:var(--myst-color-border-strong);stroke-width:2;fill:var(--myst-color-bg-secondary)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 24</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Automatic differentiation</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">How a computer finds every derivative of a program, exactly and in one backward sweep</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 24 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Three ways to differentiate</li>
+<li class="an-up" style="--d:.15s">Computational graphs and the evaluation trace</li>
+<li class="an-up" style="--d:.25s">Forward mode: the chain rule from the inputs</li>
+<li class="an-up" style="--d:.35s">Reverse mode: the chain rule from the output</li>
+<li class="an-up" style="--d:.45s">Inside an engine: order, memory and backpropagation</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+<aside class="am"><div class="t">Before this topic</div><p>Topic 23: the chain rule, gradient descent and backpropagation.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:40%"><col style="width:60%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x} \in \mathbb{R}^n, \ \mathbf{y} = f(\mathbf{x}) \in \mathbb{R}^m</span></td><td><span class="tex">n</span> inputs, <span class="tex">m</span> outputs</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">v_i = \varphi_i(\dots)</span></td><td>Intermediate value made by one elementary operation <span class="tex">\varphi_i</span></td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">\partial v_i / \partial v_j</span></td><td>Local derivative along one arrow of the graph</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\partial v_i / \partial x_k</span></td><td>How much <span class="tex">v_i</span> moves when input <span class="tex">x_k</span> moves (forward mode)</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\partial y / \partial v_i</span></td><td>How much the output moves when <span class="tex">v_i</span> moves (reverse mode)</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\mathbf{J}_f \in \mathbb{R}^{m \times n}</span></td><td>Jacobian: all partial derivatives <span class="tex">\partial y_i / \partial x_j</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">h</span></td><td>Step of a finite difference</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p><span class="tex">\partial a / \partial b</span> is a slope: how much <span class="tex">a</span> changes for a small change in <span class="tex">b</span>.</p><p>For training, <span class="tex">y</span> is the cost <span class="tex">J</span> and <span class="tex">\mathbf{x}</span> holds the parameters <span class="tex">\boldsymbol\theta</span>.</p></aside>
+<aside class="am"><div class="t">Running example</div><p><span class="tex">f(x_1, x_2) = \ln x_1 + x_1 x_2 - \sin x_2</span> at <span class="tex">(2, 5)</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Three ways to differentiate</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">By formula, by nudging the input, or by following the program.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Gradients drive learning">
+<div class="hdr" data-s="Approaches"></div>
+<h2>Gradients drive learning</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Gradient descent (Topic 23) needs the slope of the cost along every parameter, at every step:</p>
+<div class="eq"><div class="m tex-d">\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \alpha \, \nabla_{\boldsymbol{\theta}} J(\boldsymbol{\theta}), \qquad \nabla_{\boldsymbol{\theta}} J = \Big(\frac{\partial J}{\partial \theta_1}, \dots, \frac{\partial J}{\partial \theta_n}\Big)</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="m1" style="margin:0">Deriving these slopes by hand for each new model is slow and error-prone. <strong>Automatic differentiation</strong> (AD) lets the computer find them from the code that computes <span class="tex">J</span>.</p>
+<div class="figbox frag" data-step="m1" style="height:340px;flex:none;margin-top:12px"><svg id="grad-svg" viewBox="0 0 1160 340"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The small network of Topic 23 has 7&nbsp;894 parameters.</p><p>Each step of (1) needs 7&nbsp;894 slopes, and training takes thousands of steps.</p></aside>
+<div class="grow"></div>
+<p class="cap frag" data-step="m1"><b>Figure 1:</b>The cost along one parameter. The slope at the current point says which way to move.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Symbolic differentiation">
+<div class="hdr" data-s="Approaches"></div>
+<h2>Symbolic differentiation</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Apply the rules of calculus to the formula, as on paper. The result is a new formula. Repeated parts get copied again and again, so it can grow very fast. Take <span class="tex">l_1 = x</span> and <span class="tex">l_{k+1} = 4 \, l_k (1 - l_k)</span>:</p>
+<p class="cap" style="margin:16px 0 12px"><b>Table 2:</b>Each step adds one line of code, but the derivative keeps growing (Baydin et al., 2018).</p>
+<table class="tb" style="font-size:24px">
+<colgroup><col style="width:5%"><col style="width:29%"><col style="width:66%"></colgroup>
+<thead><tr><th><span class="tex">k</span></th><th><span class="tex">l_k</span></th><th><span class="tex">dl_k / dx</span></th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>1</td><td><span class="tex">x</span></td><td><span class="tex">1</span></td></tr>
+<tr class="an-up" style="--d:.15s"><td>2</td><td><span class="tex">4x(1-x)</span></td><td><span class="tex">4(1-x) - 4x</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td>3</td><td><span class="tex">16x(1-x)(1-2x)^2</span></td><td><span class="tex">16(1-x)(1-2x)^2 - 16x(1-2x)^2</span><br><span class="tex">{}- 64x(1-x)(1-2x)</span></td></tr>
+<tr class="an-up" style="--d:.35s"><td>4</td><td><span class="tex">64x(1-x)(1-2x)^2</span><br><span class="tex">{}\cdot(1-8x+8x^2)^2</span></td><td><span class="tex">128x(1-x)(16x-8)(1-2x)^2(1-8x+8x^2)</span><br><span class="tex">{}+ 64(1-x)(1-2x)^2(1-8x+8x^2)^2</span><br><span class="tex">{}- 64x(1-2x)^2(1-8x+8x^2)^2</span><br><span class="tex">{}- 256x(1-x)(1-2x)(1-8x+8x^2)^2</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Expression swell</div><p>The same factors appear in many terms. A formula has no way to say “reuse this value”.</p></aside>
+<aside class="am"><div class="t">Code is not a formula</div><p>Loops, <span class="tex">\text{if}</span> branches and function calls have no direct symbolic form.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Numerical differentiation" data-demo="fd">
+<div class="hdr" data-s="Approaches"></div>
+<h2>Numerical differentiation</h2>
+<div class="fr">
+<div class="figbox"><svg id="fd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Nudge one input by a small step <span class="tex">h</span> and measure the change:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\frac{\partial f}{\partial x_k} \approx \frac{f(\mathbf{x} + h\,\mathbf{e}_k) - f(\mathbf{x})}{h}</div><div class="n">(2)</div></div>
+<div class="ctl"><label><span>Step <span class="tex">h</span></span><b id="fd-h-val">10⁻⁴</b></label><input type="range" id="fd-h" min="-16" max="0" step="0.25" value="-4"></div>
+<div class="ro"><span>Estimate of <span class="tex">\cos 1</span></span><b id="fd-est" class="a">?</b></div>
+<div class="ro"><span>Exact</span><b>0.54030231</b></div>
+<div class="ro"><span>Error</span><b id="fd-err" class="bb">?</b></div>
+<p class="small" style="margin:0">Cost: one extra evaluation per input, <span class="tex">n + 1</span> in all.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Error of (2) for <span class="tex">f = \sin</span> at <span class="tex">x = 1</span>, computed live.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Automatic differentiation">
+<div class="hdr" data-s="Approaches"></div>
+<h2>Automatic differentiation</h2>
+<p class="small" style="margin:0 0 16px;max-width:1680px">Every program is built from a few elementary operations whose derivatives are known. AD applies the chain rule to the <strong>numbers</strong> those operations produce while the program runs, never to a formula.</p>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>The three approaches side by side.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:22%"><col style="width:26%"><col style="width:26%"><col style="width:26%"></colgroup>
+<thead><tr><th></th><th>Symbolic</th><th>Numerical</th><th>Automatic</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Result</td><td>A new formula</td><td>A number</td><td>A number</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Accuracy</td><td>Exact</td><td>Approximate, depends on <span class="tex">h</span></td><td>Exact, up to rounding</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Cost of <span class="tex">\nabla f</span>, <span class="tex">n</span> inputs</td><td>Can grow very fast</td><td><span class="tex">n + 1</span> evaluations</td><td>A small multiple of one evaluation</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Loops and branches</td><td>Hard</td><td>Yes</td><td>Yes</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>Where it is used</span></div><div class="b"><p>Every deep learning library computes gradients with automatic differentiation.</p></div></aside>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Computational graphs</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Break the program into small steps and draw who feeds whom.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The evaluation trace">
+<div class="hdr" data-s="Graphs"></div>
+<h2>The evaluation trace</h2>
+<div class="fr">
+<div class="figbox"><svg id="trace-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Running <span class="tex">f</span> computes one elementary operation at a time. Each result is a new variable:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">v_i = \varphi_i(\text{parents of } v_i)</div><div class="n">(3)</div></div>
+<p class="tex-line an-up" style="--d:.1s"><span class="tex">v_1 = \ln x_1 = 0.693</span></p>
+<p class="tex-line an-up" style="--d:.2s"><span class="tex">v_2 = x_1 x_2 = 10</span></p>
+<p class="tex-line an-up" style="--d:.3s"><span class="tex">v_3 = \sin x_2 = -0.959</span></p>
+<p class="tex-line an-up" style="--d:.4s"><span class="tex">v_4 = v_1 + v_2 = 10.693</span></p>
+<p class="tex-line an-up" style="--d:.5s"><span class="tex">y = v_5 = v_4 - v_3 = 11.652</span></p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>The graph of <span class="tex">f(x_1, x_2) = \ln x_1 + x_1 x_2 - \sin x_2</span> at <span class="tex">(2, 5)</span>. Values in blue.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Local derivatives">
+<div class="hdr" data-s="Graphs"></div>
+<h2>Local derivatives</h2>
+<div class="fr">
+<div class="figbox"><svg id="local-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Each operation knows its slope with respect to each input:</p>
+<p class="tex-line"><span class="tex">u + w: \quad 1, \ 1</span></p>
+<p class="tex-line"><span class="tex">u \cdot w: \quad w, \ u</span></p>
+<p class="tex-line"><span class="tex">\sin u: \quad \cos u</span></p>
+<p class="tex-line"><span class="tex">\ln u: \quad 1/u</span></p>
+<p class="tex-line"><span class="tex">\tanh u: \quad 1 - \tanh^2 u</span></p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>The same graph with the local derivative on every arrow.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The chain rule on the graph">
+<div class="hdr" data-s="Graphs"></div>
+<h2>The chain rule on the graph</h2>
+<div class="fr">
+<div class="figbox"><svg id="paths-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">To get <span class="tex">\partial y / \partial x_1</span>, follow every path from <span class="tex">x_1</span> to <span class="tex">y</span>. Multiply the local derivatives along each path, then add the paths:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\frac{\partial y}{\partial x_1} = \sum_{\text{paths}} \ \prod_{\text{arrows}} \text{local derivative}</div><div class="n">(4)</div></div>
+<p class="tex-line frag up" data-step="p1"><span class="tex" style="color:var(--c-a)">\text{via } v_1\!: \ \tfrac{1}{x_1} \cdot 1 \cdot 1 = 0.5</span></p>
+<p class="tex-line frag up" data-step="p2"><span class="tex" style="color:var(--c-b)">\text{via } v_2\!: \ x_2 \cdot 1 \cdot 1 = 5</span></p>
+<p class="tex-line frag up" data-step="p3"><span class="tex">\partial y / \partial x_1 = 0.5 + 5 = 5.5</span></p>
+<aside class="am frag up" data-step="p3"><div class="t">Check by hand</div><p><span class="tex">\partial f / \partial x_1 = 1/x_1 + x_2 = 5.5</span> ✓</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>The two paths from <span class="tex">x_1</span> to <span class="tex">y</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Too many paths">
+<div class="hdr" data-s="Graphs"></div>
+<h2>Too many paths</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Listing paths does not scale. In a network with <span class="tex">L</span> layers of <span class="tex">k</span> units, each input reaches the output through <span class="tex">k^{L}</span> paths, and most of them share arrows.</p>
+<p class="small frag up" data-step="q1" style="margin:12px 0 0">The fix is to compute the same sum <strong>one node at a time</strong>, reusing what was already computed:</p>
+<ul class="small frag up" data-step="q1" style="margin:8px 0 0">
+<li><strong>Forward mode</strong> starts at an input and stores, at every node, its slope with respect to that input.</li>
+<li><strong>Reverse mode</strong> starts at the output and stores, at every node, the slope of the output with respect to it.</li>
+</ul>
+<p class="small frag up" data-step="q2" style="margin:12px 0 0">Both give exactly the result of (4). They only change the order of the multiplications.</p>
+<div class="figbox" style="height:300px;flex:none;margin-top:16px"><svg id="many-svg" viewBox="0 0 1160 300"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>3 layers of 100 units: <span class="tex">100^3 = 10^6</span> paths from each input.</p><p>Node by node, each arrow is used once.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Three layers of 4 units: <span class="tex">4^3 = 64</span> paths from <span class="tex">x</span> to <span class="tex">y</span>. Three of them are highlighted.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Forward mode</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Apply the chain rule node by node, from the inputs to the output.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Forward mode by hand">
+<div class="hdr" data-s="Forward mode"></div>
+<h2>Forward mode by hand</h2>
+<div class="fr">
+<div class="figbox"><svg id="fh-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Fix one input, <span class="tex">x_1</span>. Visit the nodes from left to right. Each node multiplies the arrows coming in by the slopes already found at their start, and adds:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\frac{\partial v_i}{\partial x_1} = \sum_{j \,\in\, \text{parents}(i)} \frac{\partial v_i}{\partial v_j} \, \frac{\partial v_j}{\partial x_1}</div><div class="n">(5)</div></div>
+<p class="small" style="margin:0">Start from <span class="tex">\partial x_1 / \partial x_1 = 1</span> and <span class="tex">\partial x_2 / \partial x_1 = 0</span>.</p>
+<aside class="am frag up" data-step="f5"><div class="t">One pass, one input</div><p>For <span class="tex">\partial y / \partial x_2</span>, run again from <span class="tex">\partial x_2 / \partial x_2 = 1</span>.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Local derivatives on the arrows; slopes with respect to <span class="tex">x_1</span> under the nodes, at <span class="tex">(2, 5)</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Forward mode in motion" data-demo="fwd">
+<div class="hdr" data-s="Forward mode"></div>
+<h2>Forward mode in motion</h2>
+<div class="fr">
+<div class="figbox"><svg id="fm-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Choose the input, then step through the graph. Each node gets its value and its slope with respect to that input.</p>
+<div class="btns"><button class="bt chip" id="fm-s1">∂ / ∂x₁</button><button class="bt chip" id="fm-s2">∂ / ∂x₂</button></div>
+<div class="ctl"><label><span>Input <span class="tex">x_1</span></span><b id="fm-x1-val">2.0</b></label><input type="range" id="fm-x1" min="0.5" max="4" step="0.1" value="2"></div>
+<div class="ctl"><label><span>Input <span class="tex">x_2</span></span><b id="fm-x2-val">5.0</b></label><input type="range" id="fm-x2" min="-3" max="6" step="0.1" value="5"></div>
+<div class="btns"><button class="bt" id="fm-step">▶ Step</button><button class="bt chip" id="fm-reset">Reset</button></div>
+<div class="ro"><span>Output <span class="tex">y</span></span><b id="fm-y" class="a">?</b></div>
+<div class="ro"><span>Slope <span class="fm-dlab tex">\partial y / \partial x_1</span><span class="fm-dlab tex" style="display:none">\partial y / \partial x_2</span></span><b id="fm-d" class="bb">?</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Values in blue, slopes in orange.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 4 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 4">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 4</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Reverse mode</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Apply the chain rule node by node, from the output back to the inputs.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reverse mode by hand">
+<div class="hdr" data-s="Reverse mode"></div>
+<h2>Reverse mode by hand</h2>
+<div class="fr">
+<div class="figbox"><svg id="rh-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">After a forward pass, visit the nodes from right to left. Each node multiplies its outgoing arrows by the slopes found at their ends, and adds:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\frac{\partial y}{\partial v_j} = \sum_{i \,\in\, \text{children}(j)} \frac{\partial y}{\partial v_i} \, \frac{\partial v_i}{\partial v_j}</div><div class="n">(6)</div></div>
+<p class="small" style="margin:0">Start from <span class="tex">\partial y / \partial y = 1</span>.</p>
+<aside class="am frag up" data-step="h4"><div class="t">One pass, all inputs</div><p>One backward pass gives the slopes for <em>both</em> inputs.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>Local derivatives on the arrows; slopes of <span class="tex">y</span> under the nodes, at <span class="tex">(2, 5)</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reverse mode in motion" data-demo="rev">
+<div class="hdr" data-s="Reverse mode"></div>
+<h2>Reverse mode in motion</h2>
+<div class="fr">
+<div class="figbox"><svg id="rm-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Five steps forward store the values. Then, from <span class="tex">\partial y / \partial y = 1</span>, five steps back apply (6).</p>
+<div class="ctl"><label><span>Input <span class="tex">x_1</span></span><b id="rm-x1-val">2.0</b></label><input type="range" id="rm-x1" min="0.5" max="4" step="0.1" value="2"></div>
+<div class="ctl"><label><span>Input <span class="tex">x_2</span></span><b id="rm-x2-val">5.0</b></label><input type="range" id="rm-x2" min="-3" max="6" step="0.1" value="5"></div>
+<div class="btns"><button class="bt" id="rm-step">▶ Step</button><button class="bt chip" id="rm-reset">Reset</button></div>
+<div class="ro"><span>Phase</span><b id="rm-phase">forward</b></div>
+<div class="ro"><span><span class="tex">\partial y / \partial x_1</span></span><b id="rm-g1" class="bb">?</b></div>
+<div class="ro"><span><span class="tex">\partial y / \partial x_2</span></span><b id="rm-g2" class="bb">?</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>Values in blue, slopes of <span class="tex">y</span> in orange. Each input adds two terms.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Branches add up">
+<div class="hdr" data-s="Reverse mode"></div>
+<h2>Branches add up</h2>
+<div class="fr">
+<div class="figbox"><svg id="fan-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">When a variable feeds several operations, the terms from each one <strong>add up</strong>, as in (6).</p>
+<aside class="am"><div class="t">Example</div><p>In <span class="tex">y = x \cdot x</span> each branch gives <span class="tex">x</span>, so <span class="tex">\partial y / \partial x = x + x = 2x</span>, the derivative of <span class="tex">x^2</span>.</p></aside>
+<aside class="am frag up" data-step="b1"><div class="t">Common bug</div><p>Keeping only the last branch gives a wrong slope.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>(a) A variable used twice. (b) <span class="tex">x_1</span> in the running example.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Forward or reverse?" data-demo="jac">
+<div class="hdr" data-s="Reverse mode"></div>
+<h2>Forward or reverse?</h2>
+<div class="fr">
+<div class="figbox"><svg id="jac-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">All slopes of <span class="tex">f: \mathbb{R}^n \to \mathbb{R}^m</span> form the Jacobian:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\mathbf{J}_f = \Big[\frac{\partial y_i}{\partial x_j}\Big] \in \mathbb{R}^{m \times n}</div><div class="n">(7)</div></div>
+<div class="ctl"><label><span>Inputs <span class="tex">n</span></span><b id="jac-n-val">6</b></label><input type="range" id="jac-n" min="1" max="8" step="1" value="6"></div>
+<div class="ctl"><label><span>Outputs <span class="tex">m</span></span><b id="jac-m-val">1</b></label><input type="range" id="jac-m" min="1" max="8" step="1" value="1"></div>
+<div class="btns"><button class="bt" id="jac-f">Forward pass</button><button class="bt" id="jac-r">Reverse pass</button></div>
+<div class="btns"><button class="bt chip" id="jac-reset">Reset</button></div>
+<div class="ro"><span>Passes used</span><b id="jac-p">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>A forward pass fills one column; a reverse pass fills one row.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 5 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 5">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 5</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Inside an engine</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">What a reverse-mode engine records, in what order it works, and what it costs.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="What an engine stores">
+<div class="hdr" data-s="Engine"></div>
+<h2>What an engine stores</h2>
+<div class="fr">
+<div class="figbox"><svg id="eng-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Each operation of the forward pass creates a node. The backward pass then:</p>
+<ol class="small" style="margin:0;padding-left:1.2em">
+<li class="frag up" data-step="e1">Sorts the nodes so that every node comes after its parents.</li>
+<li class="frag up" data-step="e2">Sets all gradients to 0 and the output’s to 1.</li>
+<li class="frag up" data-step="e3">Visits the nodes from last to first. Each one adds <em>its gradient × local derivative</em> to each parent.</li>
+</ol>
+<div class="grow"></div>
+<p class="cap"><b>Figure 13:</b>(a) One node. (b) The order of the visits.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Backpropagation is reverse mode" data-demo="neu">
+<div class="hdr" data-s="Engine"></div>
+<h2>Backpropagation is reverse mode</h2>
+<div class="fr">
+<div class="figbox"><svg id="neu-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">One neuron, <span class="tex">L = (\tanh(wx + b) - y)^2</span>. Its <span class="tex">\partial L / \partial w</span> is the backpropagation slope of Topic 23.</p>
+<div class="ctl"><label><span>Weight <span class="tex">w</span></span><b id="neu-w-val">0.50</b></label><input type="range" id="neu-w" min="-2" max="2" step="0.01" value="0.5"></div>
+<div class="btns"><button class="bt" id="neu-step">Gradient step</button><button class="bt chip" id="neu-reset">Reset</button></div>
+<div class="ro"><span>Loss <span class="tex">L</span></span><b id="neu-L" class="a">?</b></div>
+<div class="ro"><span>Engine <span class="tex">\partial L / \partial w</span></span><b id="neu-g" class="bb">?</b></div>
+<div class="ro"><span>Finite difference</span><b id="neu-fd">?</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>(a) Values and slopes. (b) Loss along <span class="tex">w</span>, with slope <span class="tex">\partial L / \partial w</span>. Steps use <span class="tex">\alpha = 0.5</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Cost and memory">
+<div class="hdr" data-s="Engine"></div>
+<h2>Cost and memory</h2>
+<div class="fr">
+<div class="figbox"><svg id="mem-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Each node does a fixed amount of work on the way back, so for a scalar output:</p>
+<div class="eq" style="margin:0;font-size:22px"><div class="m tex-d">\text{time}(\nabla f) \le c \cdot \text{time}(f)</div><div class="n">(8)</div></div>
+<p class="small" style="margin:0">with a small constant <span class="tex">c</span> that does not grow with <span class="tex">n</span>. The price is memory: every forward value waits for the backward pass.</p>
+<aside class="am frag up"><div class="t">Checkpointing</div><p>Keep some values and recompute the rest on the way back: more time, less memory.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 15:</b>Stored values over one training step (illustrative).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Engine"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 4:</b>Automatic differentiation at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Exact derivatives, up to rounding</td><td>Reverse mode keeps every intermediate value in memory</td></tr>
+<tr class="an-up" style="--d:.15s"><td>The full gradient of a cost for a few evaluations</td><td>Forward mode needs one pass per input</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Works on programs with loops and branches</td><td>At kinks such as ReLU at 0 it returns one chosen slope</td></tr>
+<tr class="an-up" style="--d:.35s"><td>No derivative is written by hand for a new model</td><td>It differentiates the code as written, including its shortcuts</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>Which mode</span></div><div class="b"><p>Reverse mode when there are many inputs and one output, as in training. Forward mode when there are few inputs and many outputs.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A program is a chain of simple operations; the chain rule multiplies their local derivatives along each path and adds the paths.</li>
+<li class="an-up" style="--d:.15s">Symbolic formulas swell and finite differences are approximate; AD is exact and cheap.</li>
+<li class="an-up" style="--d:.25s">Forward mode applies the chain rule from one input onward: one pass per input.</li>
+<li class="an-up" style="--d:.35s">Reverse mode stores the values, then applies it from the output backward: one pass gives every input.</li>
+<li class="an-up" style="--d:.45s">Backpropagation is reverse mode on a network; branches add up.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">A survey written for machine learning, the reference book on the subject, and the first papers on the forward and reverse modes.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Baydin, A. G., Pearlmutter, B. A., Radul, A. A., &amp; Siskind, J. M. (2018). Automatic differentiation in machine learning: A survey. <em>Journal of Machine Learning Research</em>, 18(153), 1–43.</li>
+<li style="margin:.4em 0">Griewank, A., &amp; Walther, A. (2008). <em>Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation</em> (2nd ed.). SIAM.</li>
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Section 6.5. MIT Press.</li>
+<li style="margin:.4em 0">Wengert, R. E. (1964). A simple automatic derivative evaluation program. <em>Communications of the ACM</em>, 7(8), 463–464.</li>
+<li style="margin:.4em 0">Linnainmaa, S. (1970). <em>The representation of the cumulative rounding error of an algorithm as a Taylor expansion of the local rounding errors</em>. Master’s thesis, University of Helsinki.</li>
+<li style="margin:.4em 0">Chen, T., Xu, B., Zhang, C., &amp; Guestrin, C. (2016). Training deep nets with sublinear memory cost. <em>arXiv:1604.06174</em>.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 25: convolutional neural networks.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, clamp, curvePath, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const num = (v, d = 2) => (v < -1e-12 && Math.abs(v) >= 0.5 * 10 ** -d ? '−' : '') + Math.abs(v).toFixed(d);
+const MID = { 'text-anchor': 'middle' };
+const A = 'var(--c-a)', B = 'var(--c-b)';
+function T(parent, x, y, s, cls = 'tx', attrs = {}) { return el('text', { class: cls, x, y, text: s, ...attrs }, parent); }
+const at = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+function unit(g, p, r, label, cls = 'box', fs) {
+  el('circle', { class: cls, cx: p[0], cy: p[1], r }, g);
+  if (label) T(g, p[0], p[1] + 10, label, 'tx', fs ? { ...MID, style: `font-size:${fs}px;font-weight:600` } : { ...MID, 'font-weight': 600 });
+}
+/* straight arrow between two circles of radius ra and rb */
+function arrow(g, a, b, ra, rb, attrs = {}) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+  return el('line', { class: 'wire', x1: a[0] + ux * ra, y1: a[1] + uy * ra, x2: b[0] - ux * (rb + 4), y2: b[1] - uy * (rb + 4), 'marker-end': 'url(#ah)', ...attrs }, g);
+}
+function pick(btns, i) {
+  btns.forEach((b, k) => {
+    b.style.background = k === i ? 'var(--myst-color-primary)' : '';
+    b.style.color = k === i ? '#fff' : '';
+    b.setAttribute('aria-pressed', String(k === i));
+  });
+}
+const isActive = (svg) => svg.closest('section').hasAttribute('data-deck-active');
+/* move dots along segments [from, to]; skip the motion when hidden or reduced */
+function pulse(svg, layer, segs, color, done, state) {
+  cancelAnimationFrame(state.raf);
+  clear(layer);
+  const dots = segs.map(() => el('circle', { r: 10, style: `fill:${color}` }, layer));
+  const t0 = performance.now(), dur = REDUCED || !isActive(svg) ? 0 : 600;
+  const tick = (t) => {
+    const u = dur ? clamp((t - t0) / dur, 0, 1) : 1;
+    segs.forEach(([a, b], i) => { const p = at(a, b, u); dots[i].setAttribute('cx', p[0]); dots[i].setAttribute('cy', p[1]); });
+    if (u < 1) state.raf = requestAnimationFrame(tick); else { clear(layer); done(); }
+  };
+  state.raf = requestAnimationFrame(tick);
+}
+
+/* ───────── the running example f(x1, x2) = ln x1 + x1 x2 − sin x2 ───────── */
+const R = 46;
+const NODES = [
+  { id: 'x1', name: 'x₁', op: 'x₁', p: [110, 170], par: [] },
+  { id: 'x2', name: 'x₂', op: 'x₂', p: [110, 500], par: [] },
+  { id: 'v1', name: 'v₁', op: 'ln', p: [420, 90], par: ['x1'], f: (a) => Math.log(a), d: (a) => [1 / a], loc: ['1/x₁'] },
+  { id: 'v2', name: 'v₂', op: '×', p: [420, 330], par: ['x1', 'x2'], f: (a, b) => a * b, d: (a, b) => [b, a], loc: ['x₂', 'x₁'] },
+  { id: 'v3', name: 'v₃', op: 'sin', p: [420, 515], par: ['x2'], f: Math.sin, d: (a) => [Math.cos(a)], loc: ['cos x₂'] },
+  { id: 'v4', name: 'v₄', op: '+', p: [720, 220], par: ['v1', 'v2'], f: (a, b) => a + b, d: () => [1, 1], loc: ['1', '1'] },
+  { id: 'v5', name: 'v₅ = y', op: '−', p: [1000, 400], par: ['v4', 'v3'], f: (a, b) => a - b, d: () => [1, -1], loc: ['1', '−1'] },
+];
+const BY = Object.fromEntries(NODES.map((n) => [n.id, n]));
+const OPS = NODES.filter((n) => n.par.length);
+const short = (n) => (n.id === 'v5' ? 'y' : n.name);
+const dOut = (n) => `∂y/∂${short(n)}`;
+const dIn = (n, s) => `∂${short(n)}/∂x${'₁₂'[s]}`;
+function evaluate(x1, x2) {
+  const v = { x1, x2 };
+  OPS.forEach((n) => { v[n.id] = n.f(...n.par.map((q) => v[q])); });
+  return v;
+}
+function tangents(v, seed) {
+  const t = { x1: seed === 0 ? 1 : 0, x2: seed === 1 ? 1 : 0 };
+  OPS.forEach((n) => { const d = n.d(...n.par.map((q) => v[q])); t[n.id] = n.par.reduce((s, q, i) => s + d[i] * t[q], 0); });
+  return t;
+}
+/* draws the graph; returns text slots for the value (top) and the slope (bottom) of each node */
+function graph(svg, opts = {}) {
+  const eg = el('g', {}, svg), lab = el('g', {}, svg), ng = el('g', {}, svg), pg = el('g', {}, svg);
+  const edges = [];
+  NODES.forEach((n) => n.par.forEach((q, i) => {
+    edges.push({ from: q, to: n.id, line: arrow(eg, BY[q].p, n.p, R, R) });
+    if (opts.local) {
+      const m = at(BY[q].p, n.p, 0.5);
+      T(lab, m[0], m[1] - 12, n.loc[i], 'txs halo', { ...MID, style: `fill:${B};font-weight:600` });
+    }
+  }));
+  const slot = {};
+  NODES.forEach((n) => {
+    unit(ng, n.p, R, n.op, n.par.length ? (n.id === 'v5' ? 'box-b' : 'box') : 'box-a', n.op.length > 2 ? 26 : 0);
+    const name = n.id === 'v5' ? T(ng, n.p[0] + R + 10, n.p[1] - R + 10, n.name, 'txs', { style: 'font-weight:600' })
+      : T(ng, n.p[0], n.p[1] - R - 14, n.par.length && opts.names !== false ? n.name : '', 'txs', { ...MID, style: 'font-weight:600' });
+    slot[n.id] = {
+      name,
+      v: T(ng, n.p[0], n.p[1] + R + 34, '', 'txs halo', { ...MID, style: `fill:${A};font-weight:600` }),
+      d: T(ng, n.p[0], n.p[1] + R + 64, '', 'txs halo', { ...MID, style: `fill:${B};font-weight:600` }),
+    };
+  });
+  return { slot, edges, pg };
+}
+const SEG = (q, n) => [at(BY[q].p, BY[n].p, R / Math.hypot(BY[n].p[0] - BY[q].p[0], BY[n].p[1] - BY[q].p[1])), at(BY[n].p, BY[q].p, R / Math.hypot(BY[n].p[0] - BY[q].p[0], BY[n].p[1] - BY[q].p[1]))];
+
+/* ───────── static figures ───────── */
+function drawGrad() {
+  const svg = $('grad-svg');
+  const F = frame(svg, { W: 1160, H: 340, l: 96, t: 16, b: 70, x: [-2, 3], y: [0, 4.2], xt: [], yt: [], xl: 'parameter θₖ', yl: 'cost J' });
+  const J = (t) => 0.45 * (t - 1) ** 2 + 0.6, dJ = (t) => 0.9 * (t - 1), t0 = -0.8;
+  el('path', { class: 'curve-a', d: curvePath(J, -2, 3, F.sx, F.sy) }, F.plot);
+  el('line', { x1: F.sx(t0 - 0.9), y1: F.sy(J(t0) - 0.9 * dJ(t0)), x2: F.sx(t0 + 0.9), y2: F.sy(J(t0) + 0.9 * dJ(t0)), style: 'stroke:var(--c-b);stroke-width:4' }, F.plot);
+  el('circle', { class: 'pt fb', cx: F.sx(t0), cy: F.sy(J(t0)), r: 11 }, F.plot);
+  T(svg, F.sx(t0) + 26, F.sy(J(t0)) - 14, 'slope ∂J/∂θₖ < 0: increase θₖ', 'txs halo', { style: 'fill:var(--c-b);font-weight:600' });
+  el('circle', { class: 'pt fa', cx: F.sx(1), cy: F.sy(J(1)), r: 9 }, F.plot);
+  T(svg, F.sx(1), F.sy(J(1)) - 22, 'lowest cost', 'txs', MID);
+}
+
+function drawTrace() {
+  const g = graph($('trace-svg'));
+  const v = evaluate(2, 5);
+  NODES.forEach((n) => { g.slot[n.id].v.textContent = num(v[n.id], n.par.length ? 3 : 0); });
+}
+
+function drawLocal() {
+  graph($('local-svg'), { local: true });
+}
+
+function drawPaths() {
+  const g = graph($('paths-svg'), { local: true });
+  const PATH = { a: ['x1>v1', 'v1>v4'], b: ['x1>v2', 'v2>v4'], both: ['v4>v5'] };
+  const COL = { a: 'var(--c-a)', b: 'var(--c-b)', both: 'var(--myst-color-text)' };
+  const STEP = { a: 'p1', b: 'p2', both: 'p1' };
+  g.edges.forEach((e) => {
+    const k = Object.keys(PATH).find((p) => PATH[p].includes(`${e.from}>${e.to}`));
+    if (!k) { e.line.style.opacity = '.35'; return; }
+    const hl = el('line', { x1: e.line.getAttribute('x1'), y1: e.line.getAttribute('y1'), x2: e.line.getAttribute('x2'), y2: e.line.getAttribute('y2'), class: 'frag', 'data-step': STEP[k], style: `stroke:${COL[k]};stroke-width:7;stroke-linecap:round` }, e.line.parentNode);
+    e.line.after(hl);
+  });
+}
+
+/* chain-rule steps on the graph: the slope's name above each node, its calculation below (one fragment per step) */
+function drawByHand(id, notes) {
+  const g = graph($(id), { local: true });
+  Object.entries(notes).forEach(([k, [step, name, ...calc]]) => {
+    const s = g.slot[k], n = BY[k];
+    s.name.textContent = name;
+    calc.flat().forEach((line, i) => {
+      const node = i ? s.d : s.v;
+      node.textContent = line;
+      node.setAttribute('class', 'txs halo frag');
+      node.setAttribute('data-step', step);
+      node.setAttribute('style', `fill:${B};font-weight:600`);
+      if (!n.par.length) { node.setAttribute('x', n.p[0] - R); node.setAttribute('text-anchor', 'start'); }
+    });
+  });
+}
+function drawForwardHand() {
+  drawByHand('fh-svg', {
+    x1: ['f0', '∂x₁/∂x₁', '= 1'], x2: ['f0', '∂x₂/∂x₁', '= 0'],
+    v1: ['f1', '∂v₁/∂x₁', '½ · 1 = 0.5'],
+    v2: ['f2', '∂v₂/∂x₁', '5 · 1 + 2 · 0 = 5'],
+    v3: ['f3', '∂v₃/∂x₁', '0.28 · 0 = 0'],
+    v4: ['f4', '∂v₄/∂x₁', '1 · 0.5 + 1 · 5', '= 5.5'],
+    v5: ['f5', '∂y/∂x₁', '1 · 5.5 − 1 · 0 = 5.5'],
+  });
+}
+function drawReverseHand() {
+  drawByHand('rh-svg', {
+    v5: ['h0', '∂y/∂y', '= 1'],
+    v4: ['h1', '∂y/∂v₄', '1 · 1 = 1'], v3: ['h1', '∂y/∂v₃', '1 · (−1) = −1'],
+    v1: ['h2', '∂y/∂v₁', '1 · 1 = 1'], v2: ['h2', '∂y/∂v₂', '1 · 1 = 1'],
+    x1: ['h3', '∂y/∂x₁', ['1 · ½ + 1 · 5', '= 5.5']],
+    x2: ['h4', '∂y/∂x₂', ['1 · 2 + (−1) · 0.28', '= 1.72']],
+  });
+}
+
+function drawMany() {
+  const svg = $('many-svg'), K = 4, xs = [70, 330, 590, 850, 1090], ys = (i) => 45 + i * 70;
+  const layer = (l) => (l === 0 || l === 4 ? [150] : [0, 1, 2, 3].map(ys));
+  for (let l = 0; l < 4; l++) layer(l).forEach((a) => layer(l + 1).forEach((b) => el('line', { x1: xs[l], y1: a, x2: xs[l + 1], y2: b, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, svg)));
+  [[0, 0, 0, 'var(--c-a)'], [1, 3, 2, 'var(--c-b)'], [3, 1, 3, 'var(--c-c)']].forEach(([i, j, k, c]) => {
+    const pts = [[xs[0], 150], [xs[1], ys(i)], [xs[2], ys(j)], [xs[3], ys(k)], [xs[4], 150]];
+    el('path', { d: 'M' + pts.map((q) => q.join(' ')).join('L'), style: `fill:none;stroke:${c};stroke-width:5;stroke-linejoin:round` }, svg);
+  });
+  for (let l = 0; l <= 4; l++) layer(l).forEach((a) => el('circle', { class: l === 0 ? 'box-a' : l === 4 ? 'box-b' : 'box', cx: xs[l], cy: a, r: 18 }, svg));
+  T(svg, xs[0], 205, 'x', 'tx', MID);
+  T(svg, xs[4], 205, 'y', 'tx', MID);
+}
+
+function drawFan() {
+  const svg = $('fan-svg');
+  /* (a) y = x · x */
+  T(svg, 0, 40, '(a) y = x · x', 'ttl');
+  const X = [100, 330], M = [420, 330];
+  el('path', { class: 'wire', d: `M${X[0] + 40} ${X[1] - 22}Q260 200 ${M[0] - 38} ${M[1] - 26}`, 'marker-end': 'url(#ah)' }, svg);
+  el('path', { class: 'wire', d: `M${X[0] + 40} ${X[1] + 22}Q260 460 ${M[0] - 38} ${M[1] + 26}`, 'marker-end': 'url(#ah)' }, svg);
+  const BS = 'stroke:var(--c-b);stroke-width:3;fill:none;stroke-dasharray:8 6';
+  el('path', { d: `M${M[0] - 30} ${M[1] - 52}Q260 140 ${X[0] + 20} ${X[1] - 52}`, style: BS, 'marker-end': 'url(#ah-b)' }, svg);
+  el('path', { d: `M${M[0] - 30} ${M[1] + 52}Q260 520 ${X[0] + 20} ${X[1] + 52}`, style: BS, 'marker-end': 'url(#ah-b)' }, svg);
+  unit(svg, X, 40, 'x', 'box-a');
+  unit(svg, M, 40, '×', 'box-b');
+  const O = 'fill:var(--c-b);font-weight:600';
+  T(svg, 260, 160, '1 · x', 'txs halo', { ...MID, style: O });
+  T(svg, 260, 520, '1 · x', 'txs halo', { ...MID, style: O });
+  T(svg, 260, 620, '∂y/∂x = x + x = 2x', 'tx', { ...MID, 'font-weight': 700 });
+  /* (b) x1 in the running example */
+  const g = el('g', { class: 'frag', 'data-step': 'b0' }, svg);
+  T(g, 600, 40, '(b) x₁ at (2, 5)', 'ttl');
+  const X1 = [680, 330], LN = [1000, 160], MU = [1000, 500];
+  arrow(g, X1, LN, 40, 40); arrow(g, X1, MU, 40, 40);
+  el('path', { d: `M${LN[0] - 50} ${LN[1] - 30}Q840 130 ${X1[0] + 10} ${X1[1] - 50}`, style: BS, 'marker-end': 'url(#ah-b)' }, g);
+  el('path', { d: `M${MU[0] - 50} ${MU[1] + 30}Q840 530 ${X1[0] + 10} ${X1[1] + 50}`, style: BS, 'marker-end': 'url(#ah-b)' }, g);
+  unit(g, X1, 40, 'x₁', 'box-a');
+  unit(g, LN, 40, 'ln', 'box', 26);
+  unit(g, MU, 40, '×', 'box');
+  T(g, LN[0] + 56, LN[1] + 9, '∂y/∂v₁ = 1', 'txs', { style: O });
+  T(g, MU[0] + 56, MU[1] + 9, '∂y/∂v₂ = 1', 'txs', { style: O });
+  T(g, 850, 115, '1 · 1/x₁ = 0.5', 'txs halo', { ...MID, style: O });
+  T(g, 850, 590, '1 · x₂ = 5', 'txs halo', { ...MID, style: O });
+  T(g, 880, 660, '∂y/∂x₁ = 0.5 + 5 = 5.5', 'tx', { ...MID, 'font-weight': 700 });
+}
+
+function drawEngine() {
+  const svg = $('eng-svg');
+  /* (a) one node */
+  T(svg, 0, 40, '(a) the node of v₂ = x₁ · x₂', 'ttl');
+  const x0 = 60, y0 = 80, w = 640, rows = [['value', '10', A], ['grad ∂y/∂v₂', '1', B], ['parents', 'x₁, x₂', null], ['local derivatives', '∂/∂x₁ = 5, ∂/∂x₂ = 2', null]];
+  el('rect', { class: 'box', x: x0, y: y0, width: w, height: 60 + rows.length * 56, rx: 10 }, svg);
+  el('rect', { class: 'box-a', x: x0, y: y0, width: w, height: 60, rx: 10 }, svg);
+  T(svg, x0 + 24, y0 + 40, 'node: operation ×', 'tx', { 'font-weight': 700 });
+  rows.forEach(([k, val, col], i) => {
+    const y = y0 + 60 + i * 56 + 38;
+    T(svg, x0 + 24, y, k, 'txs');
+    T(svg, x0 + w - 24, y, val, 'tx', { 'text-anchor': 'end', style: col ? `fill:${col};font-weight:700` : 'font-weight:600' });
+    if (i) el('line', { class: 'gl', x1: x0 + 16, x2: x0 + w - 16, y1: y0 + 60 + i * 56, y2: y0 + 60 + i * 56 }, svg);
+  });
+  /* (b) order of the visits */
+  T(svg, 0, 470, '(b) sorted nodes', 'ttl');
+  const order = ['x₁', 'x₂', 'v₁', 'v₂', 'v₃', 'v₄', 'y'], y = 580, gap = 150, xs = order.map((_, i) => 90 + i * gap);
+  const fw = el('g', { class: 'frag', 'data-step': 'e1' }, svg), bw = el('g', { class: 'frag', 'data-step': 'e3' }, svg);
+  el('path', { class: 'wire-a', d: `M${xs[0]} 508H${xs[6]}`, 'marker-end': 'url(#ah-a)' }, fw);
+  T(fw, (xs[0] + xs[6]) / 2, 496, 'forward pass: creates nodes in this order', 'txs', { ...MID, style: `fill:${A};font-weight:600` });
+  order.forEach((s, i) => unit(svg, [xs[i], y], 34, s, i === 6 ? 'box-b' : i < 2 ? 'box-a' : 'box', 26));
+  el('path', { d: `M${xs[6]} 652H${xs[0]}`, style: 'stroke:var(--c-b);stroke-width:3;fill:none', 'marker-end': 'url(#ah-b)' }, bw);
+  T(bw, (xs[0] + xs[6]) / 2, 690, 'backward pass: visits them last to first', 'txs', { ...MID, style: `fill:${B};font-weight:600` });
+}
+
+function drawMem() {
+  const svg = $('mem-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, b: 90, x: [0, 3], y: [0, 1.15], xt: [], yt: [], xl: 'time within one training step', yl: 'values in memory' });
+  el('rect', { x: F.sx(0), y: F.T, width: F.sx(1) - F.sx(0), height: F.H - F.B - F.T, style: 'fill:var(--c-a);fill-opacity:.08' }, F.plot);
+  el('rect', { x: F.sx(1), y: F.T, width: F.sx(3) - F.sx(1), height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.08' }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: `M${F.sx(0)} ${F.sy(0)}L${F.sx(1)} ${F.sy(1)}` }, F.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.8s', d: `M${F.sx(1)} ${F.sy(1)}L${F.sx(3)} ${F.sy(0)}` }, F.plot);
+  T(svg, F.sx(0.5), F.T + 44, 'forward pass', 'tx', { ...MID, style: `fill:${A};font-weight:700` });
+  T(svg, F.sx(0.5), F.T + 80, 'stores v₁, v₂, …', 'txs', MID);
+  T(svg, F.sx(2), F.T + 44, 'backward pass', 'tx', { ...MID, style: `fill:${B};font-weight:700` });
+  T(svg, F.sx(2), F.T + 80, 'uses each value, then frees it', 'txs', MID);
+  T(svg, F.sx(1) + 16, F.sy(1) + 6, 'peak', 'txs');
+}
+
+/* ───────── interactive demos ───────── */
+/* finite differences: truncation error falls with h, rounding error grows as h shrinks */
+(() => {
+  const svg = $('fd-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [-16, 0], y: [-12, 1], xt: [-16, -12, -8, -4, 0], yt: [-12, -8, -4, 0], fx: (v) => (v ? '10' + sup(v) : '1'), fy: (v) => (v ? '10' + sup(v) : '1'), xl: 'step h', yl: 'error' });
+  function sup(v) { return String(v).replace('-', '⁻').replace(/\d/g, (c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[c]); }
+  const x = 1, exact = Math.cos(x);
+  const est = (h) => (Math.sin(x + h) - Math.sin(x)) / h;
+  const lerr = (t) => Math.log10(Math.max(Math.abs(est(10 ** t) - exact), 1e-12));
+  el('path', { class: 'curve-t', d: curvePath((t) => Math.log10((10 ** t * Math.sin(x)) / 2), -16, 0, F.sx, F.sy) }, F.plot);
+  el('path', { d: curvePath((t) => Math.log10((2.2e-16 * Math.sin(x)) / 10 ** t), -16, 0, F.sx, F.sy), style: 'fill:none;stroke:var(--c-c);stroke-width:3;stroke-dasharray:10 8' }, F.plot);
+  el('path', { class: 'curve-b', style: 'stroke-width:3.5', d: curvePath(lerr, -16, 0, F.sx, F.sy, 640) }, F.plot);
+  const mark = el('line', { y1: F.T, y2: F.H - F.B, class: 'curve-t' }, F.plot);
+  const dot = el('circle', { r: 12, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:5' }, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.W - F.R - 410, y: F.T + 10, width: 400, height: 128, rx: 6, style: 'fill:var(--myst-color-bg);opacity:.92' }, lg);
+  legend(lg, F.W - F.R - 396, F.T + 40, [['line', 'curve-b', 'measured error'], ['line', 'curve-t', 'truncation, grows with h'], ['line', 'curve-t', 'rounding, grows as h shrinks']]);
+  lg.querySelectorAll('line')[2].setAttribute('style', 'stroke:var(--c-c);stroke-width:3;stroke-dasharray:10 8');
+  const s = $('fd-h');
+  function draw() {
+    const t = +s.value, h = 10 ** t, e = Math.abs(est(h) - exact);
+    mark.setAttribute('x1', F.sx(t)); mark.setAttribute('x2', F.sx(t));
+    dot.setAttribute('cx', F.sx(t)); dot.setAttribute('cy', F.sy(lerr(t)));
+    $('fd-h-val').textContent = t ? '10' + sup(Number.isInteger(t) ? t : t.toFixed(2)) : '1';
+    $('fd-est').textContent = est(h).toFixed(8);
+    $('fd-err').textContent = e ? e.toExponential(1).replace('e-', ' × 10⁻').replace(/⁻(\d+)/, (m, d) => '⁻' + d.replace(/\d/g, (c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[c])) : '0';
+  }
+  s.addEventListener('input', draw);
+  draw();
+})();
+
+/* forward and reverse mode on the running example */
+function modeDemo(pre, mode) {
+  const svg = $(pre + '-svg');
+  const g = graph(svg, { names: false });
+  const msg = T(svg, 580, 688, '', 'tx', MID);
+  const st = { raf: 0 };
+  const s1 = $(pre + '-x1'), s2 = $(pre + '-x2');
+  const seedBtns = mode === 'fwd' ? [$(pre + '-s1'), $(pre + '-s2')] : [];
+  const stepBtn = $(pre + '-step');
+  let seed = 0, k = 0, busy = false, v, t, adj;
+  const last = mode === 'fwd' ? OPS.length : 2 * OPS.length + 1;
+  function paint() {
+    NODES.forEach((n) => {
+      const shown = !n.par.length || OPS.indexOf(n) < Math.min(k, OPS.length);
+      g.slot[n.id].v.textContent = shown ? `${n.name.replace(' = y', '')} = ${num(v[n.id], 2)}` : '?';
+      if (mode === 'fwd') g.slot[n.id].d.textContent = shown ? `${dIn(n, seed)} = ${num(t[n.id], 2)}` : '';
+      else g.slot[n.id].d.textContent = adj && n.id in adj ? `${dOut(n)} = ${num(adj[n.id], 2)}` : '';
+    });
+    stepBtn.disabled = busy || k >= last;
+    if (mode === 'fwd') {
+      $(pre + '-y').textContent = k >= last ? num(v.v5, 3) : '?';
+      $(pre + '-d').textContent = k >= last ? num(t.v5, 3) : '?';
+    } else {
+      $(pre + '-phase').textContent = k < OPS.length ? 'forward' : k >= last ? 'done' : 'backward';
+      $(pre + '-g1').textContent = k >= last ? num(adj.x1, 3) : '?';
+      $(pre + '-g2').textContent = k >= last ? num(adj.x2, 3) : '?';
+    }
+  }
+  function reset() {
+    cancelAnimationFrame(st.raf); clear(g.pg);
+    v = evaluate(+s1.value, +s2.value); t = tangents(v, seed); adj = null; k = 0; busy = false;
+    $(pre + '-x1-val').textContent = num(+s1.value, 1);
+    $(pre + '-x2-val').textContent = num(+s2.value, 1);
+    msg.textContent = mode === 'fwd' ? `Start: ∂x${'₁₂'[seed]}/∂x${'₁₂'[seed]} = 1, ∂x${'₂₁'[seed]}/∂x${'₁₂'[seed]} = 0. Press Step.` : 'Press Step to run the forward pass.';
+    paint();
+  }
+  function forwardStep() {
+    const n = OPS[k];
+    busy = true; paint();
+    pulse(svg, g.pg, n.par.map((q) => SEG(q, n.id)), A, () => {
+      k++; busy = false;
+      if (mode === 'fwd') msg.textContent = `${dIn(n, seed)} = ${n.par.map((q, i) => `${n.loc[i]} · ${dIn(BY[q], seed)}`).join(' + ').replace('+ −1 ·', '− 1 ·')} = ${num(t[n.id], 2)}`;
+      else msg.textContent = `${n.name.replace(' = y', '')} = ${num(v[n.id], 3)} stored`;
+      paint();
+    }, st);
+  }
+  function backwardStep() {
+    if (k === OPS.length) { adj = { v5: 1 }; k++; msg.textContent = 'Start: ∂y/∂y = 1'; paint(); return; }
+    const n = OPS[last - k - 1], d = n.d(...n.par.map((q) => v[q]));
+    busy = true; paint();
+    pulse(svg, g.pg, n.par.map((q) => SEG(q, n.id).slice().reverse()), B, () => {
+      const parts = n.par.map((q, i) => {
+        const c = adj[n.id] * d[i];
+        adj[q] = (adj[q] || 0) + c;
+        return `${dOut(BY[q])} gets ${dOut(n)} · ${n.loc[i]} = ${num(c, 2)}`;
+      });
+      k++; busy = false;
+      msg.textContent = parts.join(';   ');
+      paint();
+    }, st);
+  }
+  stepBtn.addEventListener('click', () => { if (busy || k >= last) return; if (k < OPS.length) forwardStep(); else backwardStep(); });
+  $(pre + '-reset').addEventListener('click', reset);
+  [s1, s2].forEach((s) => s.addEventListener('input', reset));
+  seedBtns.forEach((b, i) => b.addEventListener('click', () => {
+    seed = i; pick(seedBtns, i);
+    document.querySelectorAll(`.${pre}-dlab`).forEach((e, k) => { e.style.display = k === i ? '' : 'none'; });
+    reset();
+  }));
+  if (seedBtns.length) pick(seedBtns, 0);
+  reset();
+}
+modeDemo('fm', 'fwd');
+modeDemo('rm', 'rev');
+
+/* Jacobian: forward passes fill columns, reverse passes fill rows */
+(() => {
+  const svg = $('jac-svg');
+  const gGrid = el('g', {}, svg), gFn = el('g', {}, svg);
+  const sn = $('jac-n'), sm = $('jac-m');
+  let n, m, cols, rows, passes;
+  function draw() {
+    clear(gGrid); clear(gFn);
+    const cell = Math.min(64, 440 / n, 440 / m), x0 = 120, y0 = 140;
+    T(gGrid, x0, 60, 'Jacobian (m × n)', 'ttl');
+    for (let j = 0; j < n; j++) T(gGrid, x0 + (j + 0.5) * cell, y0 - 14, 'x' + '₁₂₃₄₅₆₇₈'[j], 'txs', MID);
+    for (let i = 0; i < m; i++) T(gGrid, x0 - 16, y0 + (i + 0.5) * cell + 8, 'y' + '₁₂₃₄₅₆₇₈'[i], 'txs', { 'text-anchor': 'end' });
+    for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) {
+      const c = cols.has(j) ? 'fa' : rows.has(i) ? 'fb' : 'cell';
+      el('rect', { class: c, x: x0 + j * cell + 2, y: y0 + i * cell + 2, width: cell - 4, height: cell - 4, rx: 4, style: c === 'cell' ? '' : 'opacity:.75' }, gGrid);
+    }
+    /* the function as a box with n inputs and m outputs */
+    const bx = 760, by = 140, bh = 440, ys = (k, K) => by + ((k + 0.5) * bh) / K;
+    el('rect', { class: 'box', x: bx + 90, y: by, width: 140, height: bh, rx: 10 }, gFn);
+    T(gFn, bx + 160, by + bh / 2 + 10, 'f', 'tx', { ...MID, 'font-weight': 700, style: 'font-size:40px' });
+    for (let j = 0; j < n; j++) {
+      el('line', { class: cols.has(j) ? 'wire-a' : 'wire', x1: bx + 20, x2: bx + 86, y1: ys(j, n), y2: ys(j, n) }, gFn);
+      el('circle', { class: cols.has(j) ? 'fa' : 'box', cx: bx + 14, cy: ys(j, n), r: 10 }, gFn);
+    }
+    for (let i = 0; i < m; i++) {
+      el('line', { class: 'wire', x1: bx + 234, x2: bx + 300, y1: ys(i, m), y2: ys(i, m), style: rows.has(i) ? 'stroke:var(--c-b);stroke-width:3' : '' }, gFn);
+      el('circle', { class: rows.has(i) ? 'fb' : 'box', cx: bx + 306, cy: ys(i, m), r: 10 }, gFn);
+    }
+    T(gFn, bx + 14, by + bh + 40, `n = ${n}`, 'txs', MID);
+    T(gFn, bx + 306, by + bh + 40, `m = ${m}`, 'txs', MID);
+    const full = [...Array(m * n).keys()].every((q) => cols.has(q % n) || rows.has(Math.floor(q / n)));
+    T(gGrid, x0, 680, `Forward mode needs ${n} pass${n > 1 ? 'es' : ''}; reverse mode needs ${m}.`, 'tx', { 'font-weight': 600 });
+    if (full) T(gGrid, x0, 616, `Complete after ${passes} pass${passes > 1 ? 'es' : ''}.`, 'txs', { style: 'fill:var(--c-c);font-weight:700' });
+    $('jac-p').textContent = passes;
+    $('jac-f').disabled = cols.size >= n;
+    $('jac-r').disabled = rows.size >= m;
+  }
+  function reset() {
+    n = +sn.value; m = +sm.value; cols = new Set(); rows = new Set(); passes = 0;
+    $('jac-n-val').textContent = n; $('jac-m-val').textContent = m;
+    draw();
+  }
+  $('jac-f').addEventListener('click', () => { if (cols.size < n) { cols.add(cols.size); passes++; draw(); } });
+  $('jac-r').addEventListener('click', () => { if (rows.size < m) { rows.add(rows.size); passes++; draw(); } });
+  $('jac-reset').addEventListener('click', reset);
+  [sn, sm].forEach((s) => s.addEventListener('input', reset));
+  reset();
+})();
+
+/* one neuron trained with reverse mode */
+(() => {
+  const svg = $('neu-svg');
+  const X = 1.5, BI = 0.2, Y = 0.5, AL = 0.5, r = 34;
+  const N = {
+    w: [70, 70], x: [70, 210], u: [250, 140], b: [440, 40], z: [440, 170], a: [640, 170], y: [840, 40], L: [840, 170],
+  };
+  const EDGES = [['w', 'u'], ['x', 'u'], ['u', 'z'], ['b', 'z'], ['z', 'a'], ['a', 'L'], ['y', 'L']];
+  T(svg, 0, 20, '(a) graph', 'ttl');
+  EDGES.forEach(([p, q]) => arrow(svg, N[p], N[q], r, r));
+  const OPL = { w: 'w', x: 'x', u: '×', b: 'b', z: '+', a: 'tanh', y: 'y', L: 'L' };
+  Object.entries(N).forEach(([k, p]) => unit(svg, p, r, OPL[k], k === 'w' ? 'box-a' : k === 'L' ? 'box-b' : 'box', k === 'a' ? 22 : 0));
+  const side = (k, dy, col) => T(svg, N[k][0] + r + 12, N[k][1] + dy, '', 'txs halo', { style: `fill:${col};font-weight:600` });
+  const below = (k, dy, col) => T(svg, N[k][0], N[k][1] + r + dy, '', 'txs halo', { ...MID, style: `fill:${col};font-weight:600` });
+  const tv = { u: below('u', 30, A), z: below('z', 30, A), a: below('a', 30, A), L: side('L', -4, A) };
+  const tg = { w: side('w', 8, B), u: below('u', 58, B), z: below('z', 58, B), a: below('a', 58, B), L: side('L', 26, B) };
+  T(svg, N.x[0], N.x[1] + r + 30, 'x = 1.5', 'txs', MID);
+  T(svg, N.b[0] + r + 12, N.b[1] + 8, 'b = 0.2', 'txs');
+  T(svg, N.y[0] + r + 12, N.y[1] + 8, 'y = 0.5', 'txs');
+  /* (b) loss along w */
+  const gB = el('g', {}, svg);
+  T(gB, 0, 345, '(b) loss L(w)', 'ttl');
+  const loss = (w) => (Math.tanh(w * X + BI) - Y) ** 2;
+  const F = frame(gB, { W: 1160, H: 700, l: 96, t: 365, b: 64, x: [-2, 2], y: [0, 2.4], xt: [-2, -1, 0, 1, 2], yt: [0, 1, 2], fx: (v) => (v < 0 ? '−' + -v : String(v)), xl: '', yl: '' });
+  T(gB, F.W - F.R - 8, F.H - F.B - 14, 'w', 'lb', { 'text-anchor': 'end' });
+  el('path', { class: 'curve-a', d: curvePath(loss, -2, 2, F.sx, F.sy) }, F.plot);
+  const tan = el('line', { style: 'stroke:var(--c-b);stroke-width:4' }, F.plot);
+  const pt = el('circle', { class: 'pt fb', r: 11 }, F.plot);
+  const sw = $('neu-w');
+  function draw() {
+    const w = +sw.value, u = w * X, z = u + BI, a = Math.tanh(z), L = (a - Y) ** 2;
+    const gL = 1, ga = 2 * (a - Y), gz = ga * (1 - a * a), gu = gz, gw = gu * X;
+    tv.u.textContent = 'u = ' + num(u, 2); tv.z.textContent = 'z = ' + num(z, 2); tv.a.textContent = 'a = ' + num(a, 3); tv.L.textContent = 'L = ' + num(L, 3);
+    tg.L.textContent = '∂L/∂L = ' + num(gL, 0); tg.a.textContent = '∂L/∂a = ' + num(ga, 3); tg.z.textContent = '∂L/∂z = ' + num(gz, 3); tg.u.textContent = '∂L/∂u = ' + num(gu, 3); tg.w.textContent = '∂L/∂w = ' + num(gw, 3);
+    const h = 0.6;
+    tan.setAttribute('x1', F.sx(w - h)); tan.setAttribute('y1', F.sy(L - h * gw));
+    tan.setAttribute('x2', F.sx(w + h)); tan.setAttribute('y2', F.sy(L + h * gw));
+    pt.setAttribute('cx', F.sx(w)); pt.setAttribute('cy', F.sy(L));
+    const e = 1e-6;
+    $('neu-w-val').textContent = num(w, 2);
+    $('neu-L').textContent = num(L, 4);
+    $('neu-g').textContent = num(gw, 4);
+    $('neu-fd').textContent = num((loss(w + e) - loss(w - e)) / (2 * e), 4);
+  }
+  sw.addEventListener('input', draw);
+  $('neu-step').addEventListener('click', () => {
+    const w = +sw.value, a = Math.tanh(w * X + BI), gw = 2 * (a - Y) * (1 - a * a) * X;
+    sw.value = clamp(w - AL * gw, -2, 2).toFixed(2);
+    draw();
+  });
+  $('neu-reset').addEventListener('click', () => { sw.value = 0.5; draw(); });
+  draw();
+})();
+
+drawGrad(); drawTrace(); drawLocal(); drawPaths(); drawMany(); drawForwardHand(); drawReverseHand(); drawFan(); drawEngine(); drawMem();
+})();
+</script>
+</body>
+</html>

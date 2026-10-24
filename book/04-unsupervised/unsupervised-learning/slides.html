@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsupervised learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488;--c-f:#db2777;--c-g:#ca8a04;--c-h:#64748b}
+.dark{--c-e:#2dd4bf;--c-f:#f472b6;--c-g:#facc15;--c-h:#94a3b8}
+.fe{fill:var(--c-e)}.ff{fill:var(--c-f)}.fg{fill:var(--c-g)}.fh{fill:var(--c-h)}
+.gray{fill:var(--myst-color-text-tertiary)}
+.ats-prose table.tb.cmp td{padding:.25em .6em;vertical-align:middle}
+.thumb{display:block;width:240px;height:84px;overflow:hidden;border:1px solid var(--myst-color-border);border-radius:2px}
+#an-svg{cursor:crosshair}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 15</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Unsupervised learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Finding structure in data that comes without answers</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 15 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Learning without labels</li>
+<li class="an-up" style="--d:.15s">Similarity and groups</li>
+<li class="an-up" style="--d:.25s">Fewer features and judging results</li>
+<li class="an-up" style="--d:.35s">The methods in this chapter</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{\mathbf{x}_i\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> examples and no labels</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">K</span></td><td>Number of groups (clusters)</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">c_i \in \{1, \dots, K\}</span></td><td>Group of example <span class="tex">i</span>; <span class="tex">C_k</span> holds the examples of group <span class="tex">k</span></td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">d(\mathbf{x}_i, \mathbf{x}_j)</span></td><td>Distance between two examples</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\mathbf{z}_i \in \mathbb{R}^q, \ q &lt; d</span></td><td>A shorter description of example <span class="tex">i</span> with <span class="tex">q</span> new features</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Supervised data was <span class="tex">\{(\mathbf{x}_i, y_i)\}</span>. Here the label <span class="tex">y_i</span> is missing.</p><p>Alone, <span class="tex">d</span> counts the features. With two arguments, <span class="tex">d(\cdot, \cdot)</span> is a distance.</p><p>Uppercase <span class="tex">K</span> counts the groups; lowercase <span class="tex">k</span> picks one.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Learning without labels</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">We only see the inputs, and we ask what shape they have.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Same data, no labels" data-demo="toggle">
+<div class="hdr" data-s="Without labels"></div>
+<h2>Same data, no labels</h2>
+<div class="fr">
+<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px;min-height:0">
+<div class="figbox"><svg id="lab-svg" viewBox="0 0 560 620"></svg></div>
+<div class="figbox"><svg id="unl-svg" viewBox="0 0 560 620"></svg></div>
+<div class="subcap">(a) Supervised: every point has a label</div>
+<div class="subcap">(b) Unsupervised: only the positions</div>
+</div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Without labels we can still ask: are there groups? Press the button to search for 3 groups in (b).</p>
+<div class="btns"><button class="bt" id="tg-find">Find 3 groups</button><button class="bt chip" id="tg-reset">Reset</button></div>
+<div class="ro"><span>Agreement with the hidden labels</span><b id="tg-agree" class="a">—</b></div>
+<aside class="am"><div class="t">Why labels are missing</div><p>Raw data is cheap: logs, sensors, photos. Labels need an expert, a survey or a long wait.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>60 examples of three species. The search in (b) never sees the colors of (a).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Four questions">
+<div class="hdr" data-s="Without labels"></div>
+<h2>Four questions without labels</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1fr) auto auto;column-gap:40px;row-gap:4px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="q1-svg" viewBox="0 0 400 440"></svg></div>
+<div class="figbox an-fade" style="--d:.25s"><svg id="q2-svg" viewBox="0 0 400 440"></svg></div>
+<div class="figbox an-fade" style="--d:.45s"><svg id="q3-svg" viewBox="0 0 400 440"></svg></div>
+<div class="figbox an-fade" style="--d:.65s"><svg id="q4-svg" viewBox="0 0 400 440"></svg></div>
+<div class="subcap"><b>(a) Clustering</b><br>Which groups are there?</div>
+<div class="subcap"><b>(b) Dimensionality reduction</b><br>Can fewer features describe it?</div>
+<div class="subcap"><b>(c) Anomaly detection</b><br>Which points are unusual?</div>
+<div class="subcap"><b>(d) Density estimation</b><br>Where do points crowd?</div>
+<div class="subcap"><span class="tex">c_i \in \{1, \dots, K\}</span></div>
+<div class="subcap"><span class="tex">\mathbf{z}_i \in \mathbb{R}^q</span></div>
+<div class="subcap">one score per point</div>
+<div class="subcap">a height over the plane</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 2:</b>The four main families of unsupervised tasks. The bottom row is what each one returns. This chapter covers (a) and (b).</p>
+</section>
+
+<section class="s ats-prose" data-label="Uses in practice">
+<div class="hdr" data-s="Without labels"></div>
+<h2>Uses in practice</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Real problems where nobody gives the right answer in advance.</p>
+<table class="tb" style="font-size:27px">
+<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+<thead><tr><th>Use</th><th>Data</th><th>Task</th><th>Result</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Customer segments</strong></td><td>Purchases and visits of each client</td><td>Clustering</td><td>Groups for each campaign</td></tr>
+<tr class="an-up" style="--d:.13s"><td><strong>News topics</strong></td><td>Word counts of each article</td><td>Clustering</td><td>Articles grouped by subject</td></tr>
+<tr class="an-up" style="--d:.21s"><td><strong>Image compression</strong></td><td>Pixel values of each image</td><td>Dimensionality reduction</td><td>Fewer numbers per image</td></tr>
+<tr class="an-up" style="--d:.29s"><td><strong>Gene studies</strong></td><td>Many measurements per patient</td><td>Dimensionality reduction</td><td>A 2-D map to look at</td></tr>
+<tr class="an-up" style="--d:.37s"><td><strong>Card fraud</strong></td><td>Amount, place and time of payments</td><td>Anomaly detection</td><td>Payments to check by hand</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:16px;max-width:1300px;font-size:26px"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>The output often feeds a later step: a supervised model, or a person who checks the flagged cases.</p></div></aside>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Similarity and groups</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Close points belong together, so first we decide what close means.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distance formula">
+<div class="hdr" data-s="Similarity"></div>
+<h2>Distance between examples</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Every method in this chapter compares examples. The usual measure is the Euclidean distance, a straight line between two rows of the table:</p>
+<div class="eq"><div class="m tex-d">d(\mathbf{x}_i, \mathbf{x}_j) = \sqrt{\sum_{l=1}^{d} (x_{il} - x_{jl})^2}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="s1" style="margin:16px 0 0">A feature measured in large numbers dominates the sum. Standardizing each feature first (Topic 4) puts them on the same footing:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">x_{il} \ \leftarrow \ \frac{x_{il} - \bar{x}_l}{s_l}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="s2" style="margin:16px 0 0">Here <span class="tex">\bar{x}_l</span> and <span class="tex">s_l</span> are the mean and standard deviation of feature <span class="tex">l</span>. Change the scale and the nearest neighbor can change.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Clients as (age, income in thousands):<br>A = (25, 500), B = (60, 520), C = (27, 800).</p><p>Raw: <span class="tex">d(A,B) \approx 40.3</span>, <span class="tex">d(A,C) \approx 300.0</span>. B is closer.</p><p>Divide age by 15 and income by 150: <span class="tex">d(A,B) \approx 2.34</span>, <span class="tex">d(A,C) \approx 2.00</span>. Now C is closer.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Compact and separated">
+<div class="hdr" data-s="Similarity"></div>
+<h2>Compact and separated</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="good-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="bad-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap" id="good-cap">(a) Groups that follow the clouds</div>
+<div class="subcap" id="bad-cap">(b) The same points cut into strips</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 3:</b>A good clustering is compact inside and separated between groups. Each thin line joins a point to its group center (square). In (b) the lines are longer, and the total of their squared lengths, <span class="tex">W</span>, is larger.</p>
+</section>
+
+<section class="s ats-prose" data-label="Within-cluster sum of squares">
+<div class="hdr" data-s="Similarity"></div>
+<h2>Measuring compactness</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The centroid of group <span class="tex">k</span> is the average of its members, feature by feature:</p>
+<div class="eq"><div class="m tex-d">\boldsymbol{\mu}_k = \frac{1}{|C_k|} \sum_{i \in C_k} \mathbf{x}_i</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="w1" style="margin:16px 0 0">The within-cluster sum of squares adds the squared distance of every example to its own centroid:</p>
+<div class="eq frag up" data-step="w1"><div class="m tex-d">W = \sum_{k=1}^{K} \sum_{i \in C_k} \lVert \mathbf{x}_i - \boldsymbol{\mu}_k \rVert^2</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="w2" style="margin:16px 0 0">Small <span class="tex">W</span> means compact groups. More groups always allow a smaller <span class="tex">W</span>, so <span class="tex">W</span> alone cannot choose <span class="tex">K</span>. Topic 16 calls it the inertia <span class="tex">J</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">C_1 = \{(1,2), (3,2), (2,5)\}</span>, so <span class="tex">\boldsymbol{\mu}_1 = (2, 3)</span>.</p><p>Squared distances: <span class="tex">2 + 2 + 4 = 8</span>.</p><p><span class="tex">C_2 = \{(8,8), (10,8)\}</span>, so <span class="tex">\boldsymbol{\mu}_2 = (9, 8)</span>; squared distances <span class="tex">1 + 1 = 2</span>.</p><p><span class="tex">W = 8 + 2 = 10</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Silhouette">
+<div class="hdr" data-s="Similarity"></div>
+<h2>The silhouette</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">For example <span class="tex">i</span>, let <span class="tex">a_i</span> be its average distance to the rest of its group, and <span class="tex">b_i</span> its average distance to the nearest other group:</p>
+<div class="eq"><div class="m tex-d">s_i = \frac{b_i - a_i}{\max(a_i, b_i)}</div><div class="n">(5)</div></div>
+<div class="figbox frag up" data-step="h1" style="flex:none;height:230px"><svg id="sil-svg" viewBox="0 0 1160 230"></svg></div>
+<p class="cap frag up" data-step="h1" style="margin:4px 0 0"><b>Figure 4:</b>For the point at 0: <span class="tex">a</span> reaches its own group, <span class="tex">b</span> the other one.</p>
+<p class="small frag up" data-step="h2" style="margin:12px 0 0"><span class="tex">s_i</span> lies between −1 and 1. Near 1: well placed. Near 0: on a border. Below 0: probably in the wrong group. Average it over all examples.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Points 0, 2, 6, 8 on a line; groups {0, 2} and {6, 8}.</p><p>Point 0: <span class="tex">a = 2</span>, <span class="tex">b = \tfrac{6 + 8}{2} = 7</span>, <span class="tex">s = \tfrac{5}{7} \approx 0.71</span>.</p><p>Point 2: <span class="tex">a = 2</span>, <span class="tex">b = \tfrac{4 + 6}{2} = 5</span>, <span class="tex">s = 0.6</span>.</p><p>By symmetry the average is <span class="tex">\tfrac{0.71 + 0.6 + 0.6 + 0.71}{4} \approx 0.66</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing K" data-demo="k">
+<div class="hdr" data-s="Similarity"></div>
+<h2>How many groups?</h2>
+<div class="fr">
+<div class="figbox"><svg id="k-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Move the slider to split the same 60 points into <span class="tex">K</span> groups.</p>
+<div class="ctl"><label><span>Groups <span class="tex">K</span></span><b id="k-val">3</b></label><input type="range" id="k-in" min="1" max="8" step="1" value="3"></div>
+<div class="ro"><span><span class="tex">W</span></span><b id="k-w" class="a">0</b></div>
+<div class="ro"><span>Average silhouette</span><b id="k-s" class="bb">0</b></div>
+<p class="small" style="margin:0"><span class="tex">W</span> keeps falling as <span class="tex">K</span> grows. The silhouette peaks where the groups are real.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Left: the best grouping found for each <span class="tex">K</span>. Right: both measures for every <span class="tex">K</span>; the current one is darker.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two ways to group">
+<div class="hdr" data-s="Similarity"></div>
+<h2>Two ways to group</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="part-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox an-fade" style="--d:.4s"><svg id="dend-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Partitional: one split into <span class="tex">K = 3</span> groups</div>
+<div class="subcap">(b) Hierarchical: a tree of merges</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 6:</b>The same eight points. (a) gives one answer for a chosen <span class="tex">K</span> (k-means, Topic 16). (b) gives every grouping at once; cutting the tree at the dashed line gives the same three groups (Topic 17).</p>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Fewer features and judging results</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Shorter descriptions, unusual points, and how to check an answer nobody gave us.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Fewer features">
+<div class="hdr" data-s="Fewer features"></div>
+<h2>Fewer features</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 4px">Dimensionality reduction maps each example to a shorter list of numbers:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">g : \mathbb{R}^d \to \mathbb{R}^q, \qquad \mathbf{z}_i = g(\mathbf{x}_i), \qquad q &lt; d</div><div class="n">(6)</div></div>
+<p class="small" style="margin:0 0 4px">A projection takes a weighted sum of the features along a direction <span class="tex">\mathbf{w}</span> of length 1:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">z_i = w_1 x_{i1} + w_2 x_{i2} + \dots + w_d x_{id}</div><div class="n">(7)</div></div>
+<div class="figbox" style="flex:none;height:330px"><svg id="proj-svg" viewBox="0 0 1160 330"></svg></div>
+<p class="cap" style="margin-top:4px"><b>Figure 7:</b>Each point drops onto the line (dashed). Its position on the line is <span class="tex">z_i</span>: one number instead of two.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{w} = (0.6, 0.8)</span>, length <span class="tex">\sqrt{0.36 + 0.64} = 1</span>.</p><p><span class="tex">\mathbf{x}_i = (2, 1)</span> gives <span class="tex">z_i = 0.6 \cdot 2 + 0.8 \cdot 1 = 2.0</span>.</p><p>A good direction keeps the points spread out along the line. Topic 18 (PCA) finds the best one.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Far from everything" data-demo="anom">
+<div class="hdr" data-s="Fewer features"></div>
+<h2>Far from everything</h2>
+<div class="fr">
+<div class="figbox"><svg id="an-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Score: distance to the nearest other example. Click to add a point.</p>
+<div class="eq" style="margin:0;font-size:26px"><div class="m tex-d">\text{score}(\mathbf{x}) = \min_{i} d(\mathbf{x}, \mathbf{x}_i)</div><div class="n">(8)</div></div>
+<div class="ctl"><label><span>Threshold</span><b id="an-t-val">1.20</b></label><input type="range" id="an-t" min="0.4" max="3" step="0.1" value="1.2"></div>
+<div class="ro"><span>Score of the new point</span><b id="an-score" class="bb">—</b></div>
+<div class="ro"><span>Points flagged</span><b id="an-n" class="a">0</b></div>
+<div class="btns"><button class="bt chip" id="an-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Rings mark scores above the threshold. Among (1, 1), (2, 1), (9, 9), the score of (9, 9) is <span class="tex">\sqrt{7^2 + 8^2} \approx 10.6</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Judging without labels">
+<div class="hdr" data-s="Judging results"></div>
+<h2>Judging without labels</h2>
+<div class="figbox"><svg id="judge-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 9:</b>With no labels there is no accuracy to compute. Four checks remain, and in practice we combine several of them.</p>
+</section>
+
+<section class="s ats-prose" data-label="Clusters in pure noise" data-demo="noise">
+<div class="hdr" data-s="Judging results"></div>
+<h2>Groups in pure noise</h2>
+<div class="fr">
+<div class="figbox"><svg id="nz-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<div class="btns"><button class="bt" id="nz-noise">Noise</button><button class="bt chip" id="nz-blobs">Groups</button><button class="bt chip" id="nz-new">Redraw</button></div>
+<div class="ctl"><label><span>Groups <span class="tex">K</span></span><b id="nz-k-val">4</b></label><input type="range" id="nz-k" min="2" max="6" step="1" value="4"></div>
+<div class="ro"><span>Average silhouette</span><b id="nz-s" class="bb">0</b></div>
+<aside class="adm k-note sm" style="font-size:24px"><div class="h"><i data-i="caution"></i><span>Pitfalls</span></div><div class="b"><p>Any algorithm returns <span class="tex">K</span> groups. Results also change with <span class="tex">K</span> and with feature scales.</p></div></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>90 uniform random points still get <span class="tex">K</span> neat regions. A low silhouette is the warning sign.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The chapter ahead">
+<div class="hdr" data-s="Judging results"></div>
+<h2>The chapter ahead</h2>
+<p class="cap" style="margin-bottom:12px"><b>Table 3:</b>The three methods of this chapter and the question each one answers.</p>
+<table class="tb cmp" style="font-size:28px">
+<colgroup><col style="width:8%"><col style="width:23%"><col style="width:32%"><col style="width:20%"><col style="width:17%"></colgroup>
+<thead><tr><th>Topic</th><th>Method</th><th>Question</th><th>Output</th><th>Picture</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>16</td><td><strong>k-means clustering</strong></td><td>Which <span class="tex">K</span> groups, each around a center?</td><td><span class="tex">c_i</span> and centroids <span class="tex">\boldsymbol{\mu}_k</span></td><td><svg class="thumb" id="th-km" viewBox="0 0 240 84"></svg></td></tr>
+<tr class="an-up" style="--d:.15s"><td>17</td><td><strong>Hierarchical clustering</strong></td><td>How do small groups nest inside larger ones?</td><td>A tree of merges (dendrogram)</td><td><svg class="thumb" id="th-hc" viewBox="0 0 240 84"></svg></td></tr>
+<tr class="an-up" style="--d:.25s"><td>18</td><td><strong>Principal component analysis</strong></td><td>Which few directions keep most of the spread?</td><td>New features <span class="tex">\mathbf{z}_i \in \mathbb{R}^q</span></td><td><svg class="thumb" id="th-pca" viewBox="0 0 240 84"></svg></td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:28px;max-width:1300px;font-size:26px"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>All three rest on distances or spreads, so all three need scaled features.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Strengths and limits">
+<div class="hdr" data-s="Closing"></div>
+<h2>Strengths and limits</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 4:</b>Unsupervised learning at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Limits</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Works on raw data, with no labeling cost</td><td>No right answer to check against</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Finds groups nobody thought to name</td><td>Always returns groups, even in noise</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Shrinks many features into a few</td><td>Depends on the distance and on feature scales</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Flags rare cases that no label describes</td><td>Choices such as <span class="tex">K</span> or <span class="tex">q</span> are left to us</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Prepares inputs for a later supervised model</td><td>The meaning of each group needs a human</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>To explore a new data set, to summarize it, or when labels are too expensive to collect.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Unsupervised learning sees only the inputs <span class="tex">\mathbf{x}_i</span>; there is no label <span class="tex">y_i</span>.</li>
+<li class="an-up" style="--d:.15s">Its main tasks are clustering, dimensionality reduction and anomaly detection.</li>
+<li class="an-up" style="--d:.25s">Everything rests on a distance, so scale the features first.</li>
+<li class="an-up" style="--d:.35s">Good groups are compact inside and far apart; <span class="tex">W</span> and the silhouette measure this.</li>
+<li class="an-up" style="--d:.45s">Any algorithm finds groups, even in noise; check results with several measures and with people.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>References</h2>
+<section>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 12. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 14. Springer.</li>
+<li style="margin:.4em 0">Bishop, C. M. (2006). <em>Pattern Recognition and Machine Learning</em>, Chapters 9 and 12. Springer.</li>
+<li style="margin:.4em 0">Rousseeuw, P. J. (1987). Silhouettes: a graphical aid to the interpretation and validation of cluster analysis. <em>Journal of Computational and Applied Mathematics</em>, 20, 53-65.</li>
+<li style="margin:.4em 0">Jain, A. K. (2010). Data clustering: 50 years beyond K-means. <em>Pattern Recognition Letters</em>, 31(8), 651-666.</li>
+<li style="margin:.4em 0">Chandola, V., Banerjee, A., &amp; Kumar, V. (2009). Anomaly detection: a survey. <em>ACM Computing Surveys</em>, 41(3), 1-58.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 16: k-means clustering.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, lin, clamp, mean, fmt, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const CL = ['fa', 'fb', 'fc', 'fd', 'fe', 'ff', 'fg', 'fh'];
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const d2 = (p, q) => (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
+const dist = (p, q) => Math.sqrt(d2(p, q));
+const pct = (v) => Math.round(v * 100) + '%';
+
+function blobs(seed, centers, n, sd) {
+  const r = rng(seed), pts = [];
+  centers.forEach(([cx, cy], c) => {
+    for (let i = 0; i < n; i++) pts.push({ x: clamp(cx + sd * gauss(r), 0.3, 9.7), y: clamp(cy + sd * gauss(r), 0.3, 9.7), c });
+  });
+  return pts;
+}
+
+/* k-means with k-means++ starts; keeps the run with the smallest W */
+function kmeans(pts, K, seed = 1, restarts = 8) {
+  const r = rng(seed), n = pts.length;
+  let best = null;
+  for (let t = 0; t < restarts; t++) {
+    const cents = [{ ...pts[Math.floor(r() * n)] }];
+    while (cents.length < K) {
+      const w = pts.map((p) => Math.min(...cents.map((c) => d2(p, c))));
+      let u = r() * w.reduce((s, v) => s + v, 0), j = 0;
+      while (j < n - 1 && u > w[j]) { u -= w[j]; j++; }
+      cents.push({ x: pts[j].x, y: pts[j].y });
+    }
+    let assign = new Array(n).fill(-1);
+    for (let it = 0; it < 100; it++) {
+      let changed = 0;
+      const next = pts.map((p) => { let b = 0; cents.forEach((c, k) => { if (d2(p, c) < d2(p, cents[b])) b = k; }); return b; });
+      next.forEach((v, i) => { if (v !== assign[i]) changed++; });
+      assign = next;
+      cents.forEach((c, k) => {
+        const m = pts.filter((_, i) => assign[i] === k);
+        if (m.length) { c.x = mean(m.map((p) => p.x)); c.y = mean(m.map((p) => p.y)); }
+      });
+      if (!changed) break;
+    }
+    const W = pts.reduce((s, p, i) => s + d2(p, cents[assign[i]]), 0);
+    if (!best || W < best.W) best = { assign, cents, W };
+  }
+  return best;
+}
+function withinSS(pts, assign, K) {
+  let W = 0;
+  const cents = [];
+  for (let k = 0; k < K; k++) {
+    const m = pts.filter((_, i) => assign[i] === k);
+    const c = { x: mean(m.map((p) => p.x)), y: mean(m.map((p) => p.y)) };
+    cents.push(c);
+    m.forEach((p) => { W += d2(p, c); });
+  }
+  return { W, cents };
+}
+function silhouette(pts, assign, K) {
+  if (K < 2) return NaN;
+  const s = pts.map((p, i) => {
+    const sum = new Array(K).fill(0), cnt = new Array(K).fill(0);
+    pts.forEach((q, j) => { if (j !== i) { sum[assign[j]] += dist(p, q); cnt[assign[j]]++; } });
+    const own = assign[i];
+    if (!cnt[own]) return 0;
+    const a = sum[own] / cnt[own];
+    let b = Infinity;
+    for (let k = 0; k < K; k++) if (k !== own && cnt[k]) b = Math.min(b, sum[k] / cnt[k]);
+    return (b - a) / Math.max(a, b);
+  });
+  return mean(s);
+}
+/* shade the region nearest to each centroid */
+function voronoi(F, X, Y, cents, g, nx = 90, ny = 70, op = 0.13) {
+  const dx = (X[1] - X[0]) / nx, dy = (Y[1] - Y[0]) / ny;
+  const near = (x, y) => { let b = 0; cents.forEach((c, k) => { if (d2({ x, y }, c) < d2({ x, y }, cents[b])) b = k; }); return b; };
+  const sh = el('g', { 'shape-rendering': 'crispEdges', style: `opacity:${op}` }, g);
+  for (let i = 0; i < nx; i++) {
+    const x = X[0] + (i + 0.5) * dx;
+    let j0 = 0, k0 = near(x, Y[0] + 0.5 * dy);
+    for (let j = 1; j <= ny; j++) {
+      const k = j < ny ? near(x, Y[0] + (j + 0.5) * dy) : -1;
+      if (k === k0) continue;
+      const xa = F.sx(X[0] + i * dx), xb = F.sx(X[0] + (i + 1) * dx), ya = F.sy(Y[0] + j * dy), yb = F.sy(Y[0] + j0 * dy);
+      el('rect', { x: xa, y: ya, width: xb - xa + 0.6, height: yb - ya + 0.6, class: CL[k0] }, sh);
+      j0 = j; k0 = k;
+    }
+  }
+}
+function centroidMark(F, c, k, g, s = 15) {
+  el('rect', { x: F.sx(c.x) - s, y: F.sy(c.y) - s, width: 2 * s, height: 2 * s, rx: 3, class: CL[k], style: 'stroke:var(--myst-color-text);stroke-width:3.5' }, g);
+}
+/* agglomerative clustering with average linkage */
+function agglo(pts) {
+  let cl = pts.map((p, i) => ({ ids: [i], node: { leaf: i, h: 0 } }));
+  while (cl.length > 1) {
+    let best = null;
+    for (let a = 0; a < cl.length; a++) for (let b = a + 1; b < cl.length; b++) {
+      let s = 0;
+      cl[a].ids.forEach((i) => cl[b].ids.forEach((j) => { s += dist(pts[i], pts[j]); }));
+      s /= cl[a].ids.length * cl[b].ids.length;
+      if (!best || s < best.s) best = { a, b, s };
+    }
+    const A = cl[best.a], B = cl[best.b];
+    const m = { ids: A.ids.concat(B.ids), node: { l: A.node, r: B.node, h: best.s } };
+    cl = cl.filter((_, i) => i !== best.a && i !== best.b).concat([m]);
+  }
+  return cl[0].node;
+}
+function leaves(n, out = []) { if (n.leaf !== undefined) out.push(n.leaf); else { leaves(n.l, out); leaves(n.r, out); } return out; }
+function drawDend(node, xOf, sy, g, style) {
+  if (node.leaf !== undefined) return { x: xOf(node.leaf), h: 0 };
+  const L = drawDend(node.l, xOf, sy, g, style), R = drawDend(node.r, xOf, sy, g, style);
+  el('path', { d: `M${L.x} ${sy(L.h)}V${sy(node.h)}H${R.x}V${sy(R.h)}`, style }, g);
+  return { x: (L.x + R.x) / 2, h: node.h };
+}
+
+/* ───────── shared data ───────── */
+const THREE = blobs(11, [[2.8, 7.2], [7.3, 6.6], [5.0, 2.6]], 20, 0.85);
+const SPECIES = ['species A', 'species B', 'species C'];
+
+/* ───────── static figures ───────── */
+function drawQuestions() {
+  const mk = (id) => { const svg = document.getElementById(id); return { svg, F: frame(svg, { W: 400, H: 440, l: 20, r: 20, t: 20, b: 20, x: [0, 10], y: [0, 10], grid: false }) }; };
+  /* (a) clustering */
+  let { svg, F } = mk('q1-svg');
+  const pts = blobs(5, [[2.6, 7.2], [7.4, 6.8], [5.0, 2.6]], 12, 0.6);
+  [[2.6, 7.2], [7.4, 6.8], [5.0, 2.6]].forEach(([x, y], k) => el('ellipse', { cx: F.sx(x), cy: F.sy(y), rx: 74, ry: 70, class: CL[k], style: 'fill-opacity:.1;stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:8 6' }, F.plot));
+  pts.forEach((p) => el('circle', { class: `pt ${CL[p.c]}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 9 }, F.plot));
+  /* (b) dimensionality reduction */
+  ({ svg, F } = mk('q2-svg'));
+  const r = rng(8), ang = 0.62, u = [Math.cos(ang), Math.sin(ang)];
+  const cl = Array.from({ length: 26 }, () => { const t = 3.4 * gauss(r) * 0.6, s = 0.55 * gauss(r); return { x: 5 + t * u[0] - s * u[1], y: 5 + t * u[1] + s * u[0] }; });
+  el('line', { x1: F.sx(5 - 6 * u[0]), y1: F.sy(5 - 6 * u[1]), x2: F.sx(5 + 6 * u[0]), y2: F.sy(5 + 6 * u[1]), class: 'curve-b', style: 'stroke-width:4' }, F.plot);
+  cl.forEach((p) => {
+    const t = (p.x - 5) * u[0] + (p.y - 5) * u[1], q = { x: 5 + t * u[0], y: 5 + t * u[1] };
+    el('line', { x1: F.sx(p.x), y1: F.sy(p.y), x2: F.sx(q.x), y2: F.sy(q.y), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5;stroke-dasharray:4 4' }, F.plot);
+    el('circle', { class: 'fb', cx: F.sx(q.x), cy: F.sy(q.y), r: 4.5 }, F.plot);
+    el('circle', { class: 'pt fa', cx: F.sx(p.x), cy: F.sy(p.y), r: 8 }, F.plot);
+  });
+  /* (c) anomaly detection */
+  ({ svg, F } = mk('q3-svg'));
+  blobs(9, [[4.2, 5.2]], 30, 1.0).forEach((p) => el('circle', { class: 'pt gray', cx: F.sx(p.x), cy: F.sy(p.y), r: 8 }, F.plot));
+  [[8.6, 8.6], [8.4, 1.4]].forEach(([x, y]) => {
+    el('circle', { cx: F.sx(x), cy: F.sy(y), r: 20, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, F.plot);
+    el('circle', { class: 'pt fb', cx: F.sx(x), cy: F.sy(y), r: 9 }, F.plot);
+  });
+  /* (d) density estimation */
+  ({ svg, F } = mk('q4-svg'));
+  [[3.3, 6.6, 1], [7.0, 3.2, 0.8]].forEach(([x, y, s]) => [3, 2.1, 1.3, 0.6].forEach((k) => el('ellipse', { cx: F.sx(x), cy: F.sy(y), rx: 30 * k * s, ry: 26 * k * s, class: 'fa', style: 'fill-opacity:.13;stroke:var(--c-a);stroke-opacity:.5;stroke-width:1.5' }, F.plot)));
+  blobs(13, [[3.3, 6.6], [7.0, 3.2]], 14, 0.75).forEach((p) => el('circle', { class: 'pt gray', cx: F.sx(p.x), cy: F.sy(p.y), r: 6 }, F.plot));
+}
+
+function drawGoodBad() {
+  const X = [0, 10], Y = [0, 10];
+  const show = (id, assign, capId, name) => {
+    const svg = document.getElementById(id);
+    const F = frame(svg, { W: 792, H: 560, l: 80, t: 20, b: 70, x: X, y: Y, xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+    const { W, cents } = withinSS(THREE, assign, 3);
+    THREE.forEach((p, i) => el('line', { x1: F.sx(p.x), y1: F.sy(p.y), x2: F.sx(cents[assign[i]].x), y2: F.sy(cents[assign[i]].y), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5' }, F.plot));
+    THREE.forEach((p, i) => el('circle', { class: `pt ${CL[assign[i]]} an-pop`, cx: F.sx(p.x), cy: F.sy(p.y), r: 9, style: `--d:${(i * 0.01).toFixed(2)}s` }, F.plot));
+    cents.forEach((c, k) => centroidMark(F, c, k, F.plot, 13));
+    document.getElementById(capId).innerHTML = `${name}: <span style="color:var(--myst-color-text);font-weight:700">W = ${fmt(W, 1)}</span>`;
+  };
+  const km = kmeans(THREE, 3, 3);
+  show('good-svg', km.assign, 'good-cap', '(a) Groups that follow the clouds');
+  show('bad-svg', THREE.map((p) => (p.x < 10 / 3 ? 0 : p.x < 20 / 3 ? 1 : 2)), 'bad-cap', '(b) The same points cut into strips');
+}
+
+function drawSil() {
+  const svg = document.getElementById('sil-svg');
+  const sx = lin(-1, 9, 120, 1100), Y = 150;
+  el('path', { class: 'ax', d: `M${sx(-1)} ${Y}H${sx(9)}` }, svg);
+  [0, 2, 4, 6, 8].forEach((v) => {
+    el('line', { class: 'ax', x1: sx(v), x2: sx(v), y1: Y - 6, y2: Y + 6 }, svg);
+    el('text', { class: 'tk', x: sx(v), y: Y + 40, 'text-anchor': 'middle', text: v }, svg);
+  });
+  const arc = (x0, x1, h, cls, lab, dy) => {
+    el('path', { d: `M${sx(x0)} ${Y - 14}Q${(sx(x0) + sx(x1)) / 2} ${Y - h} ${sx(x1)} ${Y - 14}`, class: cls, style: 'fill:none;stroke-width:3', 'marker-end': 'url(#ah)' }, svg);
+    if (lab) el('text', { class: 'txs', x: (sx(x0) + sx(x1)) / 2, y: Y - h / 2 - 12 + dy, 'text-anchor': 'middle', 'font-weight': 600, text: lab }, svg);
+  };
+  arc(0, 2, 96, 'sa', '', 0);
+  arc(0, 6, 160, 'sb', '', 0);
+  arc(0, 8, 230, 'sb', '', 0);
+  el('text', { class: 'txs', x: sx(1), y: Y - 20, 'text-anchor': 'middle', 'font-weight': 600, text: 'a = 2', style: 'fill:var(--c-a)' }, svg);
+  el('text', { class: 'txs', x: sx(7.6), y: 60, 'text-anchor': 'middle', 'font-weight': 600, text: 'b = (6 + 8) / 2 = 7', style: 'fill:var(--c-b)' }, svg);
+  [[0, 0], [2, 0], [6, 1], [8, 1]].forEach(([v, c]) => el('circle', { class: `pt ${CL[c]}`, cx: sx(v), cy: Y, r: 13 }, svg));
+}
+
+function drawTwoWays() {
+  const P = [[1.5, 7.5], [2.4, 8.5], [2.8, 6.7], [7.0, 8.1], [8.0, 7.1], [5.0, 2.5], [6.0, 3.3], [4.3, 1.7]].map(([x, y]) => ({ x, y }));
+  const NAMES = 'ABCDEFGH';
+  const km = kmeans(P, 3, 2);
+  /* recolor so that groups follow the order A.., D.., F.. */
+  const order = [];
+  km.assign.forEach((k) => { if (!order.includes(k)) order.push(k); });
+  const col = (i) => order.indexOf(km.assign[i]);
+  const svg = document.getElementById('part-svg');
+  const F = frame(svg, { W: 792, H: 560, l: 80, t: 20, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  voronoi(F, [0, 10], [0, 10], order.map((k) => km.cents[k]), F.plot, 90, 70, 0.14);
+  P.forEach((p, i) => {
+    el('circle', { class: `pt ${CL[col(i)]}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 11 }, F.plot);
+    el('text', { class: 'txs', x: F.sx(p.x) + (i === 5 ? -18 : 16), y: F.sy(p.y) + (i === 5 ? 34 : -12), 'text-anchor': i === 5 ? 'end' : 'start', 'font-weight': 600, text: NAMES[i] }, F.plot);
+  });
+  order.forEach((k, j) => centroidMark(F, km.cents[k], j, F.plot, 12));
+
+  const sv = document.getElementById('dend-svg');
+  const root = agglo(P), lv = leaves(root);
+  const H = root.h, L = 100, R = 760, T = 30, B = 470;
+  const sy = lin(0, H * 1.05, B, T);
+  const xOf = (i) => L + 30 + (lv.indexOf(i) * (R - L - 60)) / (P.length - 1);
+  el('path', { class: 'ax', d: `M${L} ${T}V${B}H${R}` }, sv);
+  [0, 2, 4, 6].filter((v) => v <= H * 1.05).forEach((v) => {
+    el('line', { class: 'gl', x1: L, x2: R, y1: sy(v), y2: sy(v) }, sv);
+    el('text', { class: 'tk', x: L - 12, y: sy(v) + 8, 'text-anchor': 'end', text: v }, sv);
+  });
+  el('text', { class: 'lb', transform: `translate(${L - 56} ${(T + B) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'merge distance' }, sv);
+  drawDend(root, xOf, sy, el('g', {}, sv), 'fill:none;stroke:var(--myst-color-text);stroke-width:3');
+  const hs = [];
+  (function walk(n) { if (n.leaf === undefined) { hs.push(n.h); walk(n.l); walk(n.r); } })(root);
+  hs.sort((a, b) => b - a);
+  const cut = (hs[1] + hs[2]) / 2;
+  el('line', { x1: L, x2: R, y1: sy(cut), y2: sy(cut), style: 'stroke:var(--c-b);stroke-width:3;stroke-dasharray:12 8' }, sv);
+  el('text', { class: 'txs', x: R, y: sy(cut) - 12, 'text-anchor': 'end', style: 'fill:var(--c-b)', 'font-weight': 600, text: 'cut: 3 groups' }, sv);
+  P.forEach((p, i) => {
+    el('circle', { class: `pt ${CL[col(i)]}`, cx: xOf(i), cy: B + 30, r: 11 }, sv);
+    el('text', { class: 'txs', x: xOf(i), y: B + 76, 'text-anchor': 'middle', 'font-weight': 600, text: NAMES[i] }, sv);
+  });
+}
+
+function drawProj() {
+  const svg = document.getElementById('proj-svg');
+  const F = frame(svg, { W: 560, H: 330, l: 70, r: 10, t: 10, b: 30, x: [0, 10], y: [0, 6], grid: false });
+  const r = rng(21), u = [0.8, 0.6], c = { x: 5, y: 3 };
+  const pts = Array.from({ length: 16 }, () => { const t = 2.4 * gauss(r), s = 0.45 * gauss(r); return { x: c.x + t * u[0] - s * u[1], y: c.y + t * u[1] + s * u[0] }; });
+  el('line', { x1: F.sx(c.x - 7 * u[0]), y1: F.sy(c.y - 7 * u[1]), x2: F.sx(c.x + 7 * u[0]), y2: F.sy(c.y + 7 * u[1]), class: 'curve-b', style: 'stroke-width:4' }, F.plot);
+  const zs = [];
+  pts.forEach((p) => {
+    const t = (p.x - c.x) * u[0] + (p.y - c.y) * u[1], q = { x: c.x + t * u[0], y: c.y + t * u[1] };
+    zs.push(t);
+    el('line', { x1: F.sx(p.x), y1: F.sy(p.y), x2: F.sx(q.x), y2: F.sy(q.y), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:5 5' }, F.plot);
+    el('circle', { class: 'fb', cx: F.sx(q.x), cy: F.sy(q.y), r: 5 }, F.plot);
+    el('circle', { class: 'pt fa', cx: F.sx(p.x), cy: F.sy(p.y), r: 9 }, F.plot);
+  });
+  el('text', { class: 'lb', x: 300, y: 320, 'text-anchor': 'middle', text: 'two features per point' }, svg);
+  el('path', { class: 'wire', d: 'M600 165H700', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: 650, y: 150, 'text-anchor': 'middle', text: 'g' }, svg);
+  const zx = lin(-6, 6, 740, 1140), Y = 165;
+  el('path', { class: 'ax', d: `M740 ${Y}H1140` }, svg);
+  [-4, 0, 4].forEach((v) => {
+    el('line', { class: 'ax', x1: zx(v), x2: zx(v), y1: Y - 6, y2: Y + 6 }, svg);
+    el('text', { class: 'tk', x: zx(v), y: Y + 38, 'text-anchor': 'middle', text: v }, svg);
+  });
+  zs.forEach((z) => el('circle', { class: 'pt fb', cx: zx(clamp(z, -6, 6)), cy: Y, r: 9 }, svg));
+  el('text', { class: 'lb', x: 940, y: 320, 'text-anchor': 'middle', text: 'one number per point: z' }, svg);
+}
+
+function drawJudge() {
+  const svg = document.getElementById('judge-svg');
+  const cx = 840, cy = 300, BW = 600, BH = 170;
+  el('rect', { class: 'box-a', x: cx - 170, y: cy - 70, width: 340, height: 140, rx: 4 }, svg);
+  el('text', { class: 'tx', x: cx, y: cy - 10, 'text-anchor': 'middle', 'font-weight': 600, text: 'A clustering' }, svg);
+  el('text', { class: 'txs', x: cx, y: cy + 30, 'text-anchor': 'middle', text: 'no labels to compare' }, svg);
+  const B = [
+    [0, 10, 'Inner measures', ['compact and separated?', 'W, silhouette']],
+    [1080, 10, 'Stability', ['rerun on parts of the data:', 'same groups again?']],
+    [0, 420, 'Usefulness', ['does a later task improve', 'with these groups?']],
+    [1080, 420, 'A human look', ['do the groups make sense', 'to an expert?']],
+  ];
+  const pics = [
+    (g, x, y) => { [[0, 0, 'fa'], [24, -14, 'fa'], [12, 20, 'fa'], [92, 4, 'fb'], [116, -12, 'fb'], [110, 24, 'fb']].forEach(([dx, dy, c]) => el('circle', { class: `pt ${c}`, cx: x + dx, cy: y + dy, r: 9 }, g)); },
+    (g, x, y) => {
+      [0, 84].forEach((ox) => {
+        el('rect', { x: x + ox - 8, y: y - 34, width: 64, height: 68, rx: 3, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+        [[6, -18, 'fa'], [18, -8, 'fa'], [34, 16, 'fb'], [44, 6, 'fb']].forEach(([dx, dy, c]) => el('circle', { class: c, cx: x + ox + dx, cy: y + dy, r: 6 }, g));
+      });
+      el('text', { class: 'tx', x: x + 66, y: y + 10, 'text-anchor': 'middle', text: '≈' }, g);
+    },
+    (g, x, y) => {
+      el('path', { class: 'ax', d: `M${x - 6} ${y + 40}H${x + 130}` }, g);
+      el('rect', { x, y: y + 40 - 36, width: 40, height: 36, class: 'gray' }, g);
+      el('rect', { x: x + 70, y: y + 40 - 70, width: 40, height: 70, class: 'fc' }, g);
+      el('text', { class: 'tk', x: x + 20, y: y + 66, 'text-anchor': 'middle', text: 'before' }, g);
+      el('text', { class: 'tk', x: x + 90, y: y + 66, 'text-anchor': 'middle', text: 'after' }, g);
+    },
+    (g, x, y) => {
+      el('path', { d: `M${x} ${y}Q${x + 60} ${y - 44} ${x + 120} ${y}Q${x + 60} ${y + 44} ${x} ${y}Z`, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:3' }, g);
+      el('circle', { cx: x + 60, cy: y, r: 17, class: 'fa' }, g);
+      el('circle', { cx: x + 60, cy: y, r: 7, class: 'ink' }, g);
+    },
+  ];
+  B.forEach(([x, y, t, lines], i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.2 + i * 0.2}s` }, svg);
+    el('rect', { class: 'box', x, y, width: BW, height: BH, rx: 4 }, g);
+    el('text', { class: 'tx', x: x + 24, y: y + 48, 'font-weight': 600, text: t }, g);
+    lines.forEach((s, j) => el('text', { class: 'txs', x: x + 24, y: y + 94 + j * 34, text: s }, g));
+    pics[i](g, x + 440, y + 92);
+    const left = x < cx, ex = left ? x + BW + 8 : x - 8, ey = y + BH / 2;
+    const tx = left ? cx - 170 : cx + 170, ty = y < cy ? cy - 40 : cy + 40;
+    el('path', { class: 'wire', d: `M${tx} ${ty}L${ex} ${ey}`, 'marker-end': 'url(#ah)' }, g);
+  });
+}
+
+function drawThumbs() {
+  const mini = (id) => { const svg = document.getElementById(id); return { svg, sx: lin(0, 10, 0, 240), sy: lin(0, 10, 84, 0), plot: svg }; };
+  let F = mini('th-km');
+  const P = blobs(31, [[2.2, 6.5], [5.2, 3.0], [8.0, 6.8]], 9, 0.8);
+  const km = kmeans(P, 3, 1);
+  voronoi(F, [0, 10], [0, 10], km.cents, F.plot, 60, 21, 0.2);
+  P.forEach((p, i) => el('circle', { class: CL[km.assign[i]], cx: F.sx(p.x), cy: F.sy(p.y), r: 3.2 }, F.plot));
+  km.cents.forEach((c, k) => el('rect', { x: F.sx(c.x) - 5, y: F.sy(c.y) - 5, width: 10, height: 10, class: CL[k], style: 'stroke:var(--myst-color-text);stroke-width:1.5' }, F.plot));
+  F = mini('th-hc');
+  const Q = [[1, 2], [1.6, 2.4], [5, 5], [5.4, 4.6], [8, 1], [8.6, 1.5], [3, 8]].map(([x, y]) => ({ x, y }));
+  const root = agglo(Q), lv = leaves(root);
+  const sy = lin(0, root.h * 1.05, 76, 8);
+  drawDend(root, (i) => 22 + lv.indexOf(i) * 32, sy, F.svg, 'fill:none;stroke:var(--myst-color-text);stroke-width:2');
+  F = mini('th-pca');
+  const r = rng(4), u = [0.94, -0.34];
+  for (let i = 0; i < 30; i++) { const t = 38 * gauss(r), v = 7 * gauss(r); el('circle', { class: 'fa', cx: clamp(120 + t * u[0] + v * u[1], 6, 234), cy: clamp(42 + t * u[1] - v * u[0], 6, 78), r: 3 }, F.plot); }
+  el('line', { x1: 120, y1: 42, x2: 120 + 70 * u[0], y2: 42 + 70 * u[1], class: 'curve-b', style: 'stroke-width:3' }, F.plot);
+  el('line', { x1: 120, y1: 42, x2: 120 + 22 * u[1], y2: 42 - 22 * u[0], class: 'curve-b', style: 'stroke-width:3' }, F.plot);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.toggle = (() => {
+  const X = [0, 10], Y = [0, 10];
+  const mk = (id) => frame(document.getElementById(id), { W: 560, H: 620, l: 80, t: 70, b: 84, x: X, y: Y, xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  const A = mk('lab-svg'), B = mk('unl-svg');
+  THREE.forEach((p) => el('circle', { class: `pt ${CL[p.c]}`, cx: A.sx(p.x), cy: A.sy(p.y), r: 9 }, A.plot));
+  const la = document.getElementById('lab-svg');
+  legend(la, 84, 22, [['dot', 'fa', 'A']]); legend(la, 184, 22, [['dot', 'fb', 'B']]); legend(la, 284, 22, [['dot', 'fc', 'C']]);
+  const lb = document.getElementById('unl-svg');
+  const note = el('text', { class: 'txs', x: 84, y: 30, text: 'no labels' }, lb);
+  const layer = el('g', {}, B.plot);
+  const km = kmeans(THREE, 3, 5);
+  /* best matching between found groups and hidden species */
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  let best = perms[0], bestHit = -1;
+  perms.forEach((pm) => { const hit = THREE.filter((p, i) => pm[km.assign[i]] === p.c).length; if (hit > bestHit) { bestHit = hit; best = pm; } });
+  const out = document.getElementById('tg-agree');
+  function draw(found) {
+    clear(layer);
+    if (found) voronoi(B, X, Y, [0, 1, 2].map((k) => km.cents[best.indexOf(k)]), layer, 70, 70, 0.12);
+    THREE.forEach((p, i) => el('circle', { class: `pt ${found ? CL[best[km.assign[i]]] : 'gray'}${found && !REDUCED ? ' an-pop' : ''}`, cx: B.sx(p.x), cy: B.sy(p.y), r: 9 }, layer));
+    if (found) [0, 1, 2].forEach((k) => centroidMark(B, km.cents[best.indexOf(k)], k, layer, 12));
+    note.textContent = found ? 'groups found: 1, 2, 3' : 'no labels';
+    out.textContent = found ? pct(bestHit / THREE.length) : '—';
+  }
+  document.getElementById('tg-find').addEventListener('click', () => draw(true));
+  document.getElementById('tg-reset').addEventListener('click', () => draw(false));
+  draw(false);
+  return {};
+})();
+
+DEMOS.k = (() => {
+  const svg = document.getElementById('k-svg');
+  const X = [0, 10], Y = [0, 10];
+  const F = frame(svg, { W: 700, H: 700, l: 90, r: 20, t: 20, b: 84, x: X, y: Y, xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  const layer = el('g', {}, F.plot);
+  const res = [];
+  for (let K = 1; K <= 8; K++) { const km = kmeans(THREE, K, 7 + K, 10); res.push({ ...km, s: silhouette(THREE, km.assign, K) }); }
+  /* small charts */
+  const ks = [1, 2, 3, 4, 5, 6, 7, 8], bx = lin(0.5, 8.5, 800, 1150);
+  const maxW = res[0].W;
+  const chart = (top, h, title, vals, max, cls) => {
+    el('text', { class: 'ttl', x: 790, y: top - 14, text: title }, svg);
+    el('path', { class: 'ax', d: `M790 ${top + h}H1155` }, svg);
+    const bars = ks.map((K, i) => {
+      const v = isNaN(vals[i]) ? 0 : vals[i];
+      return el('rect', { x: bx(K) - 15, y: top + h - (h * v) / max, width: 30, height: (h * v) / max, class: cls }, svg);
+    });
+    ks.forEach((K) => el('text', { class: 'tk', x: bx(K), y: top + h + 30, 'text-anchor': 'middle', text: K }, svg));
+    return bars;
+  };
+  const wBars = chart(60, 200, 'W for each K', res.map((r) => r.W), maxW, 'fa');
+  const sBars = chart(400, 200, 'silhouette for each K', res.map((r) => r.s), 1, 'fb');
+  el('text', { class: 'lb', x: 975, y: 670, 'text-anchor': 'middle', text: 'K' }, svg);
+  const inp = document.getElementById('k-in');
+  function draw() {
+    const K = +inp.value, R = res[K - 1];
+    clear(layer);
+    voronoi(F, X, Y, R.cents, layer, 80, 80, 0.12);
+    THREE.forEach((p, i) => el('circle', { class: `pt ${CL[R.assign[i]]}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 9 }, layer));
+    R.cents.forEach((c, k) => centroidMark(F, c, k, layer, 12));
+    wBars.forEach((b, i) => { b.style.opacity = i === K - 1 ? 1 : 0.3; });
+    sBars.forEach((b, i) => { b.style.opacity = i === K - 1 ? 1 : 0.3; });
+    document.getElementById('k-val').textContent = K;
+    document.getElementById('k-w').textContent = fmt(R.W, 1);
+    document.getElementById('k-s').textContent = K < 2 ? '—' : fmt(R.s, 2);
+  }
+  inp.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.anom = (() => {
+  const svg = document.getElementById('an-svg');
+  const X = [0, 10], Y = [0, 10];
+  const F = frame(svg, { W: 1160, H: 700, x: X, y: Y, xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2' });
+  const base = blobs(23, [[3.4, 6.2], [7.0, 3.2]], 22, 0.8).map(({ x, y }) => ({ x, y })).concat([{ x: 8.8, y: 8.6 }, { x: 1.2, y: 1.4 }]);
+  let pts, added;
+  const layer = el('g', {}, F.plot);
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'gray', 'example'], ['ring', '', 'flagged']]);
+  const inp = document.getElementById('an-t');
+  const score = (i) => Math.min(...pts.map((q, j) => (j === i ? Infinity : dist(pts[i], q))));
+  function draw() {
+    const t = +inp.value;
+    document.getElementById('an-t-val').textContent = t.toFixed(2);
+    clear(layer);
+    let n = 0;
+    if (added !== null) {
+      const i = added, s = score(i);
+      let jb = 0, db = Infinity;
+      pts.forEach((q, j) => { if (j !== i && dist(pts[i], q) < db) { db = dist(pts[i], q); jb = j; } });
+      el('line', { x1: F.sx(pts[i].x), y1: F.sy(pts[i].y), x2: F.sx(pts[jb].x), y2: F.sy(pts[jb].y), style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6' }, layer);
+      el('text', { class: 'txs', x: F.sx(pts[i].x) + (pts[i].x > 8 ? -30 : 30), y: F.sy(pts[i].y) + (pts[i].y > 9 ? 40 : -24), 'text-anchor': pts[i].x > 8 ? 'end' : 'start', 'font-weight': 700, text: `score ${fmt(s, 2)}` }, layer);
+      document.getElementById('an-score').textContent = fmt(s, 2);
+    } else document.getElementById('an-score').textContent = '—';
+    pts.forEach((p, i) => {
+      const flag = score(i) > t;
+      if (flag) { n++; el('circle', { cx: F.sx(p.x), cy: F.sy(p.y), r: 22, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, layer); }
+      el('circle', { class: `pt ${i === added ? 'fa' : flag ? 'fb' : 'gray'}`, cx: F.sx(p.x), cy: F.sy(p.y), r: i === added ? 12 : 10 }, layer);
+    });
+    document.getElementById('an-n').textContent = n;
+  }
+  svg.addEventListener('click', (e) => {
+    const p = toSvgPoint(svg, e), x = F.ix(p.x), y = F.iy(p.y);
+    if (x < 0 || x > 10 || y < 0 || y > 10) return;
+    e.preventDefault();
+    pts.push({ x, y });
+    added = pts.length - 1;
+    draw();
+  });
+  inp.addEventListener('input', draw);
+  document.getElementById('an-reset').addEventListener('click', () => { pts = base.map((p) => ({ ...p })); added = null; draw(); });
+  pts = base.map((p) => ({ ...p })); added = null;
+  draw();
+  return {};
+})();
+
+DEMOS.noise = (() => {
+  const svg = document.getElementById('nz-svg');
+  const X = [0, 10], Y = [0, 10];
+  const F = frame(svg, { W: 1160, H: 700, x: X, y: Y, xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2' });
+  const layer = el('g', {}, F.plot);
+  let mode = 'noise', seed = 1, pts = [];
+  const inp = document.getElementById('nz-k');
+  const bN = document.getElementById('nz-noise'), bB = document.getElementById('nz-blobs');
+  function sample() {
+    if (mode === 'noise') { const r = rng(100 + seed); pts = Array.from({ length: 90 }, () => ({ x: 0.3 + 9.4 * r(), y: 0.3 + 9.4 * r() })); }
+    else pts = blobs(200 + seed, [[2.6, 7.4], [7.4, 7.0], [3.2, 2.6], [7.6, 2.8]], 22, 0.75);
+  }
+  function draw() {
+    const K = +inp.value, km = kmeans(pts, K, seed, 6);
+    clear(layer);
+    voronoi(F, X, Y, km.cents, layer, 100, 70, 0.13);
+    pts.forEach((p, i) => el('circle', { class: `pt ${CL[km.assign[i]]}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 10 }, layer));
+    km.cents.forEach((c, k) => centroidMark(F, c, k, layer, 13));
+    document.getElementById('nz-k-val').textContent = K;
+    document.getElementById('nz-s').textContent = fmt(silhouette(pts, km.assign, K), 2);
+    bN.className = mode === 'noise' ? 'bt' : 'bt chip';
+    bB.className = mode === 'noise' ? 'bt chip' : 'bt';
+  }
+  bN.addEventListener('click', () => { mode = 'noise'; sample(); draw(); });
+  bB.addEventListener('click', () => { mode = 'blobs'; sample(); draw(); });
+  document.getElementById('nz-new').addEventListener('click', () => { seed++; sample(); draw(); });
+  inp.addEventListener('input', draw);
+  sample(); draw();
+  return {};
+})();
+
+drawQuestions(); drawGoodBad(); drawSil(); drawTwoWays(); drawProj(); drawJudge(); drawThumbs();
+})();
+</script>
+</body>
+</html>

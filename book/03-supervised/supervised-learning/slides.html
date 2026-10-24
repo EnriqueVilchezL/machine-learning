@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supervised learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.ats-prose table.tb.cmp td{padding:.2em .6em;vertical-align:middle}
+.thumb{display:block;width:170px;height:64px;overflow:hidden;border:1px solid var(--myst-color-border);border-radius:2px}
+#click-svg{cursor:crosshair}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 7</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Supervised learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Learning a function from examples that come with the right answer</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 7 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">The supervised setting</li>
+<li class="an-up" style="--d:.15s">Measuring performance</li>
+<li class="an-up" style="--d:.25s">Models and their assumptions</li>
+<li class="an-up" style="--d:.35s">The methods in this chapter</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i \in \mathcal{Y}</span></td><td>Its label, from the set <span class="tex">\mathcal{Y}</span> of possible labels</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">f : \mathbb{R}^d \to \mathcal{Y}</span></td><td>A model: a rule from features to a label</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\hat{f}, \ \hat{y} = \hat{f}(\mathbf{x})</span></td><td>Model chosen by training and its prediction</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">L(y, \hat{y})</span></td><td>Loss: the cost of predicting <span class="tex">\hat{y}</span> when the truth is <span class="tex">y</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p><span class="tex">\mathbb{R}^d</span> is the set of all lists of <span class="tex">d</span> numbers.</p><p>A hat marks something learned from data: <span class="tex">\hat{f}</span> is the fitted model, <span class="tex">\hat{y}</span> its guess.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The supervised setting</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">We show the model examples together with the right answer.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Learning from labeled examples">
+<div class="hdr" data-s="Supervised setting"></div>
+<h2>Learning from labeled examples</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 600" preserveAspectRatio="xMidYMid meet">
+<g class="an-fade">
+<text class="ttl" x="0" y="24">training</text>
+<rect class="box" x="0" y="44" width="460" height="44"/>
+<text class="lb" x="20" y="74">input</text><text class="lb" x="340" y="74">label</text>
+<line class="gl" x1="320" y1="44" x2="320" y2="280"/>
+<rect x="0" y="88" width="460" height="192" style="fill:none;stroke:var(--myst-color-border-strong);stroke-width:2"/>
+<text class="txs" x="20" y="122">Win a free trip now</text><text class="txs fb" x="340" y="122" font-weight="600">spam</text>
+<text class="txs" x="20" y="170">Meeting moved to 3 pm</text><text class="txs fa" x="340" y="170" font-weight="600">not spam</text>
+<text class="txs" x="20" y="218">Your account is locked</text><text class="txs fb" x="340" y="218" font-weight="600">spam</text>
+<text class="txs" x="20" y="266">Lunch on Friday?</text><text class="txs fa" x="340" y="266" font-weight="600">not spam</text>
+<text class="txs" x="0" y="322" font-style="italic">labels come from people, natural processes or other systems</text>
+</g>
+<g class="an-fade" style="--d:.4s">
+<rect class="box-a" x="640" y="100" width="360" height="120" rx="4"/>
+<text class="tx" x="820" y="152" text-anchor="middle" font-weight="600">Learning algorithm</text>
+<text class="txs" x="820" y="190" text-anchor="middle">adjusts the model</text>
+<rect class="box-a" x="1260" y="100" width="420" height="120" rx="4"/>
+<text class="tx" x="1470" y="152" text-anchor="middle" font-weight="600">Model</text>
+<text class="txs" x="1470" y="190" text-anchor="middle">a function: input → label</text>
+<path class="wire-a" d="M460 162H632" marker-end="url(#ah-a)"/>
+<path class="wire-a" d="M1000 160H1252" marker-end="url(#ah-a)"/>
+<path class="wire" d="M1470 100C1470 40 820 40 820 92" stroke-dasharray="8 8" marker-end="url(#ah)"/>
+<text class="txs" x="1145" y="30" text-anchor="middle">compare its guesses with the labels, adjust</text>
+<circle r="8" class="fa"><animateMotion dur="1.8s" repeatCount="indefinite" path="M460 162H632"/></circle>
+<circle r="8" class="fa"><animateMotion dur="1.8s" repeatCount="indefinite" path="M1000 160H1252"/></circle>
+<circle r="7" class="ink3"><animateMotion dur="2.6s" repeatCount="indefinite" path="M1470 100C1470 40 820 40 820 92"/></circle>
+</g>
+<g class="frag" data-step="use">
+<path class="wire" d="M1470 220V340H820V442" stroke-dasharray="8 8" marker-end="url(#ah)"/>
+<text class="txs" x="1145" y="380" text-anchor="middle">the trained model is reused</text>
+<text class="ttl" x="0" y="430">prediction</text>
+<rect class="box" x="0" y="450" width="460" height="90" rx="4"/>
+<text class="tx" x="230" y="490" text-anchor="middle">New input</text>
+<text class="txs" x="230" y="524" text-anchor="middle">an email without a label</text>
+<rect class="box-a" x="640" y="450" width="360" height="90" rx="4"/>
+<text class="tx" x="820" y="505" text-anchor="middle" font-weight="600">Model</text>
+<rect class="box" x="1260" y="450" width="420" height="90" rx="4"/>
+<text class="tx" x="1470" y="490" text-anchor="middle">Prediction</text>
+<text class="txs fb" x="1470" y="524" text-anchor="middle" font-weight="600">spam</text>
+<path class="wire" d="M460 495H632" marker-end="url(#ah)"/>
+<path class="wire" d="M1000 495H1252" marker-end="url(#ah)"/>
+</g>
+</svg>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 1:</b>Supervision means we tell the model the right answer for each training example. After training, the model gives answers for inputs that have no label.</p>
+</section>
+
+<section class="s ats-prose" data-label="Inputs and labels">
+<div class="hdr" data-s="Supervised setting"></div>
+<h2>Inputs and labels</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Supervised problems with very different inputs. The label can be a class, a number or a richer structure.</p>
+<table class="tb" style="font-size:27px">
+<colgroup><col style="width:21%"><col style="width:29%"><col style="width:30%"><col style="width:20%"></colgroup>
+<thead><tr><th>Problem</th><th>Input</th><th>Label</th><th>Kind of label</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Spam filter</strong></td><td>Text of an email</td><td>spam or not spam</td><td>Class</td></tr>
+<tr class="an-up" style="--d:.13s"><td><strong>Digits</strong></td><td>Image of a handwritten digit</td><td>0, 1, …, 9</td><td>Class</td></tr>
+<tr class="an-up" style="--d:.21s"><td><strong>Diagnosis</strong></td><td>Glucose and blood pressure</td><td>diabetes or not</td><td>Class</td></tr>
+<tr class="an-up" style="--d:.29s"><td><strong>House prices</strong></td><td>Size, location, rooms</td><td>price in colones</td><td>Number</td></tr>
+<tr class="an-up" style="--d:.37s"><td><strong>Rain</strong></td><td>Today's weather readings</td><td>millimeters of rain tomorrow</td><td>Number</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Speech</strong></td><td>Audio clip</td><td>the sentence that was spoken</td><td>Structure</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:24px;max-width:1300px;font-size:26px"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>Whatever the input, it is first turned into numbers (Topic 1). In this chapter each label is one class or one number.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Classification and regression">
+<div class="hdr" data-s="Supervised setting"></div>
+<h2>Classification and regression</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="cls-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="reg-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Classification: the answer is a category</div>
+<div class="subcap">(b) Regression: the answer is a number</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 2:</b>In (a) the model splits the plane into regions, one per class. In (b) it draws a curve, and the prediction is the height of the curve at the new input.</p>
+</section>
+<section class="s ats-prose" data-label="Model as a function">
+<div class="hdr" data-s="Supervised setting"></div>
+<h2>Models as functions</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">A model takes the <span class="tex">d</span> features of an example and returns a label:</p>
+<div class="eq"><div class="m tex-d">f : \mathbb{R}^d \to \mathcal{Y}, \qquad \hat{y} = \hat{f}(\mathbf{x})</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="m1" style="margin:16px 0 0">The set of possible labels <span class="tex">\mathcal{Y}</span> decides the task. Classification has <span class="tex">C</span> classes; regression has any real number:</p>
+<div class="eq frag up" data-step="m1"><div class="m tex-d">\text{classification: } \mathcal{Y} = \{c_1, \dots, c_C\}, \qquad \text{regression: } \mathcal{Y} = \mathbb{R}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="m2" style="margin:16px 0 0">Training uses <span class="tex">\mathcal{D}</span> to choose one function <span class="tex">\hat{f}</span>. Predicting means evaluating it at a new <span class="tex">\mathbf{x}</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Diagnosis (Table 2), with <span class="tex">d = 2</span>:</p><p><span class="tex">\mathbf{x} = (\text{glucose}, \text{pressure})</span></p><p><span class="tex">\mathcal{Y} = \{\text{diabetes}, \text{no diabetes}\}</span>, <span class="tex">C = 2</span>.</p><p>House prices: <span class="tex">\mathcal{Y} = \mathbb{R}</span>, and <span class="tex">\hat{y}</span> is a price.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Teach a classifier" data-demo="click">
+<div class="hdr" data-s="Supervised setting"></div>
+<h2>Teach a classifier</h2>
+<div class="fr">
+<div class="figbox"><svg id="click-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Pick a class and click on the plot to add a labeled example. The model gives each point the class of the closer average (square).</p>
+<div class="btns"><button class="bt" id="click-a">Blue</button><button class="bt chip" id="click-b">Orange</button><button class="bt chip" id="click-reset">Reset</button></div>
+<div class="ro"><span>Blue · orange examples</span><b id="click-n">4 · 4</b></div>
+<div class="ro"><span>Training accuracy</span><b id="click-acc" class="a">100%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>A nearest-average classifier. Each new label moves an average, and the boundary moves with it.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Measuring performance</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Counting the right and wrong answers on data the model has not seen.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The confusion matrix" data-demo="conf">
+<div class="hdr" data-s="Performance"></div>
+<h2>The confusion matrix</h2>
+<div class="fr">
+<div class="figbox"><svg id="conf-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<div class="ctl"><label><span>Threshold</span><b id="conf-t-val">0.50</b></label><input type="range" id="conf-t" min="0" max="1" step="0.05" value="0.5"></div>
+<div class="ro"><span>Accuracy</span><b id="conf-acc">0%</b></div>
+<div class="ro"><span>Precision</span><b id="conf-prec" class="a">0%</b></div>
+<div class="ro"><span>Recall</span><b id="conf-rec" class="bb">0%</b></div>
+<p class="small" style="margin:0"><strong>Precision:</strong> of the flagged emails, the share that is spam. <strong>Recall:</strong> of the spam emails, the share we flagged.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>50 test emails, 20 of them spam. Emails with a score above the threshold are flagged.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Metric formulas">
+<div class="hdr" data-s="Performance"></div>
+<h2>Counting right and wrong</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Call the four cells TP, FP, FN and TN: true positives, false positives, false negatives and true negatives.</p>
+<div class="eq"><div class="m tex-d">\text{accuracy} = \frac{\text{TP} + \text{TN}}{\text{TP} + \text{FP} + \text{FN} + \text{TN}}</div><div class="n">(3)</div></div>
+<div class="eq frag up" data-step="k1"><div class="m tex-d">\text{precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}, \qquad \text{recall} = \frac{\text{TP}}{\text{TP} + \text{FN}}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="k2" style="margin:16px 0 0">Precision divides by the emails we flagged. Recall divides by the emails that really are spam.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>50 emails, 20 of them spam.</p><p>TP = 15, FN = 5<br>FP = 3, TN = 27</p><p><span class="tex">\text{accuracy} = \tfrac{42}{50} = 84\%</span></p><p><span class="tex">\text{precision} = \tfrac{15}{18} \approx 83\%</span></p><p><span class="tex">\text{recall} = \tfrac{15}{20} = 75\%</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Rare classes and numbers">
+<div class="hdr" data-s="Performance"></div>
+<h2>Rare classes and numbers</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="rare-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="mae-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Accuracy misleads when a class is rare</div>
+<div class="subcap">(b) For numbers, average the size of the errors</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 5:</b>(a) 100 card payments, 2 of them fraud. A model that never says fraud is 98% accurate and catches none. (b) Each orange segment is one error; the average error summarizes them.</p>
+</section>
+<section class="s ats-prose" data-label="Loss formulas">
+<div class="hdr" data-s="Performance"></div>
+<h2>Losses and average error</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">A loss <span class="tex">L(y, \hat{y})</span> scores one prediction. Three common ones:</p>
+<div class="eq"><div class="m tex-d">L_{0\text{-}1} = \mathbb{I}(y \neq \hat{y}), \qquad L_{\text{abs}} = |y - \hat{y}|, \qquad L_{\text{sq}} = (y - \hat{y})^2</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="o1" style="margin:16px 0 0">Averaging a loss over <span class="tex">n</span> examples gives one number for the whole set:</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">\frac{1}{n} \sum_{i=1}^{n} L\big(y_i, \hat{f}(\mathbf{x}_i)\big)</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="o2" style="margin:16px 0 0">With the 0-1 loss this is the error rate, <span class="tex">1 - \text{accuracy}</span>. With the absolute loss it is the average error of Figure 5b; with the squared loss, the mean squared error.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Labels 3, 5, 10; predictions 4, 3, 7. Gaps: 1, 2, 3.</p><p><span class="tex">\text{abs:}\ \tfrac{1 + 2 + 3}{3} = 2</span></p><p><span class="tex">\text{sq:}\ \tfrac{1 + 4 + 9}{3} \approx 4.67</span></p><p>Fraud model of Figure 5a: 2 mistakes in 100, error rate 0.02.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Models and their assumptions</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Every method draws boundaries in its own way.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Simple and wiggly boundaries">
+<div class="hdr" data-s="Models"></div>
+<h2>Simple and wiggly boundaries</h2>
+<div class="fr">
+<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px;min-height:0">
+<div class="figbox"><svg id="simple-svg" viewBox="0 0 560 620"></svg></div>
+<div class="figbox"><svg id="wiggly-svg" viewBox="0 0 560 620"></svg></div>
+<div class="subcap">(a) A straight line</div>
+<div class="subcap">(b) A boundary that bends</div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am an-up" style="--d:.1s"><div class="t">Model family</div><p>The set of shapes a method can draw: all straight lines, or all boundaries made of small pieces.</p></aside>
+<aside class="am an-up" style="--d:.3s"><div class="t">Parameters</div><p>The numbers training picks inside that family, such as the slope and position of the line.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The same 60 examples. (a) misses a few points; (b) puts every training point on its side.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Empirical risk">
+<div class="hdr" data-s="Models"></div>
+<h2>Learning as minimizing loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The average training loss of a model <span class="tex">f</span> is its empirical risk:</p>
+<div class="eq"><div class="m tex-d">\hat{R}(f) = \frac{1}{n} \sum_{i=1}^{n} L\big(y_i, f(\mathbf{x}_i)\big)</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="r1" style="margin:16px 0 0">Training searches the model family <span class="tex">\mathcal{F}</span> for the member with the smallest empirical risk:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">\hat{f} = \underset{f \in \mathcal{F}}{\arg\min} \ \hat{R}(f)</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="r2" style="margin:16px 0 0">For lines, searching <span class="tex">\mathcal{F}</span> means searching the slope and position: the parameters.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>10 training points, 0-1 loss.</p><p>Line A misses 3: <span class="tex">\hat{R} = 0.3</span>.</p><p>Line B misses 1: <span class="tex">\hat{R} = 0.1</span>.</p><p>Training keeps line B.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Underfitting and overfitting">
+<div class="hdr" data-s="Models"></div>
+<h2>Too simple, too flexible</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:60px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="fit1-svg" viewBox="0 0 520 540"></svg></div>
+<div class="figbox an-fade" style="--d:.3s"><svg id="fit2-svg" viewBox="0 0 520 540"></svg></div>
+<div class="figbox an-fade" style="--d:.55s"><svg id="fit3-svg" viewBox="0 0 520 540"></svg></div>
+<div class="subcap" id="fit1-cap">(a) Underfitting</div>
+<div class="subcap" id="fit2-cap">(b) Good fit</div>
+<div class="subcap" id="fit3-cap">(c) Overfitting</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>70 training points; 10% of the labels are noise. Accuracy is on 400 new test points. Too rigid means high bias; too flexible means high variance (Topics 1 and 6).</p>
+</section>
+<section class="s ats-prose" data-label="Generalization gap">
+<div class="hdr" data-s="Models"></div>
+<h2>The generalization gap</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The training error <span class="tex">\text{Err}_{\text{train}} = \hat{R}(\hat{f})</span> is measured on the examples used to fit. The test error is the same average on new examples.</p>
+<div class="eq"><div class="m tex-d">\text{gap} = \text{Err}_{\text{test}} - \text{Err}_{\text{train}}</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="g1" style="margin:16px 0 0">Underfitting: both errors are high and the gap is small.</p>
+<p class="small frag up" data-step="g2" style="margin:16px 0 0">Overfitting: the training error is near 0 and the gap is large. A low <span class="tex">\hat{R}</span> alone does not prove a good model.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Made-up training and test errors, as shares of mistakes:</p><p>Too simple: 0.25 and 0.27, so the gap is 0.02.</p><p>Too flexible: 0.00 and 0.18, so the gap is 0.18.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Same data, three models" data-demo="family">
+<div class="hdr" data-s="Models"></div>
+<h2>Same data, three models</h2>
+<div class="fr">
+<div class="figbox"><svg id="fam-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<div class="btns"><button class="bt" id="fam-knn">Neighbors</button><button class="bt chip" id="fam-line">Line</button><button class="bt chip" id="fam-tree">Tree</button></div>
+<div class="ro"><span>Training accuracy</span><b id="fam-acc" class="a">0%</b></div>
+<p class="small" style="margin:0"><strong>Assumes:</strong> <span id="fam-assume">nearby points share a label.</span></p>
+<aside class="am"><div class="t">No free lunch</div><p>No method is best on every problem. Each wins when its assumptions, its inductive bias, match the data.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>The data of Figure 6 with three methods from this chapter.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The chapter ahead">
+<div class="hdr" data-s="Models"></div>
+<h2>The chapter ahead</h2>
+<p class="cap" style="margin-bottom:12px"><b>Table 3:</b>The seven methods of this chapter, each with the boundary or curve it draws on a small example.</p>
+<table class="tb cmp" style="font-size:26px">
+<colgroup><col style="width:7%"><col style="width:21%"><col style="width:41%"><col style="width:16%"><col style="width:15%"></colgroup>
+<thead><tr><th>Topic</th><th>Method</th><th>Main idea</th><th>Task</th><th>Shape</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>8</td><td><strong>k-nearest neighbors</strong></td><td>Copy the answer of the most similar examples</td><td>Both</td><td><svg class="thumb" id="th-knn" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.12s"><td>9</td><td><strong>Linear regression</strong></td><td>Fit a straight line to predict a number</td><td>Regression</td><td><svg class="thumb" id="th-lin" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.19s"><td>10</td><td><strong>Decision trees</strong></td><td>Ask yes or no questions, one feature at a time</td><td>Both</td><td><svg class="thumb" id="th-tree" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.26s"><td>11</td><td><strong>Logistic regression</strong></td><td>A straight boundary plus a probability for each class</td><td>Classification</td><td><svg class="thumb" id="th-log" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.33s"><td>12</td><td><strong>Support vector machines</strong></td><td>The boundary with the widest gap between the classes</td><td>Classification</td><td><svg class="thumb" id="th-svm" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.40s"><td>13</td><td><strong>Naive Bayes</strong></td><td>Combine the evidence of each feature with probabilities</td><td>Classification</td><td><svg class="thumb" id="th-nb" viewBox="0 0 170 64"></svg></td></tr>
+<tr class="an-up" style="--d:.47s"><td>14</td><td><strong>Ensembles</strong></td><td>Many models vote; the group beats each member</td><td>Both</td><td><svg class="thumb" id="th-ens" viewBox="0 0 170 64"></svg></td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Supervised learning fits a function from inputs to labels, using examples that come with the answer.</li>
+<li class="an-up" style="--d:.15s">Classification predicts a category; regression predicts a number.</li>
+<li class="an-up" style="--d:.25s">A classifier splits the feature space with a decision boundary.</li>
+<li class="an-up" style="--d:.35s">With rare classes, look at the confusion matrix, precision and recall, not only accuracy.</li>
+<li class="an-up" style="--d:.45s">Each method assumes something about the data; no method wins on every problem.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic expands on labels, metrics and the assumptions behind each method.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Mitchell, T. M. (1997). <em>Machine Learning</em>. McGraw-Hill.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 2. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 2. Springer.</li>
+<li style="margin:.4em 0">Burkov, A. (2019). <em>The Hundred-Page Machine Learning Book</em>.</li>
+<li style="margin:.4em 0">Wolpert, D. H. (1996). The lack of a priori distinctions between learning algorithms. <em>Neural Computation</em>, 8(7), 1341–1390.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 8: k-nearest neighbors.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const accOf = (pts, predict) => pts.filter((p) => predict(p.x, p.y) === p.c).length / pts.length;
+
+/* Shade the plot by class on a grid; optionally trace the boundary between cells of different class */
+function regions(F, X, Y, predict, g, nx, ny, o = {}) {
+  const dx = (X[1] - X[0]) / nx, dy = (Y[1] - Y[0]) / ny, op = o.op ?? 0.14;
+  const lab = [];
+  for (let i = 0; i < nx; i++) {
+    const col = [];
+    for (let j = 0; j < ny; j++) col.push(predict(X[0] + (i + 0.5) * dx, Y[0] + (j + 0.5) * dy));
+    lab.push(col);
+  }
+  const shade = el('g', { 'shape-rendering': 'crispEdges', style: `opacity:${op}` }, g);
+  for (let i = 0; i < nx; i++) {
+    let j0 = 0;
+    for (let j = 1; j <= ny; j++) {
+      if (j < ny && lab[i][j] === lab[i][j0]) continue;
+      const xa = F.sx(X[0] + i * dx), xb = F.sx(X[0] + (i + 1) * dx);
+      const ya = F.sy(Y[0] + j * dy), yb = F.sy(Y[0] + j0 * dy);
+      el('rect', { x: xa, y: ya, width: xb - xa + 0.5, height: yb - ya + 0.5, class: lab[i][j0] ? 'fb' : 'fa' }, shade);
+      j0 = j;
+    }
+  }
+  if (o.edges === false) return;
+  let d = '';
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    if (i + 1 < nx && lab[i][j] !== lab[i + 1][j]) d += `M${F.sx(X[0] + (i + 1) * dx).toFixed(1)} ${F.sy(Y[0] + j * dy).toFixed(1)}V${F.sy(Y[0] + (j + 1) * dy).toFixed(1)}`;
+    if (j + 1 < ny && lab[i][j] !== lab[i][j + 1]) d += `M${F.sx(X[0] + i * dx).toFixed(1)} ${F.sy(Y[0] + (j + 1) * dy).toFixed(1)}H${F.sx(X[0] + (i + 1) * dx).toFixed(1)}`;
+  }
+  el('path', { d, style: `fill:none;stroke:var(--myst-color-text);stroke-width:${o.w ?? 3};stroke-linecap:square` }, g);
+}
+
+/* Half-planes of a linear rule a + b·x + c·y ≥ 0 (orange) and the boundary line */
+function clipHalf(poly, f) {
+  const out = [];
+  poly.forEach((P, i) => {
+    const Q = poly[(i + 1) % poly.length], fp = f(P), fq = f(Q);
+    if (fp >= 0) out.push(P);
+    if ((fp >= 0) !== (fq >= 0)) { const t = fp / (fp - fq); out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); }
+  });
+  return out;
+}
+function halfPlanes(F, X, Y, L, g, o = {}) {
+  const box = [[X[0], Y[0]], [X[1], Y[0]], [X[1], Y[1]], [X[0], Y[1]]];
+  const f = ([x, y]) => L.a + L.b * x + L.c * y;
+  [[f, 'fb'], [(p) => -f(p), 'fa']].forEach(([h, cls]) => {
+    const poly = clipHalf(box, h);
+    if (poly.length > 2) el('polygon', { points: poly.map(([x, y]) => `${F.sx(x)},${F.sy(y)}`).join(' '), class: cls, style: `fill-opacity:${o.op ?? 0.14}` }, g);
+  });
+  lineOf(F, X, Y, L, 0, g, `stroke:var(--myst-color-text);stroke-width:${o.w ?? 4}`);
+}
+function lineOf(F, X, Y, L, t, g, style) {
+  let p, q;
+  if (Math.abs(L.c) > Math.abs(L.b)) { const y = (x) => (t - L.a - L.b * x) / L.c; p = [X[0] - 5, y(X[0] - 5)]; q = [X[1] + 5, y(X[1] + 5)]; }
+  else { const x = (y) => (t - L.a - L.c * y) / L.b; p = [x(Y[0] - 5), Y[0] - 5]; q = [x(Y[1] + 5), Y[1] + 5]; }
+  return el('line', { x1: F.sx(p[0]), y1: F.sy(p[1]), x2: F.sx(q[0]), y2: F.sy(q[1]), style }, g);
+}
+
+/* ───────── learners (tiny versions of the chapter's methods) ───────── */
+function knn(pts, k) {
+  return (x, y) => {
+    const d = pts.map((p) => [(p.x - x) ** 2 + (p.y - y) ** 2, p.c]).sort((u, v) => u[0] - v[0]);
+    let s = 0;
+    for (let i = 0; i < k; i++) s += d[i][1];
+    return s * 2 > k ? 1 : 0;
+  };
+}
+function logistic(pts, iters = 2500, rate = 0.4) {
+  const mx = mean(pts.map((p) => p.x)), my = mean(pts.map((p) => p.y));
+  const sx = Math.sqrt(mean(pts.map((p) => (p.x - mx) ** 2))), sy = Math.sqrt(mean(pts.map((p) => (p.y - my) ** 2)));
+  let w = [0, 0, 0];
+  for (let it = 0; it < iters; it++) {
+    const g = [0, 0, 0];
+    pts.forEach((p) => {
+      const u = (p.x - mx) / sx, v = (p.y - my) / sy, e = 1 / (1 + Math.exp(-(w[0] + w[1] * u + w[2] * v))) - p.c;
+      g[0] += e; g[1] += e * u; g[2] += e * v;
+    });
+    w = w.map((wk, k) => wk - rate * g[k] / pts.length);
+  }
+  const L = { a: w[0] - w[1] * mx / sx - w[2] * my / sy, b: w[1] / sx, c: w[2] / sy };
+  L.predict = (x, y) => (L.a + L.b * x + L.c * y >= 0 ? 1 : 0);
+  return L;
+}
+const gini = (ps) => { if (!ps.length) return 0; const q = ps.filter((p) => p.c).length / ps.length; return 1 - q * q - (1 - q) * (1 - q); };
+function grow(ps, depth) {
+  const n1 = ps.filter((p) => p.c).length, leaf = { leaf: true, c: n1 * 2 > ps.length ? 1 : 0 };
+  if (depth === 0 || n1 === 0 || n1 === ps.length || ps.length < 4) return leaf;
+  let best = null;
+  ['x', 'y'].forEach((f) => {
+    const s = ps.slice().sort((a, b) => a[f] - b[f]);
+    for (let i = 2; i <= s.length - 2; i++) {
+      if (s[i][f] === s[i - 1][f]) continue;
+      const Lp = s.slice(0, i), Rp = s.slice(i), score = (Lp.length * gini(Lp) + Rp.length * gini(Rp)) / s.length;
+      if (!best || score < best.score) best = { f, thr: (s[i][f] + s[i - 1][f]) / 2, score, Lp, Rp };
+    }
+  });
+  if (!best || best.score >= gini(ps) - 1e-9) return leaf;
+  return { f: best.f, thr: best.thr, l: grow(best.Lp, depth - 1), r: grow(best.Rp, depth - 1) };
+}
+const treePredict = (n, x, y) => { while (!n.leaf) n = (n.f === 'x' ? x : y) < n.thr ? n.l : n.r; return n.c; };
+function drawTree(F, n, [x0, x1, y0, y1], g, lines, o = {}) {
+  if (n.leaf) {
+    el('rect', { x: F.sx(x0), y: F.sy(y1), width: F.sx(x1) - F.sx(x0), height: F.sy(y0) - F.sy(y1), class: n.c ? 'fb' : 'fa', style: `fill-opacity:${o.op ?? 0.14}` }, g);
+    return;
+  }
+  if (n.f === 'x') {
+    drawTree(F, n.l, [x0, n.thr, y0, y1], g, lines, o); drawTree(F, n.r, [n.thr, x1, y0, y1], g, lines, o);
+    lines.push([n.thr, y0, n.thr, y1]);
+  } else {
+    drawTree(F, n.l, [x0, x1, y0, n.thr], g, lines, o); drawTree(F, n.r, [x0, x1, n.thr, y1], g, lines, o);
+    lines.push([x0, n.thr, x1, n.thr]);
+  }
+}
+function treeRegions(F, X, Y, node, g, o = {}) {
+  const lines = [];
+  drawTree(F, node, [X[0], X[1], Y[0], Y[1]], g, lines, o);
+  lines.forEach(([a, b, c, d]) => el('line', { x1: F.sx(a), y1: F.sy(b), x2: F.sx(c), y2: F.sy(d), style: `stroke:var(--myst-color-text);stroke-width:${o.w ?? 3};stroke-dasharray:${o.dash ?? 'none'}` }, g));
+}
+function naiveBayes(pts) {
+  const st = [0, 1].map((k) => {
+    const s = pts.filter((p) => p.c === k), m = [mean(s.map((p) => p.x)), mean(s.map((p) => p.y))];
+    const v = [mean(s.map((p) => (p.x - m[0]) ** 2)), mean(s.map((p) => (p.y - m[1]) ** 2))];
+    return { m, v, prior: s.length / pts.length };
+  });
+  const ll = (s, x, y) => Math.log(s.prior) - 0.5 * (Math.log(s.v[0]) + (x - s.m[0]) ** 2 / s.v[0] + Math.log(s.v[1]) + (y - s.m[1]) ** 2 / s.v[1]);
+  return (x, y) => (ll(st[1], x, y) > ll(st[0], x, y) ? 1 : 0);
+}
+function bagging(pts, nTrees, depth, r) {
+  const trees = Array.from({ length: nTrees }, () => grow(pts.map(() => pts[Math.floor(r() * pts.length)]), depth));
+  return (x, y) => (trees.reduce((s, t) => s + treePredict(t, x, y), 0) * 2 > nTrees ? 1 : 0);
+}
+function dots(F, pts, g, r = 10, anim = false) {
+  pts.forEach((p, i) => el('circle', { class: `pt ${p.c ? 'fb' : 'fa'}${anim ? ' an-pop' : ''}`, cx: F.sx(p.x), cy: F.sy(p.y), r, style: anim ? `--d:${(i * 0.012).toFixed(3)}s` : '' }, g));
+}
+
+/* ───────── shared data ───────── */
+/* 60 examples in two overlapping clouds (Figures 6 and 8) */
+const BLOBS = (() => {
+  const r = rng(17), pts = [];
+  for (let i = 0; i < 60; i++) {
+    const c = i % 2;
+    pts.push({ x: clamp((c ? 6.4 : 3.6) + 1.35 * gauss(r), 0.3, 9.7), y: clamp((c ? 3.8 : 6.2) + 1.35 * gauss(r), 0.3, 9.7), c });
+  }
+  return pts;
+})();
+/* curved true boundary with 10% label noise (Figure 7) */
+const CURVE = (() => {
+  const r = rng(29), above = (x, y) => (y > 5 + 2.4 * Math.sin(0.7 * x - 0.6) ? 1 : 0);
+  const make = (n) => Array.from({ length: n }, () => {
+    const x = 0.2 + 9.6 * r(), y = 0.2 + 9.6 * r();
+    let c = above(x, y);
+    if (r() < 0.1) c = 1 - c;
+    return { x, y, c };
+  });
+  return { train: make(70), test: make(400) };
+})();
+
+/* ───────── static figures ───────── */
+function drawClsReg() {
+  const r = rng(41);
+  const svgC = document.getElementById('cls-svg');
+  const FC = frame(svgC, { W: 792, H: 560, l: 80, t: 60, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  const L = { a: -1, b: 0.85, c: -0.8 };
+  halfPlanes(FC, [0, 10], [0, 10], L, FC.plot, { op: 0.1 });
+  const pts = [];
+  while (pts.length < 50) {
+    const x = r() * 10, y = r() * 10, f = L.a + L.b * x + L.c * y;
+    if (Math.abs(f) < 0.7 || (x > 5.5 && x < 9.2 && y > 2.8 && y < 5)) continue;
+    pts.push({ x, y, c: f > 0 ? 1 : 0 });
+  }
+  dots(FC, pts, FC.plot, 9, true);
+  const q = { x: 6.2, y: 4.2 };
+  const g = el('g', { class: 'an-pop', style: '--d:1s' }, svgC);
+  el('circle', { cx: FC.sx(q.x), cy: FC.sy(q.y), r: 15, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:4' }, g);
+  el('text', { class: 'tx', x: FC.sx(q.x), y: FC.sy(q.y) + 10, 'text-anchor': 'middle', 'font-weight': 700, text: '?' }, g);
+  el('text', { class: 'txs', x: FC.sx(q.x) + 24, y: FC.sy(q.y) + 46, text: 'new: class B' }, g);
+  legend(svgC, 90, 22, [['dot', 'fa', 'class A']]);
+  legend(svgC, 250, 22, [['dot', 'fb', 'class B']]);
+  legend(svgC, 410, 22, [['line', '', 'boundary']]).querySelector('line').setAttribute('style', 'stroke:var(--myst-color-text);stroke-width:4');
+
+  const svgR = document.getElementById('reg-svg');
+  const FR = frame(svgR, { W: 792, H: 560, l: 80, t: 60, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'house size', yl: 'price' });
+  const f = (x) => 1.2 + 0.75 * x;
+  for (let i = 0; i < 36; i++) {
+    const x = 0.4 + r() * 9.2;
+    el('circle', { class: 'pt fa an-pop', cx: FR.sx(x), cy: FR.sy(f(x) + 0.75 * gauss(r)), r: 9, style: `--d:${i * 0.015}s` }, FR.plot);
+  }
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.6s', d: curvePath(f, 0, 10, FR.sx, FR.sy) }, FR.plot);
+  const nx = 7.5, g2 = el('g', { class: 'an-fade', style: '--d:1.4s' }, svgR);
+  el('line', { x1: FR.sx(nx), x2: FR.sx(nx), y1: FR.sy(0), y2: FR.sy(f(nx)), style: 'stroke:var(--myst-color-text);stroke-width:2.5;stroke-dasharray:8 6' }, g2);
+  el('line', { x1: FR.sx(0), x2: FR.sx(nx), y1: FR.sy(f(nx)), y2: FR.sy(f(nx)), style: 'stroke:var(--myst-color-text);stroke-width:2.5;stroke-dasharray:8 6' }, g2);
+  el('circle', { cx: FR.sx(nx), cy: FR.sy(f(nx)), r: 12, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:4' }, g2);
+  el('text', { class: 'txs', x: FR.sx(nx) + 22, y: FR.sy(f(nx)) + 48, text: `new house: ${f(nx).toFixed(1)}` }, g2);
+  legend(svgR, 90, 22, [['dot', 'fa', 'house sold']]);
+  legend(svgR, 290, 22, [['line', 'curve-b', 'fitted curve']]);
+}
+
+function drawRare() {
+  const svg = document.getElementById('rare-svg');
+  const S = 38, G = 4, X0 = 20, Y0 = 40, FRAUD = [37, 82];
+  for (let i = 0; i < 100; i++) {
+    const row = Math.floor(i / 10), col = i % 10;
+    el('rect', { x: X0 + col * (S + G), y: Y0 + row * (S + G), width: S, height: S, rx: 3, class: `${FRAUD.includes(i) ? 'fb' : 'fa'} an-pop`, style: `--d:${(i * 0.008).toFixed(3)}s;${FRAUD.includes(i) ? '' : 'fill-opacity:.55'}` }, svg);
+  }
+  legend(svg, X0, Y0 + 10 * (S + G) + 36, [['dot', 'fa', 'normal (98)'], ['dot', 'fb', 'fraud (2)']]);
+  const R0 = 480;
+  el('text', { class: 'ttl', x: R0, y: 60, text: 'a lazy model' }, svg);
+  el('text', { class: 'txs', x: R0, y: 98, text: 'always answers' }, svg);
+  el('text', { class: 'tx', x: R0, y: 134, 'font-weight': 600, text: '“not fraud”' }, svg);
+  const BW = 180;
+  [['accuracy', 0.98, '98%', 'fa', 220], ['frauds caught', 0, '0 of 2', 'fb', 340]].forEach(([lab, v, t, cls, y], i) => {
+    el('text', { class: 'lb', x: R0, y, text: lab }, svg);
+    el('rect', { x: R0, y: y + 16, width: BW, height: 36, rx: 2, style: 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border)' }, svg);
+    el('rect', { x: R0, y: y + 16, width: Math.max(4, BW * v), height: 36, rx: 2, class: `${cls} an-grow`, style: `--d:${0.9 + i * 0.3}s` }, svg);
+    el('text', { class: 'tx', x: R0 + BW + 14, y: y + 44, 'font-weight': 700, style: `fill:var(--c-${cls === 'fa' ? 'a' : 'b'})`, text: t }, svg);
+  });
+}
+
+function drawMae() {
+  const svg = document.getElementById('mae-svg');
+  const F = frame(svg, { W: 792, H: 560, l: 80, t: 60, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'house size', yl: 'price' });
+  const r = rng(52);
+  const pts = Array.from({ length: 12 }, (_, i) => { const x = 0.6 + i * 0.8 + 0.3 * r(); return [x, 1.4 + 0.72 * x + 0.9 * gauss(r)]; });
+  const xm = mean(pts.map((p) => p[0])), ym = mean(pts.map((p) => p[1]));
+  const b = pts.reduce((s, [x, y]) => s + (x - xm) * (y - ym), 0) / pts.reduce((s, [x]) => s + (x - xm) ** 2, 0), a = ym - b * xm;
+  const f = (x) => a + b * x;
+  el('path', { class: 'curve-a', d: curvePath(f, 0, 10, F.sx, F.sy) }, F.plot);
+  pts.forEach(([x, y], i) => el('line', { class: 'an-growy', x1: F.sx(x), x2: F.sx(x), y1: F.sy(f(x)), y2: F.sy(y), style: `--d:${0.4 + i * 0.08}s;stroke:var(--c-b);stroke-width:4` }, F.plot));
+  pts.forEach(([x, y]) => el('circle', { class: 'pt ink', cx: F.sx(x), cy: F.sy(y), r: 9 }, F.plot));
+  const mae = mean(pts.map(([x, y]) => Math.abs(y - f(x))));
+  legend(svg, 90, 22, [['line', 'curve-a', 'model']]);
+  legend(svg, 250, 22, [['line', '', 'error']]).querySelector('line').setAttribute('style', 'stroke:var(--c-b);stroke-width:4');
+  el('text', { class: 'tx an-fade', x: F.sx(0.4), y: F.sy(9.2), style: '--d:1.6s', 'font-weight': 600, text: `average error = ${mae.toFixed(2)}` }, F.plot);
+}
+
+function drawBoundaries() {
+  const X = [0, 10], Y = [0, 10];
+  const mk = (id) => frame(document.getElementById(id), { W: 560, H: 620, l: 80, t: 20, b: 84, x: X, y: Y, xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  const A = mk('simple-svg'), B = mk('wiggly-svg');
+  const L = logistic(BLOBS);
+  halfPlanes(A, X, Y, L, A.plot);
+  regions(B, X, Y, knn(BLOBS, 1), B.plot, 92, 100);
+  dots(A, BLOBS, A.plot, 9, true);
+  dots(B, BLOBS, B.plot, 9, true);
+}
+
+function drawFits() {
+  const X = [0, 10], Y = [0, 10];
+  const models = [
+    ['fit1', '(a) Too simple', logistic(CURVE.train)],
+    ['fit2', '(b) About right', { predict: knn(CURVE.train, 9) }],
+    ['fit3', '(c) Too flexible', { predict: knn(CURVE.train, 1) }],
+  ];
+  models.forEach(([id, name, m], i) => {
+    const F = frame(document.getElementById(id + '-svg'), { W: 520, H: 540, l: 80, t: 16, b: 84, x: X, y: Y, xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+    if (i === 0) halfPlanes(F, X, Y, m, F.plot);
+    else regions(F, X, Y, m.predict, F.plot, 84, 86);
+    dots(F, CURVE.train, F.plot, 8);
+    const tr = accOf(CURVE.train, m.predict), te = accOf(CURVE.test, m.predict);
+    document.getElementById(id + '-cap').innerHTML = `${name}: training <b style="color:var(--c-a)">${pct(tr)}</b>, test <b style="color:var(--c-b)">${pct(te)}</b>`;
+  });
+}
+
+function drawThumbs() {
+  const r = rng(63), X = [0, 10], Y = [0, 10];
+  const T = [];
+  for (let i = 0; i < 40; i++) {
+    const c = i % 2;
+    T.push({ x: clamp((c ? 6.6 : 3.4) + (c ? 1.7 : 1.0) * gauss(r), 0.3, 9.7), y: clamp((c ? 3.8 : 6.4) + (c ? 1.7 : 1.0) * gauss(r), 0.3, 9.7), c });
+  }
+  const mini = (id) => { const svg = document.getElementById(id); return { svg, sx: lin(0, 10, 0, 170), sy: lin(0, 10, 64, 0), plot: svg }; };
+  const pts = (F, set) => set.forEach((p) => el('circle', { class: p.c ? 'fb' : 'fa', cx: F.sx(p.x), cy: F.sy(p.y), r: 2.6 }, F.plot));
+  let F = mini('th-knn'); regions(F, X, Y, knn(T, 3), F.plot, 75, 30, { op: 0.2, w: 1.5 }); pts(F, T);
+  F = mini('th-tree'); treeRegions(F, X, Y, grow(T, 3), F.plot, { op: 0.2, w: 1.5 }); pts(F, T);
+  const L = logistic(T);
+  F = mini('th-log'); halfPlanes(F, X, Y, L, F.plot, { op: 0.2, w: 2 }); pts(F, T);
+  F = mini('th-svm'); halfPlanes(F, X, Y, L, F.plot, { op: 0.2, w: 2 });
+  [-2, 2].forEach((t) => lineOf(F, X, Y, L, t, F.plot, 'stroke:var(--myst-color-text);stroke-width:1.2;stroke-dasharray:4 3'));
+  pts(F, T);
+  F = mini('th-nb'); regions(F, X, Y, naiveBayes(T), F.plot, 75, 30, { op: 0.2, w: 1.5 }); pts(F, T);
+  F = mini('th-ens'); regions(F, X, Y, bagging(T, 25, 3, rng(7)), F.plot, 75, 30, { op: 0.2, w: 1.5 }); pts(F, T);
+  F = mini('th-lin');
+  const R = Array.from({ length: 14 }, (_, i) => { const x = 0.5 + i * 0.68; return [x, 2 + 0.6 * x + 0.8 * gauss(r)]; });
+  R.forEach(([x, y]) => el('circle', { class: 'fa', cx: F.sx(x), cy: F.sy(y), r: 2.8 }, F.plot));
+  el('line', { class: 'curve-b', x1: F.sx(0), y1: F.sy(2), x2: F.sx(10), y2: F.sy(8), style: 'stroke-width:2.5' }, F.plot);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.click = (() => {
+  const svg = document.getElementById('click-svg');
+  const X = [0, 10], Y = [0, 10];
+  const F = frame(svg, { W: 1160, H: 700, x: X, y: Y, xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2' });
+  const layer = el('g', {}, F.plot);
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'blue class'], ['dot', 'fb', 'orange class']]);
+  const SEED = [[2.4, 7.2, 0], [3.4, 6.1, 0], [1.8, 5.4, 0], [3.1, 8.3, 0], [7.1, 3.1, 1], [6.4, 1.9, 1], [8.2, 4.1, 1], [7.6, 2.4, 1]];
+  let pts, cls = 0;
+  const btnA = document.getElementById('click-a'), btnB = document.getElementById('click-b');
+  function draw() {
+    clear(layer);
+    const cs = [0, 1].map((k) => { const s = pts.filter((p) => p.c === k); return s.length ? [mean(s.map((p) => p.x)), mean(s.map((p) => p.y))] : null; });
+    let predict = null;
+    if (cs[0] && cs[1]) {
+      const [[x0, y0], [x1, y1]] = cs;
+      const L = { a: x0 * x0 + y0 * y0 - x1 * x1 - y1 * y1, b: 2 * (x1 - x0), c: 2 * (y1 - y0) };
+      if (Math.abs(L.b) + Math.abs(L.c) > 1e-9) { halfPlanes(F, X, Y, L, layer); predict = (x, y) => (L.a + L.b * x + L.c * y >= 0 ? 1 : 0); }
+    }
+    dots(F, pts, layer, 11);
+    cs.forEach((c, k) => { if (c) el('rect', { x: F.sx(c[0]) - 16, y: F.sy(c[1]) - 16, width: 32, height: 32, rx: 3, class: k ? 'fb' : 'fa', style: 'stroke:var(--myst-color-text);stroke-width:3.5' }, layer); });
+    document.getElementById('click-n').textContent = `${pts.filter((p) => !p.c).length} · ${pts.filter((p) => p.c).length}`;
+    document.getElementById('click-acc').textContent = predict ? pct(accOf(pts, predict)) : '—';
+  }
+  function pick(k) {
+    cls = k;
+    btnA.className = k ? 'bt chip' : 'bt';
+    btnB.className = k ? 'bt' : 'bt chip';
+  }
+  svg.addEventListener('click', (e) => {
+    const p = toSvgPoint(svg, e), x = F.ix(p.x), y = F.iy(p.y);
+    if (x < 0 || x > 10 || y < 0 || y > 10) return;
+    e.preventDefault();
+    pts.push({ x, y, c: cls });
+    draw();
+  });
+  btnA.addEventListener('click', () => pick(0));
+  btnB.addEventListener('click', () => pick(1));
+  document.getElementById('click-reset').addEventListener('click', () => { pts = SEED.map(([x, y, c]) => ({ x, y, c })); draw(); });
+  pts = SEED.map(([x, y, c]) => ({ x, y, c }));
+  pick(0); draw();
+  return {};
+})();
+
+DEMOS.conf = (() => {
+  const svg = document.getElementById('conf-svg');
+  const r = rng(9), sx = lin(0, 1, 40, 1120);
+  const mails = [];
+  for (let i = 0; i < 50; i++) {
+    const spam = i < 20 ? 1 : 0;
+    mails.push({ s: clamp((spam ? 0.68 : 0.33) + 0.17 * gauss(r), 0.02, 0.98), spam, j: (r() - 0.5) * 44 });
+  }
+  const BAND = [82, 214], AX = 262;
+  const zone = el('rect', { y: 40, height: AX - 40, style: 'fill:var(--c-b);fill-opacity:.08' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 30, text: 'actually spam' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 160, text: 'actually not spam' }, svg);
+  el('path', { class: 'ax', d: `M${sx(0)} ${AX}H${sx(1)}` }, svg);
+  [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
+    el('line', { class: 'ax', x1: sx(v), x2: sx(v), y1: AX, y2: AX + 8 }, svg);
+    el('text', { class: 'tk', x: sx(v), y: AX + 34, 'text-anchor': 'middle', text: v.toFixed(2) }, svg);
+  });
+  el('text', { class: 'lb', x: sx(1), y: AX + 72, 'text-anchor': 'end', text: 'spam score from the model →' }, svg);
+  const dotEls = mails.map((m) => el('circle', { cx: sx(m.s), cy: BAND[m.spam ? 0 : 1] + m.j, r: 11, class: `pt ${m.spam ? 'fb' : 'fa'}` }, svg));
+  const tLine = el('line', { y1: 40, y2: AX, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 6' }, svg);
+  const tLab = el('text', { class: 'txs', y: AX + 72, 'text-anchor': 'middle', 'font-weight': 600 }, svg);
+  /* matrix */
+  const MX = 340, CW = 300, CH = 110, MY = 446;
+  el('text', { class: 'ttl', x: 0, y: 400, text: 'confusion matrix' }, svg);
+  el('text', { class: 'lb', x: MX + CW / 2, y: MY - 16, 'text-anchor': 'middle', text: 'flagged as spam' }, svg);
+  el('text', { class: 'lb', x: MX + CW * 1.5 + 10, y: MY - 16, 'text-anchor': 'middle', text: 'not flagged' }, svg);
+  el('text', { class: 'lb', x: MX - 20, y: MY + CH / 2 + 8, 'text-anchor': 'end', text: 'actually spam' }, svg);
+  el('text', { class: 'lb', x: MX - 20, y: MY + CH * 1.5 + 18, 'text-anchor': 'end', text: 'actually not spam' }, svg);
+  const cells = [['tp', 0, 0, true, 'true positive'], ['fn', 1, 0, false, 'missed spam'], ['fp', 0, 1, false, 'false alarm'], ['tn', 1, 1, true, 'true negative']].map(([k, c, rw, ok, name]) => {
+    const x = MX + c * (CW + 10), y = MY + rw * (CH + 10);
+    el('rect', { x, y, width: CW, height: CH, rx: 4, style: ok ? 'fill:var(--c-c-soft);stroke:var(--c-c);stroke-width:3' : 'fill:var(--c-b-soft);stroke:var(--c-b);stroke-width:3' }, svg);
+    const n = el('text', { class: 'tx', x: x + CW / 2, y: y + 56, 'text-anchor': 'middle', style: 'font-size:44px;font-weight:700' }, svg);
+    el('text', { class: 'txs', x: x + CW / 2, y: y + 94, 'text-anchor': 'middle', text: name }, svg);
+    return [k, n];
+  });
+  const N = Object.fromEntries(cells);
+  const slider = document.getElementById('conf-t');
+  function draw() {
+    const t = +slider.value;
+    document.getElementById('conf-t-val').textContent = t.toFixed(2);
+    zone.setAttribute('x', sx(t)); zone.setAttribute('width', Math.max(0, sx(1) + 20 - sx(t)));
+    tLine.setAttribute('x1', sx(t)); tLine.setAttribute('x2', sx(t));
+    tLab.setAttribute('x', clamp(sx(t), 120, 720)); tLab.textContent = `threshold ${t.toFixed(2)}`;
+    const c = { tp: 0, fn: 0, fp: 0, tn: 0 };
+    mails.forEach((m, i) => {
+      const flag = m.s > t;
+      c[m.spam ? (flag ? 'tp' : 'fn') : (flag ? 'fp' : 'tn')]++;
+      dotEls[i].style.opacity = flag ? 1 : 0.45;
+    });
+    Object.keys(c).forEach((k) => { N[k].textContent = c[k]; });
+    document.getElementById('conf-acc').textContent = pct((c.tp + c.tn) / mails.length);
+    document.getElementById('conf-prec').textContent = c.tp + c.fp ? pct(c.tp / (c.tp + c.fp)) : '—';
+    document.getElementById('conf-rec').textContent = pct(c.tp / (c.tp + c.fn));
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.family = (() => {
+  const svg = document.getElementById('fam-svg');
+  const X = [0, 10], Y = [0, 10];
+  const F = frame(svg, { W: 1160, H: 700, x: X, y: Y, xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2' });
+  const layer = el('g', {}, F.plot);
+  const ptsLayer = el('g', {}, F.plot);
+  dots(F, BLOBS, ptsLayer, 11);
+  const L = logistic(BLOBS), tree = grow(BLOBS, 3), nn = knn(BLOBS, 3);
+  const M = {
+    knn: { predict: nn, text: 'nearby points share a label.', draw: () => regions(F, X, Y, nn, layer, 116, 70) },
+    line: { predict: L.predict, text: 'one straight cut separates the classes.', draw: () => halfPlanes(F, X, Y, L, layer) },
+    tree: { predict: (x, y) => treePredict(tree, x, y), text: 'yes or no questions on one feature at a time.', draw: () => treeRegions(F, X, Y, tree, layer) },
+  };
+  const btn = { knn: document.getElementById('fam-knn'), line: document.getElementById('fam-line'), tree: document.getElementById('fam-tree') };
+  function show(k) {
+    clear(layer);
+    M[k].draw();
+    if (!REDUCED) layer.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400 });
+    Object.keys(btn).forEach((b) => { btn[b].className = b === k ? 'bt' : 'bt chip'; });
+    document.getElementById('fam-acc').textContent = pct(accOf(BLOBS, M[k].predict));
+    document.getElementById('fam-assume').textContent = M[k].text;
+  }
+  Object.keys(btn).forEach((k) => btn[k].addEventListener('click', () => show(k)));
+  show('knn');
+  return {};
+})();
+
+drawClsReg(); drawRare(); drawMae(); drawBoundaries(); drawFits(); drawThumbs();
+})();
+</script>
+</body>
+</html>

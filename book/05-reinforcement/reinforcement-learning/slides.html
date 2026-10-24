@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reinforcement learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488;--c-h:#64748b}
+.dark{--c-e:#2dd4bf;--c-h:#94a3b8}
+.fe{fill:var(--c-e)}.fh{fill:var(--c-h)}
+.gray{fill:var(--myst-color-text-tertiary)}
+svg .tk{font-size:24px}
+.cell{fill:var(--myst-color-bg);stroke:var(--myst-color-border-strong);stroke-width:2}
+.cell-w{fill:var(--myst-color-text-tertiary);opacity:.55}
+.cell-g{fill:var(--c-c-soft);stroke:var(--c-c);stroke-width:3}
+.cell-t{fill:var(--c-b-soft);stroke:var(--c-b);stroke-width:3}
+.ats-prose table.tb.cmp td{padding:.25em .6em;vertical-align:middle}
+.thumb{display:block;width:240px;height:84px;overflow:hidden;border:1px solid var(--myst-color-border);border-radius:2px}
+.btns.tight{gap:10px}
+.btns.tight .bt{font-size:26px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 19</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Reinforcement learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Learning what to do from rewards, by trial and error</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 19 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Learning by interaction</li>
+<li class="an-up" style="--d:.15s">Rewards and returns</li>
+<li class="an-up" style="--d:.25s">Exploration and the chapter ahead</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this chapter.</p>
+<table class="tb" style="font-size:27px">
+<colgroup><col style="width:40%"><col style="width:60%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">s \in \mathcal{S}, \ a \in \mathcal{A}</span></td><td>A state and an action, from the sets of all states and actions</td></tr>
+<tr class="an-up" style="--d:.11s"><td><span class="tex">S_t, \ A_t, \ R_{t+1}</span></td><td>State, action and the reward that follows, at time step <span class="tex">t</span></td></tr>
+<tr class="an-up" style="--d:.17s"><td><span class="tex">\pi(a \mid s)</span></td><td>Policy: probability of action <span class="tex">a</span> in state <span class="tex">s</span></td></tr>
+<tr class="an-up" style="--d:.23s"><td><span class="tex">\gamma \in [0, 1)</span></td><td>Discount: how much a later reward counts</td></tr>
+<tr class="an-up" style="--d:.29s"><td><span class="tex">G_t</span></td><td>Return: the discounted sum of rewards after step <span class="tex">t</span></td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">V^\pi(s), \ Q^\pi(s, a)</span></td><td>Expected return from a state, or from a state and an action</td></tr>
+<tr class="an-up" style="--d:.41s"><td><span class="tex">\alpha, \ \varepsilon</span></td><td>Learning rate and exploration rate</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Supervised data was a fixed set <span class="tex">\{(\mathbf{x}_i, y_i)\}</span> with the right answer <span class="tex">y_i</span>.</p><p>Here there is no fixed data set. The agent collects its own experience and receives rewards, never the correct action.</p><p>Capital letters <span class="tex">S_t, A_t, R_t</span> are random; lowercase <span class="tex">s, a, r</span> are particular values. An episode runs until a terminal state.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Learning by interaction</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">An agent acts, the world answers with a new situation and a reward.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Agent and environment" data-demo="loop">
+<div class="hdr" data-s="Interaction"></div>
+<h2>Agent and environment</h2>
+<div class="fr">
+<div class="figbox"><svg id="loop-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Each step: the agent sees <span class="tex">S_t</span>, picks <span class="tex">A_t</span>, then gets <span class="tex">R_{t+1}</span> and <span class="tex">S_{t+1}</span>.</p>
+<div class="btns"><button class="bt" id="lp-step">▶ Step</button><button class="bt chip" id="lp-run">Run episode</button><button class="bt chip" id="lp-reset">Reset</button></div>
+<div class="ro"><span>Step <span class="tex">t</span></span><b id="lp-t">0</b></div>
+<div class="ro"><span>State <span class="tex">S_t</span></span><b id="lp-s" class="a">(1, 1)</b></div>
+<div class="ro"><span>Action <span class="tex">A_t</span></span><b id="lp-a">—</b></div>
+<div class="ro"><span>Reward <span class="tex">R_{t+1}</span></span><b id="lp-r" class="bb">—</b></div>
+<div class="ro"><span>Total reward</span><b id="lp-g">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>A 4 × 3 grid world. Entering the green cell gives +1, the orange cell −1; both end the episode. Other moves give 0.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Where it appears">
+<div class="hdr" data-s="Interaction"></div>
+<h2>Where it appears</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:40px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="ex1-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.25s"><svg id="ex2-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.45s"><svg id="ex3-svg" viewBox="0 0 400 360"></svg></div>
+<div class="figbox an-fade" style="--d:.65s"><svg id="ex4-svg" viewBox="0 0 400 360"></svg></div>
+<div class="subcap"><b>(a) Board game</b><br>state: the board<br>action: a move<br>reward: +1 win, −1 loss</div>
+<div class="subcap"><b>(b) Walking robot</b><br>state: joint angles<br>action: motor forces<br>reward: distance, minus falls</div>
+<div class="subcap"><b>(c) Thermostat</b><br>state: temperatures, hour<br>action: heat on or off<br>reward: comfort minus energy</div>
+<div class="subcap"><b>(d) Riding a bike</b><br>state: balance, speed<br>action: steer, pedal<br>reward: staying up</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 2:</b>Four problems in the same frame. A recommender fits too: the state is the user's history, the action is the item shown, the reward is a click.</p>
+</section>
+
+<section class="s ats-prose" data-label="Three kinds of feedback">
+<div class="hdr" data-s="Interaction"></div>
+<h2>Three kinds of feedback</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:minmax(0,1fr) auto;column-gap:56px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="fb1-svg" viewBox="0 0 520 470"></svg></div>
+<div class="figbox an-fade" style="--d:.3s"><svg id="fb2-svg" viewBox="0 0 520 470"></svg></div>
+<div class="figbox frag up" data-step="rl"><svg id="fb3-svg" viewBox="0 0 520 470"></svg></div>
+<div class="subcap"><b>(a) Supervised</b><br>a teacher gives the right answer</div>
+<div class="subcap"><b>(b) Unsupervised</b><br>no feedback at all</div>
+<div class="subcap frag up" data-step="rl"><b>(c) Reinforcement</b><br>a score, never the right action</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 3:</b>A reward says how good an outcome was. It does not say which action would have been best, so the agent must try alternatives to find out.</p>
+</section>
+
+<section class="s ats-prose" data-label="Delayed reward">
+<div class="hdr" data-s="Interaction"></div>
+<h2>Delayed reward</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<div class="figbox" style="flex:none;height:440px"><svg id="delay-svg" viewBox="0 0 1160 440"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 4:</b>A game of eight moves. Only the last step pays. Which moves deserve the credit for the win?</p>
+<ul class="small" style="margin:20px 0 0">
+<li class="frag up" data-step="d1"><b>Delayed reward:</b> the effect of an action can show up many steps later.</li>
+<li class="frag up" data-step="d2"><b>No labels:</b> nobody marks the right move at each step.</li>
+<li class="frag up" data-step="d3"><b>The agent shapes its data:</b> what it sees next depends on what it chose.</li>
+</ul>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Credit assignment</div><p>Spreading a final reward back over the steps that led to it is the credit assignment problem.</p><p>The return and the value of a state, in Part 2, are the tools for it.</p></aside>
+<aside class="am"><div class="t">Versus supervised</div><p>Supervised examples are fixed and independent. Here a bad early choice can hide the good states from the agent.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Rewards and returns</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">The goal is the total reward over time, not the next reward alone.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Episodes and the return">
+<div class="hdr" data-s="Rewards"></div>
+<h2>Episodes and the return</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">An episode is one run from a start state to a terminal state at step <span class="tex">T</span>. The return adds the rewards that come after step <span class="tex">t</span>:</p>
+<div class="eq"><div class="m tex-d">G_t = R_{t+1} + R_{t+2} + \dots + R_T</div><div class="n">(1)</div></div>
+<div class="figbox" style="flex:none;height:300px"><svg id="ep-svg" viewBox="0 0 1160 300"></svg></div>
+<p class="cap" style="margin-top:4px"><b>Figure 5:</b>One episode as a chain of states, actions and rewards. The return <span class="tex">G_0</span> collects every reward after the start.</p>
+<p class="small frag up" data-step="e1" style="margin:12px 0 0">The agent's goal: choose actions that make the expected return as large as possible.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A robot pays −1 for each step and gets +10 at the exit.</p><p>Rewards <span class="tex">-1, -1, -1, +10</span>, so <span class="tex">G_0 = -1 - 1 - 1 + 10 = 7</span>.</p><p>A path two steps longer gives <span class="tex">G_0 = 5</span>. The step cost pushes the agent to be quick.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Discounting the future">
+<div class="hdr" data-s="Rewards"></div>
+<h2>Discounting the future</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">A reward <span class="tex">k</span> steps later is multiplied by <span class="tex">\gamma^k</span>. With <span class="tex">\gamma &lt; 1</span> the sum stays finite even when the task never ends:</p>
+<div class="eq"><div class="m tex-d">G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}</div><div class="n">(2)</div></div>
+<div class="figbox frag up" data-step="g1" style="flex:none;height:250px"><svg id="disc-svg" viewBox="0 0 1160 250"></svg></div>
+<p class="cap frag up" data-step="g1" style="margin-top:14px"><b>Figure 6:</b>Weights <span class="tex">\gamma^k</span> for <span class="tex">\gamma = 0.9</span>. A reward 3 steps away counts 0.73 of its size.</p>
+<p class="small frag up" data-step="g2" style="margin:12px 0 4px">The return today is the next reward plus the discounted return from the next step:</p>
+<div class="eq frag up" data-step="g2" style="margin:0"><div class="m tex-d">G_t = R_{t+1} + \gamma \, G_{t+1}</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Rewards <span class="tex">0, 0, 1</span> and <span class="tex">\gamma = 0.9</span>:</p><p>Only the third reward is not zero, so <span class="tex">G_0 = 0.9^2 \cdot 1 = 0.81</span>.</p><p>With (3): <span class="tex">G_1 = 0 + 0.9 \cdot 1 = 0.9</span>, then <span class="tex">G_0 = 0 + 0.9 \cdot 0.9 = 0.81</span>.</p><p>Topic 20 builds the Bellman equation on (3).</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="How far ahead" data-demo="gamma">
+<div class="hdr" data-s="Rewards"></div>
+<h2>How far ahead?</h2>
+<div class="fr">
+<div class="figbox"><svg id="gm-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Path A pays +1 at once. Path B pays +5, but only at step 10. Move <span class="tex">\gamma</span> and see which one the agent prefers.</p>
+<div class="ctl"><label><span>Discount <span class="tex">\gamma</span></span><b id="gm-val">0.90</b></label><input type="range" id="gm-in" min="0" max="0.99" step="0.01" value="0.9"></div>
+<div class="ro"><span>Weight at step 10, <span class="tex">\gamma^9</span></span><b id="gm-w">0.39</b></div>
+<div class="ro"><span>About <span class="tex">1/(1-\gamma)</span> steps ahead</span><b id="gm-h">10</b></div>
+<div class="ro"><span>Return of A</span><b id="gm-a" class="a">1.00</b></div>
+<div class="ro"><span>Return of B</span><b id="gm-b" class="bb">1.94</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Top: the weight of a reward <span class="tex">k + 1</span> steps ahead is <span class="tex">\gamma^k</span>. B wins once <span class="tex">\gamma &gt; 0.84</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Policy">
+<div class="hdr" data-s="Rewards"></div>
+<h2>A policy picks actions</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 8px">A policy gives a probability to each action in each state:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">\pi(a \mid s) = P(A_t = a \mid S_t = s)</div><div class="n">(4)</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:40px;row-gap:4px;grid-template-rows:430px auto">
+<div class="figbox"><svg id="pol-svg" viewBox="0 0 560 440"></svg></div>
+<div class="figbox frag up" data-step="p1"><svg id="pst-svg" viewBox="0 0 560 440"></svg></div>
+<div class="subcap">(a) A deterministic policy: one arrow per cell</div>
+<div class="subcap frag up" data-step="p1">(b) A random policy in cell (1, 1)</div>
+</div>
+<p class="cap" style="margin-top:8px"><b>Figure 8:</b>Learning in reinforcement learning means improving the policy.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>In cell (1, 1) the policy in (b) gives</p><p><span class="tex">\pi(\uparrow \mid s) = 0.6</span>, <span class="tex">\pi(\rightarrow \mid s) = 0.3</span>,<br><span class="tex">\pi(\leftarrow \mid s) = 0.1</span>, <span class="tex">\pi(\downarrow \mid s) = 0</span>.</p><p>The four numbers add up to 1. A deterministic policy puts all of it on one action.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Value of a state">
+<div class="hdr" data-s="Rewards"></div>
+<h2>The value of a state</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 8px">The value of a state is the return we expect when we start there and follow <span class="tex">\pi</span>:</p>
+<div class="eq" style="margin:.2em 0"><div class="m tex-d">V^\pi(s) = \mathbb{E}_\pi\left[\, G_t \mid S_t = s \,\right]</div><div class="n">(5)</div></div>
+<div style="display:grid;grid-template-columns:600px 1fr;column-gap:40px;height:460px">
+<div class="figbox"><svg id="val-svg" viewBox="0 0 600 450"></svg></div>
+<div style="display:flex;flex-direction:column;justify-content:center">
+<p class="small" style="margin:0">Cells near the goal are worth more. Each step away multiplies the value by <span class="tex">\gamma = 0.9</span>.</p>
+<p class="small frag up" data-step="v1" style="margin:16px 0 0"><span class="tex">Q^\pi(s, a)</span> is the same idea for a state and a first action. Topic 21 learns it from experience.</p>
+</div>
+</div>
+<p class="cap" style="margin-top:8px"><b>Figure 9:</b>Values under the best policy in the grid world of Figure 1, with <span class="tex">\gamma = 0.9</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>From (2, 3) the best path reaches +1 on its second step: rewards <span class="tex">0, 1</span>, so <span class="tex">V = 0.9</span>.</p><p>Under a random policy, say half the runs from a cell reach the goal in 3 steps and half in 6.</p><p>In 3 steps: <span class="tex">G = 0.9^2 = 0.81</span>.<br>In 6 steps: <span class="tex">G = 0.9^5 \approx 0.59</span>.</p><p>Value: <span class="tex">V = \tfrac{0.81 + 0.59}{2} = 0.70</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Exploration and the chapter ahead</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">To find good actions the agent must sometimes try ones that look worse.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Explore or exploit">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Explore or exploit?</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<div class="figbox" style="flex:none;height:560px"><svg id="ee-svg" viewBox="0 0 1160 560"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 10:</b>A multi-armed bandit: four slot machines, each with a hidden chance of paying 1. After 8 pulls, machine A looks best, but D was never tried.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">The dilemma</div><p><b>Exploit:</b> pull the machine that looks best now.</p><p><b>Explore:</b> try another one; its estimate may be wrong, and it may be better.</p><p>Only exploiting can lock onto a poor machine. Only exploring wastes pulls.</p></aside>
+<aside class="am"><div class="t">Everyday version</div><p>Your usual restaurant, or a new one that might be better.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Estimating each arm">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Estimating each machine</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The estimate of machine <span class="tex">a</span> after <span class="tex">t</span> pulls is the average reward it has paid so far:</p>
+<div class="eq"><div class="m tex-d">Q_t(a) = \frac{\text{sum of rewards when } a \text{ was chosen}}{\text{number of times } a \text{ was chosen}}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="q1" style="margin:16px 0 8px">We do not need to store every reward. After the <span class="tex">N</span>-th pull of <span class="tex">a</span> with reward <span class="tex">R</span>, move the estimate a step toward <span class="tex">R</span>:</p>
+<div class="eq frag up" data-step="q1"><div class="m tex-d">Q(a) \ \leftarrow \ Q(a) + \frac{1}{N}\big(R - Q(a)\big)</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="q2" style="margin:16px 0 0"><span class="tex">R - Q(a)</span> is the surprise. A fixed step size <span class="tex">\alpha</span> in place of <span class="tex">1/N</span> gives the shape of the Q-learning update in Topic 21.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Machine B pays <span class="tex">1, 0, 1, 1</span> in four pulls.</p><p>By (6): <span class="tex">Q = \tfrac{3}{4} = 0.75</span>.</p><p>By (7): after three pulls, <span class="tex">Q \approx 0.667</span>.</p><p>The fourth reward is 1:</p><p><span class="tex">0.667 + \tfrac{1}{4}(0.333) = 0.75</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Epsilon-greedy">
+<div class="hdr" data-s="Exploration"></div>
+<h2>The ε-greedy rule</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0 0 8px">Flip a biased coin before each pull:</p>
+<div class="eq"><div class="m tex-d">A_t = \begin{cases} \arg\max_a Q_t(a) &amp; \text{with probability } 1 - \varepsilon \\ \text{a random action} &amp; \text{with probability } \varepsilon \end{cases}</div><div class="n">(8)</div></div>
+<div class="figbox frag up" data-step="e1" style="flex:none;height:330px"><svg id="eps-svg" viewBox="0 0 1160 330"></svg></div>
+<p class="cap frag up" data-step="e1" style="margin-top:4px"><b>Figure 11:</b>Chance of each machine under ε-greedy with <span class="tex">\varepsilon = 0.1</span> when A has the highest estimate.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Four machines, <span class="tex">\varepsilon = 0.1</span>. The random choice can also land on the best one.</p><p>Best machine: <span class="tex">0.9 + \tfrac{0.1}{4} = 0.925</span>.</p><p>Each other machine: <span class="tex">\tfrac{0.1}{4} = 0.025</span>.</p><p>Check: <span class="tex">0.925 + 3 \cdot 0.025 = 1</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bandit demo" data-demo="bandit">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Play the bandit</h2>
+<div class="fr">
+<div class="figbox"><svg id="bd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Pull machines by hand, or let ε-greedy play 100 pulls.</p>
+<div class="btns tight"><button class="bt chip" id="bd-p0">A</button><button class="bt chip" id="bd-p1">B</button><button class="bt chip" id="bd-p2">C</button><button class="bt chip" id="bd-p3">D</button><button class="bt chip" id="bd-reset">Reset</button></div>
+<div class="btns tight"><button class="bt" id="bd-run">ε-greedy × 100</button><button class="bt chip" id="bd-reveal">Show rates</button></div>
+<div class="ctl"><label><span>Exploration <span class="tex">\varepsilon</span></span><b id="bd-eps-val">0.10</b></label><input type="range" id="bd-eps" min="0" max="0.5" step="0.05" value="0.1"></div>
+<div class="ro"><span>Pulls</span><b id="bd-n">0</b></div>
+<div class="ro"><span>Average reward</span><b id="bd-avg" class="a">—</b></div>
+<div class="ro"><span>Share on the best machine</span><b id="bd-best" class="bb">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>With <span class="tex">\varepsilon = 0</span> the agent can stick to the first machine that pays.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two families">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Two families of methods</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox an-fade" style="--d:.05s"><svg id="mb-svg" viewBox="0 0 792 520"></svg></div>
+<div class="figbox an-fade" style="--d:.4s"><svg id="mf-svg" viewBox="0 0 792 520"></svg></div>
+<div class="subcap"><b>(a) Model-based: plan with a known model</b><br>the rules are written as an MDP (Topic 20)</div>
+<div class="subcap"><b>(b) Model-free: learn from trial and error</b><br>a table <span class="tex">Q(s, a)</span> filled by experience (Topic 21)</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 13:</b>When the table has too many states, a neural network can estimate <span class="tex">Q(s, a)</span>. This is deep reinforcement learning, in chapter 6; it learned Atari games from pixels and, with search, beat a Go champion.</p>
+</section>
+
+<section class="s ats-prose" data-label="The chapter ahead">
+<div class="hdr" data-s="Exploration"></div>
+<h2>The chapter ahead</h2>
+<p class="cap" style="margin-bottom:12px"><b>Table 2:</b>The two methods of this chapter and the question each one answers, with the follow-up in chapter 6.</p>
+<table class="tb cmp" style="font-size:28px">
+<colgroup><col style="width:9%"><col style="width:23%"><col style="width:33%"><col style="width:18%"><col style="width:17%"></colgroup>
+<thead><tr><th>Topic</th><th>Method</th><th>Question</th><th>Output</th><th>Picture</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>20</td><td><strong>Markov decision processes</strong></td><td>How do we write the problem down, and plan when the rules are known?</td><td><span class="tex">V(s)</span> and the best policy</td><td><svg class="thumb" id="th-mdp" viewBox="0 0 240 84"></svg></td></tr>
+<tr class="an-up" style="--d:.15s"><td>21</td><td><strong>Q-learning</strong></td><td>How can an agent learn good actions from experience alone?</td><td>A table <span class="tex">Q(s, a)</span></td><td><svg class="thumb" id="th-ql" viewBox="0 0 240 84"></svg></td></tr>
+<tr class="an-up" style="--d:.25s"><td>29</td><td><strong>Deep reinforcement learning</strong></td><td>What if there are too many states for a table?</td><td>A network that estimates <span class="tex">Q</span></td><td><svg class="thumb" id="th-drl" viewBox="0 0 240 84"></svg></td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:28px;max-width:1300px;font-size:26px"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>All of them aim at the same target: a policy with the largest expected return <span class="tex">G_t</span>.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Strengths and limits">
+<div class="hdr" data-s="Closing"></div>
+<h2>Strengths and limits</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Reinforcement learning at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Limits</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Needs no labeled answers, only a reward</td><td>Often needs a huge number of trials</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Handles decisions in sequence, with delayed effects</td><td>Credit for a late reward is hard to assign</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Can find strategies no person designed</td><td>A badly chosen reward leads to odd behavior</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Keeps adapting as it collects experience</td><td>Exploring can be costly or unsafe in the real world</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Works with a simulator when real trials are costly</td><td>Results can vary a lot from run to run</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>When decisions follow one another, success is measured by a score, and the agent can practice, ideally in a simulator.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An agent learns by acting: it sees a state, picks an action, gets a reward and a new state.</li>
+<li class="an-up" style="--d:.15s">Rewards score outcomes; they never name the right action.</li>
+<li class="an-up" style="--d:.25s">The goal is the return <span class="tex">G_t</span>, the discounted sum of future rewards.</li>
+<li class="an-up" style="--d:.35s">A policy maps states to actions; <span class="tex">V^\pi(s)</span> is the expected return from <span class="tex">s</span>.</li>
+<li class="an-up" style="--d:.45s">The agent must balance exploring and exploiting; ε-greedy is the simplest way.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>References</h2>
+<section>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.), Chapters 1, 2 and 3. MIT Press.</li>
+<li style="margin:.4em 0">Russell, S., &amp; Norvig, P. (2021). <em>Artificial Intelligence: A Modern Approach</em> (4th ed.), Chapter 22. Pearson.</li>
+<li style="margin:.4em 0">Mnih, V., Kavukcuoglu, K., Silver, D., et al. (2015). Human-level control through deep reinforcement learning. <em>Nature</em>, 518(7540), 529-533.</li>
+<li style="margin:.4em 0">Silver, D., Huang, A., Maddison, C. J., et al. (2016). Mastering the game of Go with deep neural networks and tree search. <em>Nature</em>, 529(7587), 484-489.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 20: Markov decision processes.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, lin, clamp, fmt, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const pct = (v) => Math.round(v * 100) + '%';
+/* text with subscripts: parts = [['A', 0], ['t', 1]] */
+function subText(parent, x, y, parts, attrs = {}) {
+  const t = el('text', { x, y, ...attrs }, parent);
+  parts.forEach(([s, sub]) => el('tspan', sub ? { 'baseline-shift': 'sub', style: 'font-size:24px', text: s } : { text: s }, t));
+  return t;
+}
+
+/* ───────── the 4 × 3 grid world ───────── */
+const GW = { C: 4, R: 3, wall: [1, 1], goal: [3, 2], trap: [3, 1], start: [0, 0], gamma: 0.9 };
+const ACTS = [['up', 0, 1, '↑'], ['right', 1, 0, '→'], ['down', 0, -1, '↓'], ['left', -1, 0, '←']];
+const same = (p, q) => p[0] === q[0] && p[1] === q[1];
+const isTerm = (p) => same(p, GW.goal) || same(p, GW.trap);
+const name = (p) => `(${p[0] + 1}, ${p[1] + 1})`;
+function move(p, a) {
+  const q = [p[0] + ACTS[a][1], p[1] + ACTS[a][2]];
+  if (q[0] < 0 || q[0] >= GW.C || q[1] < 0 || q[1] >= GW.R || same(q, GW.wall)) return p;
+  return q;
+}
+const reward = (q) => (same(q, GW.goal) ? 1 : same(q, GW.trap) ? -1 : 0);
+/* value iteration for the deterministic grid: V(s) = max_a [r + γ V(s')] */
+const VAL = (() => {
+  const V = {}, best = {};
+  const cells = [];
+  for (let c = 0; c < GW.C; c++) for (let r = 0; r < GW.R; r++) if (!same([c, r], GW.wall)) cells.push([c, r]);
+  cells.forEach((p) => { V[p] = 0; });
+  for (let it = 0; it < 100; it++) {
+    cells.forEach((p) => {
+      if (isTerm(p)) return;
+      let bv = -Infinity, ba = 0;
+      ACTS.forEach((_, a) => { const q = move(p, a), v = reward(q) + (isTerm(q) ? 0 : GW.gamma * V[q]); if (v > bv + 1e-9) { bv = v; ba = a; } });
+      V[p] = bv; best[p] = ba;
+    });
+  }
+  return { V, best, cells };
+})();
+/* draw the grid; returns a mapper from cell to the center in svg units */
+function drawGrid(g, x0, y0, s, opt = {}) {
+  const cx = (p) => x0 + (p[0] + 0.5) * s, cy = (p) => y0 + (GW.R - 1 - p[1] + 0.5) * s;
+  const vmax = 1;
+  for (let c = 0; c < GW.C; c++) for (let r = 0; r < GW.R; r++) {
+    const p = [c, r], x = x0 + c * s, y = y0 + (GW.R - 1 - r) * s;
+    const cls = same(p, GW.wall) ? 'cell cell-w' : same(p, GW.goal) ? 'cell cell-g' : same(p, GW.trap) ? 'cell cell-t' : 'cell';
+    el('rect', { class: cls, x, y, width: s, height: s }, g);
+    if (opt.values && !isTerm(p) && !same(p, GW.wall)) {
+      el('rect', { x: x + 3, y: y + 3, width: s - 6, height: s - 6, class: 'fa', style: `opacity:${(0.08 + 0.42 * VAL.V[p] / vmax).toFixed(2)}` }, g);
+      el('text', { class: 'tx', x: cx(p), y: cy(p) + 10, 'text-anchor': 'middle', 'font-weight': 700, text: VAL.V[p].toFixed(2) }, g);
+    }
+    if (opt.coords && !same(p, GW.wall) && !isTerm(p)) el('text', { class: 'txs ink3', x: x + 10, y: y + 30, text: name(p) }, g);
+  }
+  [[GW.goal, '+1', 'var(--c-c)'], [GW.trap, '−1', 'var(--c-b)']].forEach(([p, t, col]) => el('text', { x: cx(p), y: cy(p) + 14, 'text-anchor': 'middle', 'font-weight': 700, style: `font-size:40px;fill:${col}`, text: t }, g));
+  return { cx, cy };
+}
+function arrowIn(g, x, y, a, len, cls = 'curve-a') {
+  const dx = ACTS[a][1], dy = -ACTS[a][2];
+  el('path', { d: `M${x - dx * len / 2} ${y - dy * len / 2}L${x + dx * len / 2} ${y + dy * len / 2}`, class: cls, style: 'stroke-width:5', 'marker-end': 'url(#ah-a)' }, g);
+}
+
+/* ───────── static figures ───────── */
+function drawExamples() {
+  /* (a) board game */
+  let svg = document.getElementById('ex1-svg');
+  const X = 110, Y = 50, S = 85;
+  [1, 2].forEach((i) => {
+    el('line', { x1: X + i * S, x2: X + i * S, y1: Y, y2: Y + 3 * S, style: 'stroke:var(--myst-color-text);stroke-width:5;stroke-linecap:round' }, svg);
+    el('line', { y1: Y + i * S, y2: Y + i * S, x1: X, x2: X + 3 * S, style: 'stroke:var(--myst-color-text);stroke-width:5;stroke-linecap:round' }, svg);
+  });
+  const mark = (c, r, kind) => {
+    const x = X + (c + 0.5) * S, y = Y + (r + 0.5) * S;
+    if (kind === 'x') el('path', { d: `M${x - 24} ${y - 24}L${x + 24} ${y + 24}M${x + 24} ${y - 24}L${x - 24} ${y + 24}`, class: 'curve-a', style: 'stroke-width:8' }, svg);
+    else el('circle', { cx: x, cy: y, r: 26, class: 'curve-b', style: 'stroke-width:8' }, svg);
+  };
+  mark(0, 0, 'x'); mark(1, 1, 'o'); mark(2, 0, 'x'); mark(2, 2, 'o');
+  el('circle', { cx: X + 1.5 * S, cy: Y + 0.5 * S, r: 30, style: 'fill:none;stroke:var(--c-a);stroke-width:3;stroke-dasharray:7 6' }, svg);
+  el('text', { class: 'txs', x: 200, y: 345, 'text-anchor': 'middle', text: 'next move?' }, svg);
+  /* (b) walking robot */
+  svg = document.getElementById('ex2-svg');
+  el('line', { x1: 40, x2: 360, y1: 300, y2: 300, class: 'ax' }, svg);
+  el('rect', { x: 150, y: 70, width: 100, height: 110, rx: 16, class: 'box-a' }, svg);
+  el('circle', { cx: 200, cy: 45, r: 26, class: 'box-a' }, svg);
+  const leg = (x0, x1, x2) => el('path', { d: `M${x0} 180L${x1} 240L${x2} 300`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:10;stroke-linecap:round;stroke-linejoin:round' }, svg);
+  leg(175, 150, 120); leg(225, 250, 240);
+  [[175, 180], [150, 240], [225, 180], [250, 240]].forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 9, class: 'fb' }, svg));
+  el('path', { class: 'wire', d: 'M270 120H350', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: 300, y: 340, 'text-anchor': 'middle', text: 'forward' }, svg);
+  /* (c) thermostat */
+  svg = document.getElementById('ex3-svg');
+  el('path', { d: 'M60 170L200 50L340 170V310H60Z', class: 'box' }, svg);
+  el('rect', { x: 170, y: 230, width: 60, height: 80, class: 'gray', style: 'opacity:.5' }, svg);
+  el('rect', { x: 95, y: 190, width: 52, height: 52, class: 'box' }, svg);
+  el('rect', { x: 268, y: 140, width: 30, height: 120, rx: 15, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:3' }, svg);
+  el('rect', { x: 276, y: 200, width: 14, height: 52, rx: 7, class: 'fb' }, svg);
+  el('circle', { cx: 283, cy: 262, r: 16, class: 'fb' }, svg);
+  el('text', { class: 'tx', x: 200, y: 160, 'text-anchor': 'middle', 'font-weight': 700, text: '21 °C' }, svg);
+  el('text', { class: 'txs', x: 200, y: 348, 'text-anchor': 'middle', text: 'heat on / off' }, svg);
+  /* (d) bike */
+  svg = document.getElementById('ex4-svg');
+  [[110, 250], [290, 250]].forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 62, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:6' }, svg));
+  el('path', { d: 'M110 250L180 160L270 160L290 250M180 160L200 250L270 160M270 160L262 128', style: 'fill:none;stroke:var(--c-a);stroke-width:8;stroke-linejoin:round;stroke-linecap:round' }, svg);
+  el('path', { d: 'M205 150L215 85M215 85L255 120M215 85L200 250', style: 'fill:none;stroke:var(--c-b);stroke-width:8;stroke-linecap:round' }, svg);
+  el('circle', { cx: 220, cy: 58, r: 22, class: 'fb' }, svg);
+  el('path', { d: 'M60 60Q35 100 60 140', class: 'wire', 'marker-end': 'url(#ah)' }, svg);
+  el('path', { d: 'M340 60Q365 100 340 140', class: 'wire', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: 200, y: 345, 'text-anchor': 'middle', text: 'stay balanced' }, svg);
+}
+
+function drawFeedback() {
+  const panel = (id, inLab, outLab, boxLab, fbLab, fbCls, fbText) => {
+    const svg = document.getElementById(id);
+    el('rect', { class: 'box', x: 20, y: 30, width: 150, height: 90, rx: 4 }, svg);
+    el('text', { class: 'tx', x: 95, y: 86, 'text-anchor': 'middle', text: inLab }, svg);
+    el('rect', { class: 'box-a', x: 190, y: 30, width: 150, height: 90, rx: 4 }, svg);
+    el('text', { class: 'tx', x: 265, y: 86, 'text-anchor': 'middle', 'font-weight': 600, text: boxLab }, svg);
+    el('path', { class: 'wire-a', d: 'M170 75H184', 'marker-end': 'url(#ah-a)' }, svg);
+    el('path', { class: 'wire-a', d: 'M340 75H372', 'marker-end': 'url(#ah-a)' }, svg);
+    el('rect', { class: 'box', x: 380, y: 30, width: 120, height: 90, rx: 4 }, svg);
+    el('text', { class: 'tx', x: 440, y: 86, 'text-anchor': 'middle', text: outLab }, svg);
+    if (fbLab) {
+      el('rect', { class: fbCls, x: 110, y: 230, width: 300, height: 120, rx: 4 }, svg);
+      el('text', { class: 'tx', x: 260, y: 280, 'text-anchor': 'middle', 'font-weight': 600, text: fbLab }, svg);
+      el('text', { class: 'txs', x: 260, y: 322, 'text-anchor': 'middle', text: fbText }, svg);
+      el('path', { class: 'wire', d: 'M440 120V290H418', 'stroke-dasharray': '8 6', 'marker-end': 'url(#ah)' }, svg);
+      el('path', { class: 'wire', d: 'M110 290H60V128', 'stroke-dasharray': '8 6', 'marker-end': 'url(#ah)' }, svg);
+    } else {
+      el('rect', { x: 110, y: 230, width: 300, height: 120, rx: 4, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:10 8' }, svg);
+      el('text', { class: 'txs ink3', x: 260, y: 298, 'text-anchor': 'middle', text: 'nothing comes back' }, svg);
+    }
+  };
+  panel('fb1-svg', 'x', 'ŷ', 'model', 'teacher', 'box-b', 'right answer: y = cat');
+  panel('fb2-svg', 'x', 'groups', 'model', null);
+  panel('fb3-svg', 's', 'a', 'agent', 'environment', 'box-b', 'reward: r = +2');
+  const s3 = document.getElementById('fb3-svg');
+  el('text', { class: 'txs', x: 260, y: 420, 'text-anchor': 'middle', text: 'was another action better? unknown', style: 'font-style:italic' }, s3);
+  const s1 = document.getElementById('fb1-svg');
+  el('text', { class: 'txs', x: 260, y: 420, 'text-anchor': 'middle', text: 'the error points to the fix', style: 'font-style:italic' }, s1);
+  const s2 = document.getElementById('fb2-svg');
+  el('text', { class: 'txs', x: 260, y: 420, 'text-anchor': 'middle', text: 'find structure in x', style: 'font-style:italic' }, s2);
+}
+
+function drawDelay() {
+  const svg = document.getElementById('delay-svg');
+  const n = 8, x0 = 90, dx = 140, Y = 200;
+  el('path', { class: 'ax', d: `M${x0 - 40} ${Y}H${x0 + (n - 1) * dx + 50}` }, svg);
+  for (let i = 0; i < n; i++) {
+    const x = x0 + i * dx, last = i === n - 1;
+    const g = el('g', { class: 'an-pop', style: `--d:${(0.1 + i * 0.12).toFixed(2)}s` }, svg);
+    el('circle', { cx: x, cy: Y, r: 26, class: last ? 'fc' : 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:3' }, g);
+    el('text', { x, y: Y + 9, 'text-anchor': 'middle', style: 'font-size:24px;fill:#fff;font-weight:700', text: i + 1 }, g);
+    el('text', { class: 'tx', x, y: Y + 80, 'text-anchor': 'middle', 'font-weight': 700, style: last ? 'fill:var(--c-c)' : '', text: last ? '+1' : '0' }, g);
+  }
+  el('text', { class: 'ttl', x: x0 - 40, y: Y - 60, text: 'move' }, svg);
+  el('text', { class: 'ttl', x: x0 - 40, y: Y + 130, text: 'reward after the move' }, svg);
+  const xl = x0 + (n - 1) * dx;
+  el('path', { class: 'wire', d: `M${xl} ${Y - 34}C${xl - 100} ${Y - 150} ${x0 + 60} ${Y - 150} ${x0 + 10} ${Y - 40}`, 'stroke-dasharray': '10 8', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: (x0 + xl) / 2, y: Y - 128, 'text-anchor': 'middle', 'font-weight': 600, text: 'credit flows back to earlier moves?' }, svg);
+  el('text', { class: 'txs', x: (x0 + xl) / 2, y: 410, 'text-anchor': 'middle', text: 'move 3 may have won the game; its own reward was 0' }, svg);
+}
+
+function drawEpisode() {
+  const svg = document.getElementById('ep-svg');
+  const items = [['S', '0', 's'], ['A', '0', 'a'], ['R', '1', 'r'], ['S', '1', 's'], ['A', '1', 'a'], ['R', '2', 'r'], ['…', '', 'd'], ['S', 'T', 't']];
+  const x0 = 60, dx = 148, Y = 100;
+  items.forEach(([b, sub, k], i) => {
+    const x = x0 + i * dx, g = el('g', { class: 'an-up', style: `--d:${(0.05 + i * 0.1).toFixed(2)}s` }, svg);
+    if (k === 's' || k === 't') el('circle', { cx: x, cy: Y, r: 44, class: k === 't' ? 'cell-g' : 'box' }, g);
+    else if (k === 'a') el('rect', { x: x - 40, y: Y - 34, width: 80, height: 68, rx: 6, class: 'box-a' }, g);
+    else if (k === 'r') el('rect', { x: x - 40, y: Y - 34, width: 80, height: 68, rx: 6, class: 'box-b' }, g);
+    if (k === 'd') el('text', { class: 'tx', x, y: Y + 10, 'text-anchor': 'middle', text: '…' }, g);
+    else subText(g, x - 6, Y + 11, [[b, 0], [sub, 1]], { class: 'tx', 'text-anchor': 'middle', 'font-weight': 600 });
+    if (i < items.length - 1) el('path', { class: 'wire', d: `M${x + 46} ${Y}H${x + dx - 50}`, 'marker-end': 'url(#ah)' }, svg);
+  });
+  el('text', { class: 'txs', x: x0 + 7 * dx, y: Y + 82, 'text-anchor': 'middle', text: 'terminal' }, svg);
+  const bx = x0 + 2 * dx - 46, ex = x0 + 7 * dx - 50;
+  el('path', { d: `M${bx} ${Y + 120}V${Y + 140}H${ex}V${Y + 120}`, style: 'fill:none;stroke:var(--c-b);stroke-width:3' }, svg);
+  subText(svg, (bx + ex) / 2, Y + 186, [['G', 0], ['0', 1], [' = sum of these rewards', 0]], { class: 'txs', 'text-anchor': 'middle', style: 'fill:var(--c-b);font-weight:600' });
+}
+
+function drawDiscount() {
+  const svg = document.getElementById('disc-svg');
+  const F = frame(svg, { W: 1160, H: 250, l: 90, r: 20, t: 20, b: 70, x: [-0.6, 14.6], y: [0, 1], yt: [0, 0.5, 1], xt: [0, 2, 4, 6, 8, 10, 12, 14], xl: 'k (steps after the next reward)', grid: false });
+  for (let k = 0; k <= 14; k++) {
+    const v = 0.9 ** k;
+    el('rect', { x: F.sx(k) - 22, y: F.sy(v), width: 44, height: F.sy(0) - F.sy(v), class: 'fa an-growy', style: `--d:${(k * 0.04).toFixed(2)}s;opacity:${k === 3 ? 1 : 0.6}` }, F.plot);
+  }
+  el('text', { class: 'txs', x: F.sx(3) + 30, y: F.sy(0.73) - 8, 'font-weight': 700, text: '0.9³ ≈ 0.73' }, svg);
+}
+
+function drawPolicy() {
+  const svg = document.getElementById('pol-svg');
+  const S = 130, g = el('g', {}, svg);
+  const G = drawGrid(g, 20, 20, S, {});
+  VAL.cells.forEach((p) => { if (!isTerm(p)) arrowIn(g, G.cx(p), G.cy(p), VAL.best[p], 64); });
+  el('text', { class: 'txs ink3', x: G.cx(GW.start), y: G.cy(GW.start) + 56, 'text-anchor': 'middle', text: '(1, 1)' }, g);
+  /* stochastic policy in cell (1,1) */
+  const sv = document.getElementById('pst-svg');
+  const probs = [0.6, 0.3, 0, 0.1];
+  const F = frame(sv, { W: 560, H: 440, l: 90, r: 20, t: 30, b: 80, x: [-0.6, 3.6], y: [0, 1], yt: [0, 0.5, 1], grid: true, yl: 'π(a | s)' });
+  probs.forEach((p, a) => {
+    el('rect', { x: F.sx(a) - 40, y: F.sy(p), width: 80, height: F.sy(0) - F.sy(p), class: a === 0 ? 'fa' : 'fh' }, F.plot);
+    el('text', { class: 'tx', x: F.sx(a), y: F.sy(0) + 40, 'text-anchor': 'middle', text: ACTS[a][3] }, sv);
+    el('text', { class: 'txs', x: F.sx(a), y: F.sy(p) - 12, 'text-anchor': 'middle', 'font-weight': 700, text: p.toFixed(1) }, sv);
+  });
+}
+
+function drawValues() {
+  const svg = document.getElementById('val-svg');
+  drawGrid(el('g', {}, svg), 0, 30, 140, { values: true, coords: false });
+  [1, 2, 3, 4].forEach((c) => el('text', { class: 'tk', x: (c - 0.5) * 140, y: 22, 'text-anchor': 'middle', text: `col ${c}` }, svg));
+}
+
+/* the bandit used on three slides */
+const ARMS = ['A', 'B', 'C', 'D'];
+const RATES = [0.25, 0.55, 0.40, 0.70];
+function machine(g, x, y, w, h, label, opt = {}) {
+  el('rect', { x, y, width: w, height: h, rx: 14, class: opt.hl ? 'box-a' : 'box' }, g);
+  el('rect', { x: x + 20, y: y + 20, width: w - 40, height: h * 0.42, rx: 6, class: 'bgf', style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+  el('path', { d: `M${x + w} ${y + 40}h22v${h * 0.35}`, style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:6;stroke-linecap:round' }, g);
+  el('circle', { cx: x + w + 22, cy: y + 34, r: 12, class: 'fb' }, g);
+  el('text', { class: 'tx', x: x + w / 2, y: y + h - 24, 'text-anchor': 'middle', 'font-weight': 700, text: label }, g);
+  return { wx: x + 20, wy: y + 20, ww: w - 40, wh: h * 0.42 };
+}
+
+function drawExplore() {
+  const svg = document.getElementById('ee-svg');
+  const est = [['3 of 5 paid', 'Q = 0.60', 0.6], ['0 of 1 paid', 'Q = 0.00', 0], ['1 of 2 paid', 'Q = 0.50', 0.5], ['never tried', 'Q = ?', null]];
+  est.forEach(([n, q, v], i) => {
+    const x = 40 + i * 280, g = el('g', { class: 'an-up', style: `--d:${(0.05 + i * 0.12).toFixed(2)}s` }, svg);
+    const m = machine(g, x, 30, 200, 250, ARMS[i], { hl: i === 0 });
+    el('text', { class: 'tx', x: m.wx + m.ww / 2, y: m.wy + 46, 'text-anchor': 'middle', 'font-weight': 700, text: q }, g);
+    el('text', { class: 'txs', x: x + 100, y: 330, 'text-anchor': 'middle', text: n }, g);
+    if (v === null) el('text', { class: 'txs', x: x + 100, y: 192, 'text-anchor': 'middle', style: 'font-size:48px;fill:var(--myst-color-text-tertiary)', text: '?' }, g);
+  });
+  const g = el('g', { class: 'frag up', 'data-step': 'x1' }, svg);
+  el('path', { class: 'wire-a', d: 'M140 380V440', 'marker-end': 'url(#ah-a)' }, g);
+  el('text', { class: 'tx', x: 140, y: 490, 'text-anchor': 'middle', 'font-weight': 600, style: 'fill:var(--c-a)', text: 'exploit: pull A' }, g);
+  el('text', { class: 'txs', x: 140, y: 530, 'text-anchor': 'middle', text: 'best so far' }, g);
+  el('path', { d: 'M980 380V440', style: 'fill:none;stroke:var(--c-b);stroke-width:3', 'marker-end': 'url(#ah)' }, g);
+  el('text', { class: 'tx', x: 980, y: 490, 'text-anchor': 'middle', 'font-weight': 600, style: 'fill:var(--c-b)', text: 'explore: try D' }, g);
+  el('text', { class: 'txs', x: 980, y: 530, 'text-anchor': 'middle', text: 'could be better' }, g);
+}
+
+function drawEps() {
+  const svg = document.getElementById('eps-svg');
+  const p = [0.925, 0.025, 0.025, 0.025];
+  const F = frame(svg, { W: 1160, H: 330, l: 90, r: 380, t: 30, b: 60, x: [-0.6, 3.6], y: [0, 1], yt: [0, 0.5, 1], grid: true, yl: 'chance' });
+  p.forEach((v, a) => {
+    el('rect', { x: F.sx(a) - 50, y: F.sy(v), width: 100, height: Math.max(3, F.sy(0) - F.sy(v)), class: a === 0 ? 'fa' : 'fb' }, F.plot);
+    el('text', { class: 'tx', x: F.sx(a), y: F.sy(0) + 40, 'text-anchor': 'middle', 'font-weight': 700, text: ARMS[a] }, svg);
+    el('text', { class: 'txs', x: F.sx(a), y: F.sy(v) - 10, 'text-anchor': 'middle', 'font-weight': 700, text: String(v) }, svg);
+  });
+  legend(svg, 820, 110, [['dot', 'fa', 'greedy: 0.9 + 0.025'], ['dot', 'fb', 'only by chance']]);
+}
+
+function drawFamilies() {
+  /* (a) model-based */
+  let svg = document.getElementById('mb-svg');
+  el('rect', { x: 30, y: 20, width: 470, height: 330, rx: 18, style: 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:10 8' }, svg);
+  el('text', { class: 'ttl', x: 54, y: 58, text: 'the model: rules and rewards' }, svg);
+  const N = [[120, 170, 's₁'], [280, 120, 's₂'], [280, 280, 's₃'], [420, 200, 'goal']];
+  const E = [[0, 1, '0.8'], [0, 2, '0.2'], [1, 3, '1.0'], [2, 3, '0.5']];
+  E.forEach(([a, b, lab]) => {
+    const [x1, y1] = N[a], [x2, y2] = N[b], L = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+    el('path', { class: 'wire', d: `M${x1 + ux * 40} ${y1 + uy * 40}L${x2 - ux * 46} ${y2 - uy * 46}`, 'marker-end': 'url(#ah)' }, svg);
+    el('text', { class: 'txs', x: (x1 + x2) / 2 + uy * 26, y: (y1 + y2) / 2 - ux * 26 + 8, 'text-anchor': 'middle', text: lab }, svg);
+  });
+  N.forEach(([x, y, t], i) => {
+    el('circle', { cx: x, cy: y, r: 38, class: i === 3 ? 'cell-g' : 'box' }, svg);
+    el('text', { class: i === 3 ? 'txs' : 'tx', x, y: y + 9, 'text-anchor': 'middle', text: t }, svg);
+  });
+  el('path', { class: 'wire-a', d: 'M500 185H580', 'marker-end': 'url(#ah-a)' }, svg);
+  el('rect', { class: 'box-a', x: 590, y: 130, width: 180, height: 110, rx: 6 }, svg);
+  el('text', { class: 'tx', x: 680, y: 178, 'text-anchor': 'middle', 'font-weight': 600, text: 'plan' }, svg);
+  el('text', { class: 'txs', x: 680, y: 214, 'text-anchor': 'middle', text: 'before acting' }, svg);
+  el('text', { class: 'txs', x: 400, y: 420, 'text-anchor': 'middle', text: 'numbers on arrows: chance of each move' }, svg);
+  el('text', { class: 'txs', x: 400, y: 470, 'text-anchor': 'middle', text: 'needs the rules in advance' }, svg);
+  /* (b) model-free */
+  svg = document.getElementById('mf-svg');
+  el('rect', { class: 'box-a', x: 40, y: 40, width: 220, height: 100, rx: 6 }, svg);
+  el('text', { class: 'tx', x: 150, y: 100, 'text-anchor': 'middle', 'font-weight': 600, text: 'agent' }, svg);
+  el('rect', { class: 'box-b', x: 40, y: 260, width: 220, height: 100, rx: 6 }, svg);
+  el('text', { class: 'tx', x: 150, y: 320, 'text-anchor': 'middle', 'font-weight': 600, text: 'environment' }, svg);
+  el('path', { class: 'wire-a', d: 'M260 90C330 90 330 310 268 310', 'marker-end': 'url(#ah-a)' }, svg);
+  el('path', { class: 'wire', d: 'M40 310C-30 310 -30 90 32 90', 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'txs', x: 340, y: 206, text: 'try' }, svg);
+  el('path', { class: 'wire', d: 'M340 220H420', 'stroke-dasharray': '8 6', 'marker-end': 'url(#ah)' }, svg);
+  /* Q table */
+  const tx = 440, ty = 90, cw = 80, ch = 56;
+  el('text', { class: 'ttl', x: tx, y: ty - 24, text: 'table Q(s, a)' }, svg);
+  ['↑', '→', '↓', '←'].forEach((a, j) => el('text', { class: 'txs', x: tx + 60 + (j + 0.5) * cw, y: ty + 30, 'text-anchor': 'middle', text: a }, svg));
+  const r = rng(5);
+  ['s₁', 's₂', 's₃', 's₄'].forEach((s, i) => {
+    el('text', { class: 'txs', x: tx + 10, y: ty + 40 + (i + 1) * ch + 6, text: s }, svg);
+    for (let j = 0; j < 4; j++) {
+      const v = r();
+      el('rect', { x: tx + 60 + j * cw, y: ty + 40 + i * ch + 12, width: cw, height: ch, class: 'fa', style: `opacity:${(0.1 + 0.6 * v).toFixed(2)};stroke:var(--myst-color-bg);stroke-width:2` }, svg);
+    }
+  });
+  el('text', { class: 'txs', x: 400, y: 470, 'text-anchor': 'middle', text: 'no rules needed; learns from rewards' }, svg);
+}
+
+function drawThumbs() {
+  let svg = document.getElementById('th-mdp');
+  const N = [[40, 42], [120, 22], [120, 64], [200, 42]];
+  [[0, 1], [0, 2], [1, 3], [2, 3]].forEach(([a, b]) => el('line', { x1: N[a][0], y1: N[a][1], x2: N[b][0], y2: N[b][1], class: 'wire', style: 'stroke-width:2' }, svg));
+  N.forEach(([x, y], i) => el('circle', { cx: x, cy: y, r: 13, class: i === 3 ? 'fc' : 'fa' }, svg));
+  svg = document.getElementById('th-ql');
+  const r = rng(9);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 8; j++) el('rect', { x: 8 + j * 28, y: 6 + i * 25, width: 26, height: 23, class: 'fa', style: `opacity:${(0.1 + 0.7 * r()).toFixed(2)}` }, svg);
+  svg = document.getElementById('th-drl');
+  const L = [[40, [16, 42, 68]], [120, [10, 32, 54, 76]], [200, [30, 54]]];
+  L.slice(0, 2).forEach(([x, ys], li) => ys.forEach((y) => L[li + 1][1].forEach((y2) => el('line', { x1: x, y1: y, x2: L[li + 1][0], y2, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, svg))));
+  L.forEach(([x, ys], li) => ys.forEach((y) => el('circle', { cx: x, cy: y, r: 8, class: li === 2 ? 'fb' : 'fa' }, svg)));
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.loop = (() => {
+  const svg = document.getElementById('loop-svg');
+  /* loop diagram on the left */
+  el('rect', { class: 'box-a', x: 110, y: 90, width: 300, height: 110, rx: 6 }, svg);
+  el('text', { class: 'tx', x: 260, y: 155, 'text-anchor': 'middle', 'font-weight': 600, text: 'Agent' }, svg);
+  el('rect', { class: 'box-b', x: 110, y: 460, width: 300, height: 110, rx: 6 }, svg);
+  el('text', { class: 'tx', x: 260, y: 525, 'text-anchor': 'middle', 'font-weight': 600, text: 'Environment' }, svg);
+  const pA = 'M410 145C500 145 500 515 418 515', pS = 'M110 500C40 500 40 160 102 160', pR = 'M110 530C0 530 0 130 102 130';
+  const wA = el('path', { class: 'wire-a', d: pA, 'marker-end': 'url(#ah-a)' }, svg);
+  const wS = el('path', { class: 'wire', d: pS, 'marker-end': 'url(#ah)' }, svg);
+  const wR = el('path', { class: 'wire', d: pR, 'marker-end': 'url(#ah)', style: 'stroke:var(--c-b)' }, svg);
+  subText(svg, 440, 270, [['action A', 0], ['t', 1]], { class: 'txs', 'font-weight': 600, 'text-anchor': 'end', style: 'fill:var(--c-a)' });
+  subText(svg, 120, 270, [['state S', 0], ['t+1', 1]], { class: 'txs', 'font-weight': 600 });
+  subText(svg, 120, 370, [['reward R', 0], ['t+1', 1]], { class: 'txs', 'font-weight': 600, style: 'fill:var(--c-b)' });
+  const vA = el('text', { class: 'tx', x: 440, y: 312, 'text-anchor': 'end', 'font-weight': 700, style: 'fill:var(--c-a)', text: '' }, svg);
+  const vS = el('text', { class: 'tx', x: 120, y: 312, 'font-weight': 700, text: '' }, svg);
+  const vR = el('text', { class: 'tx', x: 120, y: 412, 'font-weight': 700, style: 'fill:var(--c-b)', text: '' }, svg);
+  [[pA, 'fa', 0], [pS, 'gray', 1.2], [pR, 'fb', 1.2]].forEach(([p, c, b]) => {
+    const dot = el('circle', { r: 8, class: c }, svg);
+    if (!REDUCED) el('animateMotion', { dur: '2.4s', begin: `${-b}s`, repeatCount: 'indefinite', path: p }, dot);
+    else dot.setAttribute('visibility', 'hidden');
+  });
+  /* grid on the right */
+  const S = 135, gx = 600, gy = 140;
+  el('text', { class: 'ttl', x: gx, y: gy - 30, text: 'the environment: a grid world' }, svg);
+  const gGrid = el('g', {}, svg);
+  const G = drawGrid(gGrid, gx, gy, S, { coords: true });
+  const trail = el('g', {}, svg);
+  const agent = el('circle', { r: 30, class: 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:4;transition:cx .35s,cy .35s' }, svg);
+  const msg = el('text', { class: 'txs', x: gx, y: gy + 3 * S + 56, 'font-weight': 600, text: '' }, svg);
+  const out = (id, v) => { document.getElementById(id).textContent = v; };
+  let r, pos, t, total, done, timer = null;
+  function place() { agent.setAttribute('cx', G.cx(pos)); agent.setAttribute('cy', G.cy(pos)); }
+  function reset() {
+    if (timer) { clearInterval(timer); timer = null; }
+    r = rng(17); pos = GW.start.slice(); t = 0; total = 0; done = false;
+    clear(trail); place();
+    out('lp-t', 0); out('lp-s', name(pos)); out('lp-a', '—'); out('lp-r', '—'); out('lp-g', 0);
+    vA.textContent = ''; vS.textContent = ''; vR.textContent = '';
+    msg.textContent = 'policy: 80% best move, 20% random';
+  }
+  function step() {
+    if (done) { reset(); return; }
+    /* policy: 80% the best action, 20% a random one */
+    const a = r() < 0.8 ? VAL.best[pos] : Math.floor(r() * 4);
+    const q = move(pos, a), rew = reward(q);
+    el('line', { x1: G.cx(pos), y1: G.cy(pos), x2: G.cx(q), y2: G.cy(q), style: 'stroke:var(--c-a);stroke-width:4;stroke-dasharray:6 6;opacity:.6' }, trail);
+    out('lp-t', t); out('lp-s', name(pos)); out('lp-a', ACTS[a][3] + ' ' + ACTS[a][0]); out('lp-r', rew > 0 ? '+1' : rew < 0 ? '−1' : '0');
+    total += rew; t += 1; pos = q; place();
+    out('lp-g', total > 0 ? '+' + total : total < 0 ? '−' + (-total) : '0');
+    vA.textContent = ACTS[a][3] + ' ' + ACTS[a][0];
+    vS.textContent = name(q);
+    vR.textContent = rew > 0 ? '+1' : rew < 0 ? '−1' : '0';
+    [wA, wS, wR].forEach((w) => { w.style.strokeWidth = '5'; setTimeout(() => { w.style.strokeWidth = ''; }, 400); });
+    if (isTerm(q)) { done = true; msg.textContent = `episode over after ${t} steps`; if (timer) { clearInterval(timer); timer = null; } }
+    else msg.textContent = '';
+  }
+  document.getElementById('lp-step').addEventListener('click', step);
+  document.getElementById('lp-reset').addEventListener('click', reset);
+  document.getElementById('lp-run').addEventListener('click', () => {
+    if (timer) return;
+    if (done) reset();
+    timer = setInterval(() => { step(); if (done || t > 40) { clearInterval(timer); timer = null; } }, 500);
+  });
+  reset();
+  return {};
+})();
+
+DEMOS.gamma = (() => {
+  const svg = document.getElementById('gm-svg');
+  const K = 30;
+  const F = frame(svg, { W: 1160, H: 360, l: 96, r: 20, t: 30, b: 76, x: [0.3, K + 0.7], y: [0, 1], xt: [1, 5, 10, 15, 20, 25, 30], yt: [0, 0.5, 1], xl: 'steps ahead', yl: 'weight' });
+  const bars = [];
+  for (let j = 1; j <= K; j++) bars.push(el('rect', { x: F.sx(j) - 13, width: 26, class: 'fa' }, F.plot));
+  const half = el('text', { class: 'txs', 'font-weight': 600, text: '' }, svg);
+  /* two paths */
+  const rowY = [470, 600], x0 = 210, dx = 76;
+  const gTot = [];
+  [['A', 'curve-a', 1, 1], ['B', 'curve-b', 10, 5]].forEach(([lab, cls, at, val], i) => {
+    const y = rowY[i];
+    el('text', { class: 'tx', x: 40, y: y + 10, 'font-weight': 700, style: `fill:var(--c-${i ? 'b' : 'a'})`, text: `Path ${lab}` }, svg);
+    el('path', { class: 'wire', d: `M${x0 - 30} ${y}H${x0 + 9 * dx + 30}` }, svg);
+    for (let j = 1; j <= 10; j++) {
+      const hit = j === at;
+      el('circle', { cx: x0 + (j - 1) * dx, cy: y, r: hit ? 30 : 20, class: hit ? (i ? 'fb' : 'fa') : 'box' }, svg);
+      el('text', { x: x0 + (j - 1) * dx, y: y + 9, 'text-anchor': 'middle', style: `font-size:24px;font-weight:700;fill:${hit ? '#fff' : 'var(--myst-color-text-tertiary)'}`, text: hit ? '+' + val : '0' }, svg);
+    }
+    gTot.push(el('text', { class: 'tx', x: 1150, y: y + 10, 'text-anchor': 'end', 'font-weight': 700, text: '' }, svg));
+  });
+  el('text', { class: 'tk', x: x0, y: 668, 'text-anchor': 'middle', text: 'step 1' }, svg);
+  el('text', { class: 'tk', x: x0 + 9 * dx, y: 668, 'text-anchor': 'middle', text: 'step 10' }, svg);
+  const inp = document.getElementById('gm-in');
+  function draw() {
+    const g = +inp.value;
+    bars.forEach((b, j) => { const v = g ** j; b.setAttribute('y', F.sy(v)); b.setAttribute('height', Math.max(0, F.sy(0) - F.sy(v))); b.style.opacity = j === 9 ? 1 : 0.55; });
+    const GA = 1, GB = 5 * g ** 9;
+    document.getElementById('gm-val').textContent = g.toFixed(2);
+    document.getElementById('gm-w').textContent = fmt(g ** 9, 2);
+    document.getElementById('gm-h').textContent = fmt(1 / (1 - g), 0);
+    document.getElementById('gm-a').textContent = fmt(GA, 2);
+    document.getElementById('gm-b').textContent = fmt(GB, 2);
+    gTot[0].textContent = `G = ${fmt(GA, 2)}${GA >= GB ? ' ✓' : ''}`;
+    gTot[1].textContent = `G = ${fmt(GB, 2)}${GB > GA ? ' ✓' : ''}`;
+    half.setAttribute('x', F.sx(10) + 24); half.setAttribute('y', clamp(F.sy(g ** 9) - 10, 60, 250));
+    half.textContent = `step 10: ${fmt(g ** 9, 2)}`;
+  }
+  inp.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.bandit = (() => {
+  const svg = document.getElementById('bd-svg');
+  const MW = 190, MH = 250, my = 20;
+  const mx = (i) => 40 + i * 280;
+  const est = [], cnt = [], bar = [], truth = [];
+  ARMS.forEach((lab, i) => {
+    const g = el('g', {}, svg);
+    const m = machine(g, mx(i), my, MW, MH, lab);
+    el('rect', { x: m.wx + m.ww / 2 - 20, y: m.wy + 8, width: 40, height: m.wh - 16, class: 'zone' }, g);
+    bar.push({ el: el('rect', { x: m.wx + m.ww / 2 - 20, width: 40, class: 'fa' }, g), y0: m.wy + 8, h: m.wh - 16 });
+    truth.push(el('line', { x1: m.wx + 6, x2: m.wx + m.ww - 6, style: 'stroke:var(--c-b);stroke-width:4;stroke-dasharray:8 5', visibility: 'hidden' }, g));
+    truth[i].setAttribute('y1', m.wy + 8 + (m.wh - 16) * (1 - RATES[i]));
+    truth[i].setAttribute('y2', m.wy + 8 + (m.wh - 16) * (1 - RATES[i]));
+    est.push(el('text', { class: 'txs', x: mx(i) + MW / 2, y: my + MH + 36, 'text-anchor': 'middle', 'font-weight': 700, text: '' }, svg));
+    cnt.push(el('text', { class: 'txs', x: mx(i) + MW / 2, y: my + MH + 70, 'text-anchor': 'middle', text: '' }, svg));
+  });
+  const F = frame(svg, { W: 1160, H: 700, l: 96, r: 30, t: 380, b: 76, x: [0, 100], y: [0, 1], xt: [0, 25, 50, 75, 100], yt: [0, 0.5, 1], xl: 'pull number', yl: 'avg reward' });
+  const tick = [...svg.querySelectorAll('.tk')].filter((n) => +n.getAttribute('y') > 600 && n.textContent !== '0' && /^\d+$/.test(n.textContent) && +n.textContent > 1);
+  el('line', { x1: F.L, x2: F.W - F.R, y1: F.sy(0.7), y2: F.sy(0.7), style: 'stroke:var(--c-c);stroke-width:3;stroke-dasharray:10 8' }, svg);
+  el('text', { class: 'txs', x: F.W - F.R - 8, y: F.sy(0.7) - 10, 'text-anchor': 'end', style: 'fill:var(--c-c)', text: 'best machine: 0.70' }, svg);
+  const curve = el('path', { class: 'curve-a', d: '' }, F.plot);
+  const inp = document.getElementById('bd-eps');
+  let r, Q, N, hist, sum, shown = false, anim = null;
+  function reset() {
+    if (anim) { cancelAnimationFrame(anim); anim = null; }
+    r = rng(42); Q = [0, 0, 0, 0]; N = [0, 0, 0, 0]; hist = []; sum = 0; draw();
+  }
+  function pull(a) {
+    const R = r() < RATES[a] ? 1 : 0;
+    N[a] += 1; Q[a] += (R - Q[a]) / N[a];
+    sum += R; hist.push(sum / (hist.length + 1));
+  }
+  function greedy() {
+    const eps = +inp.value;
+    if (r() < eps) return Math.floor(r() * 4);
+    const m = Math.max(...Q), best = [0, 1, 2, 3].filter((a) => Q[a] === m);
+    return best[Math.floor(r() * best.length)];
+  }
+  function draw() {
+    const n = hist.length, xmax = Math.max(100, Math.ceil(n / 100) * 100);
+    const sx = lin(0, xmax, F.L, F.W - F.R);
+    tick.forEach((t, k) => { t.textContent = Math.round((xmax * (k + 1)) / 4); });
+    ARMS.forEach((_, i) => {
+      const b = bar[i], h = b.h * Q[i];
+      b.el.setAttribute('y', b.y0 + b.h - h); b.el.setAttribute('height', h);
+      est[i].textContent = N[i] ? `Q = ${Q[i].toFixed(2)}` : 'Q = ?';
+      cnt[i].textContent = `N = ${N[i]}`;
+      truth[i].setAttribute('visibility', shown ? 'visible' : 'hidden');
+    });
+    curve.setAttribute('d', hist.map((v, k) => (k ? 'L' : 'M') + sx(k + 1).toFixed(1) + ' ' + F.sy(v).toFixed(1)).join(''));
+    document.getElementById('bd-n').textContent = n;
+    document.getElementById('bd-avg').textContent = n ? fmt(sum / n, 2) : '—';
+    document.getElementById('bd-best').textContent = n ? pct(N[3] / n) : '—';
+    document.getElementById('bd-eps-val').textContent = (+inp.value).toFixed(2);
+    document.getElementById('bd-reveal').textContent = shown ? 'Hide rates' : 'Show rates';
+  }
+  ARMS.forEach((_, i) => document.getElementById('bd-p' + i).addEventListener('click', () => { pull(i); draw(); }));
+  document.getElementById('bd-run').addEventListener('click', () => {
+    if (anim) return;
+    let left = 100;
+    const go = () => {
+      const k = REDUCED ? left : Math.min(4, left);
+      for (let j = 0; j < k; j++) pull(greedy());
+      left -= k; draw();
+      anim = left > 0 ? requestAnimationFrame(go) : null;
+    };
+    go();
+  });
+  document.getElementById('bd-reveal').addEventListener('click', () => { shown = !shown; draw(); });
+  document.getElementById('bd-reset').addEventListener('click', reset);
+  inp.addEventListener('input', draw);
+  reset();
+  return {};
+})();
+
+drawExamples(); drawFeedback(); drawDelay(); drawEpisode(); drawDiscount(); drawPolicy(); drawValues(); drawExplore(); drawEps(); drawFamilies(); drawThumbs();
+})();
+</script>
+</body>
+</html>

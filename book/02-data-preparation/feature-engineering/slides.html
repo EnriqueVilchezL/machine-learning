@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Engineering</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.fe-ax{transition:opacity .5s var(--ease-out)}
+.tb th.new{color:var(--c-a)}
+.tb td.new{color:var(--c-a);font-weight:600}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 3</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Feature engineering</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Turning raw columns into inputs that make the pattern easy for a model to see</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 3 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why features matter</li>
+<li class="an-up" style="--d:.15s">Building features: encoding, combining, binning</li>
+<li class="an-up" style="--d:.25s">Choosing features and avoiding leaks</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>: one row with <span class="tex">d</span> values</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">x_{ij}</span></td><td>Value of feature <span class="tex">j</span> for example <span class="tex">i</span></td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">y_i, \ \hat{y}</span></td><td>A label and a model's prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">c_1, \dots, c_K</span></td><td>The <span class="tex">K</span> categories of a categorical feature</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\mathbb{I}(\cdot)</span></td><td>Indicator: 1 if the condition holds, 0 otherwise</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">w_0, w_1, \dots</span></td><td>Weights of a linear model</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why features matter</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A model can only find patterns in the columns we give it.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Good features" data-demo="ring">
+<div class="hdr" data-s="Why features"></div>
+<h2>Good features beat fancy models</h2>
+<div class="fr">
+<div class="figbox"><svg id="ring-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">No straight cut separates the inner circle from the outer ring. Add one new column, the distance from the center, and the problem becomes easy.</p>
+<div class="btns"><button class="bt" id="ring-toggle">Add distance</button></div>
+<div class="ro"><span>Features</span><b id="ring-feat" style="font-size:26px">x₁, x₂</b></div>
+<div class="ro"><span>Best single cut</span><b id="ring-acc" class="bb">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>120 synthetic points. A cut on x₁ or x₂ alone fails; one cut on the distance separates them all.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distance feature">
+<div class="hdr" data-s="Why features"></div>
+<h2>Distance as a feature</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The new column of Figure 1 is the straight-line distance from the center <span class="tex">(0, 0)</span>:</p>
+<div class="eq"><div class="m tex-d">r_i = \sqrt{x_{i1}^2 + x_{i2}^2}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="r1" style="margin:0">A single threshold on this one number now separates the two classes:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">\hat{y} = \begin{cases} \text{A (inner)} &amp; r_i &lt; 1.5 \\ \text{B (outer)} &amp; r_i \ge 1.5 \end{cases}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="r2" style="margin:16px 0 0">The model stays simple. The knowledge that the classes form circles went into the feature.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Point <span class="tex">(0.6, 0.8)</span>:</p><p><span class="tex">r = \sqrt{0.36 + 0.64} = 1</span>, class A</p><p>Point <span class="tex">(1.2, 1.6)</span>:</p><p><span class="tex">r = \sqrt{1.44 + 2.56} = 2</span>, class B</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Kinds of features">
+<div class="hdr" data-s="Why features"></div>
+<h2>Kinds of features</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Five kinds of columns and what we usually do with each one before training.</p>
+<table class="tb">
+<colgroup><col style="width:15%"><col style="width:22%"><col style="width:30%"><col style="width:33%"></colgroup>
+<thead><tr><th>Kind</th><th>Example</th><th>Values</th><th>Typical treatment</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Numeric</strong></td><td>House area</td><td>85, 120.5, 240 m²</td><td>Use as is, then scale (Topic 4)</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Categorical</strong></td><td>Province</td><td>San José, Cartago, Limón</td><td>One-hot encoding</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Ordinal</strong></td><td>Education level</td><td>primary &lt; secondary &lt; university</td><td>Numbers that keep the order</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Text</strong></td><td>Product review</td><td>“great coffee, slow delivery”</td><td>Word counts</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Date</strong></td><td>Purchase date</td><td>2026-03-14 07:30</td><td>Day of week, month, holiday, hour</td></tr>
+</tbody>
+</table>
+<aside class="adm k-tip sm frag up" style="margin-top:28px;max-width:1300px"><div class="h"><i data-i="hint"></i><span>Hint</span></div><div class="b"><p>Most models only accept numbers. Every kind of column has to end up as one or more numeric columns.</p></div></aside>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Building features</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Encode categories, combine columns, group values and add curves.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Encoding categories">
+<div class="hdr" data-s="Building features"></div>
+<h2>Encoding categories</h2>
+<div class="figbox"><svg id="enc-svg" viewBox="0 0 1680 540"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 2:</b>(a) Numbering the provinces invents an order and distances that do not exist. (b) One-hot encoding gives each province its own 0/1 column.</p>
+<aside class="adm k-tip sm frag up" style="margin-top:20px;max-width:1300px"><div class="h"><i data-i="tip"></i><span>When numbers are fine</span></div><div class="b"><p>Use 1, 2, 3 only when the order is real: small &lt; medium &lt; large.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="One-hot formula">
+<div class="hdr" data-s="Building features"></div>
+<h2>One-hot as a vector</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A categorical value <span class="tex">x</span> becomes <span class="tex">K</span> columns, one per category, each 0 or 1:</p>
+<div class="eq"><div class="m tex-d">\mathbf{e}(x) = \big(\mathbb{I}(x = c_1), \ \mathbb{I}(x = c_2), \ \dots, \ \mathbb{I}(x = c_K)\big)</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="h1" style="margin:0">Exactly one entry is 1, so the entries always add up to 1:</p>
+<div class="eq frag up" data-step="h1"><div class="m tex-d">\sum_{k=1}^{K} \mathbb{I}(x = c_k) = 1</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="h2" style="margin:0">Any two different categories are equally far apart, so no order is invented:</p>
+<div class="eq frag up" data-step="h2"><div class="m tex-d">\sum_{k=1}^{K} \big(e_k(c_a) - e_k(c_b)\big)^2 = 2 \qquad \text{for } a \ne b</div><div class="n">(5)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The <span class="tex">K = 7</span> provinces in the order of Figure 2.</p><p>Cartago: <span class="tex">(0,0,1,0,0,0,0)</span></p><p>Limón: <span class="tex">(0,0,0,0,0,0,1)</span></p><p>They differ in two entries, so (5) gives <span class="tex">1 + 1 = 2</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="New features">
+<div class="hdr" data-s="Building features"></div>
+<h2>New features from old ones</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Three houses for sale. The blue columns are computed from the original ones.</p>
+<table class="tb" style="font-size:26px">
+<thead>
+<tr><th colspan="4">Original columns</th><th colspan="4" class="new frag" data-step="new">New features</th></tr>
+<tr><th>Area m²</th><th>Bedrooms</th><th>Year built</th><th>Listed on</th><th class="new frag" data-step="new">m² per bedroom</th><th class="new frag" data-step="new">Age</th><th class="new frag" data-step="new">Month</th><th class="new frag" data-step="new">Schools within 1 km</th></tr>
+</thead>
+<tbody>
+<tr><td>120</td><td>3</td><td>1998</td><td>2026-03-14</td><td class="new frag" data-step="new">40</td><td class="new frag" data-step="new">28</td><td class="new frag" data-step="new">March</td><td class="new frag" data-step="new">2</td></tr>
+<tr><td>85</td><td>2</td><td>2015</td><td>2026-07-02</td><td class="new frag" data-step="new">42.5</td><td class="new frag" data-step="new">11</td><td class="new frag" data-step="new">July</td><td class="new frag" data-step="new">0</td></tr>
+<tr><td>240</td><td>4</td><td>1975</td><td>2026-12-20</td><td class="new frag" data-step="new">60</td><td class="new frag" data-step="new">51</td><td class="new frag" data-step="new">December</td><td class="new frag" data-step="new">4</td></tr>
+</tbody>
+</table>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:48px;margin-top:40px">
+<aside class="am an-up" style="--d:.1s"><div class="t">Ratio</div><p>Area ÷ bedrooms: how big each room is.</p></aside>
+<aside class="am an-up" style="--d:.25s"><div class="t">Difference</div><p>Listing year − year built: the age of the house.</p></aside>
+<aside class="am an-up" style="--d:.4s"><div class="t">Date parts</div><p>Month, day of week, holiday.</p></aside>
+<aside class="am an-up" style="--d:.55s"><div class="t">Counts</div><p>How many schools, bus stops or past visits.</p></aside>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Binning" data-demo="bins">
+<div class="hdr" data-s="Building features"></div>
+<h2>Binning: grouping values</h2>
+<div class="fr">
+<div class="figbox"><svg id="bins-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Binning turns a number into a group, like age ranges on a survey. The group is then a category.</p>
+<div class="ctl"><label><span>Number of bins</span><b id="bins-k-val">6</b></label><input type="range" id="bins-k" min="0" max="10" step="1" value="5"></div>
+<div class="ro"><span>Bin width</span><b id="bins-w">10 years</b></div>
+<div class="ro"><span>Age 34 goes to</span><b id="bins-ex" class="bb">30–39</b></div>
+<div class="ro"><span>Fewest people in a bin</span><b id="bins-min" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Ages of 400 bus passengers (synthetic). Few bins hide the two groups; many bins leave few people in each.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bin formula">
+<div class="hdr" data-s="Building features"></div>
+<h2>Which bin a value falls in</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Split the range from <span class="tex">a</span> to <span class="tex">b</span> into <span class="tex">B</span> bins of equal width:</p>
+<div class="eq"><div class="m tex-d">w = \frac{b - a}{B}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="b1" style="margin:0">A value <span class="tex">x</span> goes to the bin with this index, counting from 0. The brackets <span class="tex">\lfloor \cdot \rfloor</span> round down.</p>
+<div class="eq frag up" data-step="b1"><div class="m tex-d">\text{bin}(x) = \left\lfloor \frac{x - a}{w} \right\rfloor</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="b2" style="margin:16px 0 0">The bin index is a category. It can be one-hot encoded with (3).</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Ages from 20 to 80 in <span class="tex">B = 6</span> bins: <span class="tex">w = \tfrac{60}{6} = 10</span> years.</p><p>Age 34: <span class="tex">\lfloor \tfrac{14}{10} \rfloor = \lfloor 1.4 \rfloor = 1</span>, the second bin, 30–39.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Polynomial features" data-demo="poly">
+<div class="hdr" data-s="Building features"></div>
+<h2>Adding a squared feature</h2>
+<div class="fr">
+<div class="figbox"><svg id="poly-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Homes use more power on cold and on hot days. A straight line cannot follow that U shape.</p>
+<div class="btns"><button class="bt" id="poly-toggle">Add temperature²</button></div>
+<div class="ro"><span>Features</span><b id="poly-feat" style="font-size:26px">temp</b></div>
+<div class="ro"><span>Average error</span><b id="poly-err" class="bb">0</b></div>
+<aside class="am"><div class="t">Interactions</div><p>The same trick multiplies two columns, such as area × quality.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>40 synthetic days. Still a linear model, but with temperature² as an input its prediction bends.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Polynomial formula">
+<div class="hdr" data-s="Building features"></div>
+<h2>Squares and products</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">With temperature <span class="tex">x</span>, the straight line is <span class="tex">\hat{y} = w_0 + w_1 x</span>. Adding <span class="tex">x^2</span> as a column gives</p>
+<div class="eq"><div class="m tex-d">\hat{y} = w_0 + w_1 x + w_2 x^2</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="p1" style="margin:0">It is still a weighted sum of columns, so still a linear model. Only the columns changed.</p>
+<p class="small frag up" data-step="p2" style="margin:16px 0 0">An interaction feature multiplies two columns, so the effect of one depends on the other:</p>
+<div class="eq frag up" data-step="p2"><div class="m tex-d">\hat{y} = w_0 + w_1 x_1 + w_2 x_2 + w_3 \, x_1 x_2</div><div class="n">(9)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">w_0 = 30</span>, <span class="tex">w_1 = -2</span>, <span class="tex">w_2 = 0.05</span>:</p><p><span class="tex">x = 10\!: \ 30 - 20 + 5 = 15</span></p><p><span class="tex">x = 20\!: \ 30 - 40 + 20 = 10</span></p><p><span class="tex">x = 30\!: \ 30 - 60 + 45 = 15</span></p><p>Predicted kWh: cold and hot days use more power, a U shape.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Choosing features</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">More columns are not always better, and some columns cheat.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Feature selection">
+<div class="hdr" data-s="Choosing features"></div>
+<h2>Useless features hurt</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="imp-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="noise-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) How much each feature helps predict the price</div>
+<div class="subcap">(b) Accuracy as random columns are added</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 5:</b>Illustrative values. (a) Some columns carry almost no information. (b) Each useless column gives the model more noise to memorize: training accuracy rises while test accuracy falls.</p>
+</section>
+
+<section class="s ats-prose" data-label="Leakage">
+<div class="hdr" data-s="Choosing features"></div>
+<h2>Features that leak the answer</h2>
+<div class="figbox"><svg id="leak-svg" viewBox="0 0 1680 500"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 6:</b>Predicting whether a customer will leave (churn). Only the blue columns exist at the moment we predict.</p>
+<aside class="adm k-danger sm frag up" data-step="warn" style="margin-top:20px;max-width:1400px"><div class="h"><i data-i="danger"></i><span>Data leakage</span></div><div class="b"><p>A column known only after the answer makes the test score look perfect, and the model fails in real use. Price per m² leaks the same way when we predict the price.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">The right feature can make a hard problem easy.</li>
+<li class="an-up" style="--d:.15s">Categories without order need one-hot encoding, not 1, 2, 3.</li>
+<li class="an-up" style="--d:.25s">Ratios, differences, date parts and counts add knowledge a model cannot guess.</li>
+<li class="an-up" style="--d:.35s">Squared and product features let a linear model follow curves.</li>
+<li class="an-up" style="--d:.45s">Drop useless columns, and never use one that is known only after the answer.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic works through more examples of building and choosing features.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Zheng, A., &amp; Casari, A. (2018). <em>Feature Engineering for Machine Learning</em>. O'Reilly.</li>
+<li style="margin:.4em 0">Kuhn, M., &amp; Johnson, K. (2019). <em>Feature Engineering and Selection: A Practical Approach for Predictive Models</em>. CRC Press.</li>
+<li style="margin:.4em 0">Domingos, P. (2012). A few useful things to know about machine learning. <em>Communications of the ACM</em>, 55(10), 78–87.</li>
+<li style="margin:.4em 0">Kaufman, S., Rosset, S., Perlich, C., &amp; Stitelman, O. (2012). Leakage in data mining: Formulation, detection, and avoidance. <em>ACM Transactions on Knowledge Discovery from Data</em>, 6(4), 1–21.</li>
+<li style="margin:.4em 0">Géron, A. (2022). <em>Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow</em> (3rd ed.). O'Reilly.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 4: normalization.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+const ease = (t) => 1 - (1 - t) ** 3;
+function animate(ms, step) {
+  const t0 = performance.now();
+  const tick = (now) => {
+    const t = REDUCED ? 1 : clamp((now - t0) / ms, 0, 1);
+    step(ease(t));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+/* best accuracy of a single threshold on one column, trying both directions */
+function bestCut(vals, ys) {
+  const idx = vals.map((v, i) => i).sort((a, b) => vals[a] - vals[b]);
+  const n = ys.length, pos = ys.reduce((s, y) => s + y, 0);
+  let left1 = 0, best = Math.max(pos, n - pos);
+  idx.forEach((i, k) => {
+    left1 += ys[i];
+    const left0 = k + 1 - left1;
+    best = Math.max(best, left0 + (pos - left1), left1 + (n - pos - left0));
+  });
+  return best / n;
+}
+
+/* ───────── static figures ───────── */
+function drawEncoding() {
+  const svg = document.getElementById('enc-svg');
+  const P = ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'];
+  /* (a) ordinal numbers */
+  el('text', { class: 'ttl', x: 0, y: 30, text: '(a) province as a number' }, svg);
+  const X = (k) => 60 + (k - 1) * 116, AY = 220;
+  el('path', { class: 'ax', d: `M30 ${AY}H790` }, svg);
+  P.forEach((p, i) => {
+    const k = i + 1, g = el('g', { class: 'an-pop', style: `--d:${0.1 + i * 0.08}s` }, svg);
+    el('circle', { class: 'fa', cx: X(k), cy: AY, r: 11 }, g);
+    el('text', { class: 'tx', x: X(k), y: AY + 50, 'text-anchor': 'middle', 'font-weight': 700, text: k }, g);
+    el('text', { class: 'txs', x: X(k), y: i % 2 ? AY - 34 : AY + 88, 'text-anchor': 'middle', text: p }, g);
+  });
+  const f1 = el('g', { class: 'frag', 'data-step': 'a1' }, svg);
+  el('path', { class: 'curve-b', style: 'stroke-width:3', d: `M${X(2)} ${AY - 70}C${X(2)} ${AY - 150} ${X(4)} ${AY - 150} ${X(4)} ${AY - 70}`, fill: 'none' }, f1);
+  el('path', { class: 'wire', d: `M${X(3)} ${AY - 128}V${AY - 22}`, 'marker-end': 'url(#ah)' }, f1);
+  el('text', { class: 'txs', x: X(3), y: AY - 146, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: '(Alajuela + Heredia) ÷ 2 = Cartago?' }, f1);
+  const f2 = el('g', { class: 'frag', 'data-step': 'a2' }, svg);
+  el('text', { class: 'txs', x: 30, y: 400, text: 'The model also reads that Limón (7) is', }, f2);
+  el('text', { class: 'txs', x: 30, y: 436, text: '“seven times” San José (1), and that Cartago' }, f2);
+  el('text', { class: 'txs', x: 30, y: 472, text: 'is closer to Heredia than to Limón. None of it is real.' }, f2);
+  /* (b) one-hot */
+  const B0 = 900;
+  el('text', { class: 'ttl', x: B0, y: 30, text: '(b) one-hot: one column per province' }, svg);
+  const CW = 80, RX = B0 + 190, RY = 210, RH = 64;
+  P.forEach((p, j) => el('text', { class: 'lb', transform: `translate(${RX + j * CW + CW / 2 + 8} ${RY - 14}) rotate(-40)`, text: p }, svg));
+  [['house 1', 'Cartago'], ['house 2', 'Limón'], ['house 3', 'San José']].forEach(([h, prov], i) => {
+    const y = RY + i * RH, g = el('g', { class: 'an-fade', style: `--d:${0.6 + i * 0.25}s` }, svg);
+    el('text', { class: 'tx', x: B0, y: y + 42, text: h }, g);
+    P.forEach((p, j) => {
+      const on = p === prov;
+      el('rect', { x: RX + j * CW, y, width: CW, height: RH, style: `fill:${on ? 'var(--c-a)' : 'var(--myst-color-bg)'};stroke:var(--myst-color-border-strong);stroke-width:1` }, g);
+      el('text', { x: RX + j * CW + CW / 2, y: y + 42, 'text-anchor': 'middle', style: `font-size:28px;font-weight:${on ? 700 : 400};fill:${on ? '#fff' : 'var(--myst-color-text-tertiary)'}`, text: on ? 1 : 0 }, g);
+    });
+  });
+  el('text', { class: 'txs an-fade', style: '--d:1.4s', x: B0, y: 436, text: 'Each column answers yes (1) or no (0).' }, svg);
+  el('text', { class: 'txs an-fade', style: '--d:1.4s', x: B0, y: 472, text: 'No order and no fake distances.' }, svg);
+}
+
+function drawSelection() {
+  const svgI = document.getElementById('imp-svg');
+  const feats = [['area', 0.36], ['location', 0.27], ['age', 0.14], ['bedrooms', 0.09], ['bathrooms', 0.07], ['door color', 0.02], ['listing ID', 0.015], ['agent name length', 0.01]];
+  const sx = lin(0, 0.4, 260, 760);
+  el('path', { class: 'ax', d: 'M260 20V500' }, svgI);
+  feats.forEach(([n, v], i) => {
+    const y = 34 + i * 58, useful = v > 0.05;
+    el('text', { class: useful ? 'tx' : 'tx ink3', x: 244, y: y + 30, 'text-anchor': 'end', style: 'font-size:26px', text: n }, svgI);
+    el('rect', { class: `an-grow ${useful ? 'fa' : ''}`, x: 260, y, width: Math.max(4, sx(v) - 260), height: 40, rx: 2, style: `--d:${0.2 + i * 0.1}s;${useful ? '' : 'fill:var(--myst-color-border-strong)'}` }, svgI);
+    el('text', { class: 'tk', x: sx(v) + 10, y: y + 29, text: v.toFixed(2) }, svgI);
+  });
+  el('text', { class: 'lb', x: 510, y: 548, 'text-anchor': 'middle', text: 'importance' }, svgI);
+
+  const svgN = document.getElementById('noise-svg');
+  const labs = ['0', '5', '10', '20', '50', '100', '200'];
+  const tr = [0.93, 0.94, 0.95, 0.96, 0.98, 0.99, 1.0], te = [0.91, 0.9, 0.88, 0.85, 0.79, 0.73, 0.67];
+  const F = frame(svgN, { W: 792, H: 560, l: 96, t: 60, b: 84, x: [-0.3, 6.3], y: [0.6, 1.0], xt: [0, 1, 2, 3, 4, 5, 6], yt: [0.6, 0.7, 0.8, 0.9, 1.0], fx: (v) => labs[v], fy: (v) => Math.round(v * 100) + '%', xl: 'useless columns added', yl: 'accuracy' });
+  [[tr, 'curve-a', 'fa'], [te, 'curve-b', 'fb']].forEach(([ys, cl, fc], k) => {
+    el('path', { class: `${cl} an-draw`, pathLength: 1, style: `--d:${k * 0.5}s`, d: ys.map((y, i) => (i ? 'L' : 'M') + F.sx(i) + ' ' + F.sy(y)).join('') }, F.plot);
+    ys.forEach((y, i) => el('circle', { class: `pt ${fc} an-pop`, cx: F.sx(i), cy: F.sy(y), r: 8, style: `--d:${k * 0.5 + i * 0.1}s` }, F.plot));
+  });
+  legend(svgN, F.L + 300, 22, [['line', 'curve-a', 'training']]);
+  legend(svgN, F.L + 480, 22, [['line', 'curve-b', 'test']]);
+}
+
+function drawLeak() {
+  const svg = document.getElementById('leak-svg');
+  const NOW = 960, AY = 170;
+  el('rect', { x: 0, y: 40, width: NOW, height: 450, style: 'fill:var(--c-a);fill-opacity:.07' }, svg);
+  el('rect', { class: 'frag', 'data-step': 'after', x: NOW, y: 40, width: 1680 - NOW, height: 450, style: 'fill:var(--c-b);fill-opacity:.08' }, svg);
+  el('text', { class: 'ttl', x: 20, y: 80, style: 'fill:var(--c-a)', text: 'known when we predict' }, svg);
+  el('path', { class: 'ax', d: `M0 ${AY}H1660`, 'marker-end': 'url(#ah)' }, svg);
+  el('line', { x1: NOW, x2: NOW, y1: 40, y2: 490, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8' }, svg);
+  el('text', { class: 'tx', x: NOW + 16, y: 80, 'font-weight': 700, text: 'today: predict churn' }, svg);
+  [[120, 'signs up', 0], [520, 'months of use', 0], [1260, 'customer leaves', 1], [1560, 'account closed', 1]].forEach(([x, t, after]) => {
+    const g = el('g', after ? { class: 'frag', 'data-step': 'after' } : { class: 'an-pop', style: `--d:${x / 1500}s` }, svg);
+    el('circle', { class: after ? 'fb' : 'fa', cx: x, cy: AY, r: 11 }, g);
+    el('text', { class: 'txs', x, y: AY + 44, 'text-anchor': 'middle', text: t }, g);
+  });
+  ['months as a customer', 'support calls last month', 'monthly bill'].forEach((t, i) => {
+    const y = 270 + i * 72, g = el('g', { class: 'an-up', style: `--d:${0.4 + i * 0.15}s` }, svg);
+    el('rect', { class: 'box-a', x: 60, y, width: 420, height: 56, rx: 4 }, g);
+    el('text', { class: 'tx', x: 270, y: y + 38, 'text-anchor': 'middle', text: t }, g);
+  });
+  const g = el('g', { class: 'frag', 'data-step': 'after' }, svg);
+  el('text', { class: 'ttl', x: NOW + 16, y: 116, style: 'fill:var(--c-b)', text: 'known only after the answer' }, g);
+  ['account closed date', 'cancellation reason', 'final refund'].forEach((t, i) => {
+    const y = 270 + i * 72;
+    el('rect', { class: 'box-b', x: 1140, y, width: 420, height: 56, rx: 4 }, g);
+    el('text', { class: 'tx', x: 1350, y: y + 38, 'text-anchor': 'middle', text: t }, g);
+  });
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.ring = (() => {
+  const svg = document.getElementById('ring-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [-5.27, 5.27], y: [-3, 3], xt: [-4, -2, 0, 2, 4], yt: [-2, 0, 2], xl: 'feature x₁', yl: 'feature x₂' });
+  F.back.classList.add('fe-ax');
+  /* second set of axes: distance (x) and angle (y) */
+  const back2 = el('g', { class: 'fe-ax', style: 'opacity:0' }, svg);
+  svg.insertBefore(back2, F.plot);
+  const dx = lin(0, 3, F.L, F.W - F.R), dy = lin(0, 470, F.H - F.B, F.T);
+  [0, 0.5, 1, 1.5, 2, 2.5, 3].forEach((v) => {
+    el('line', { class: 'gl', x1: dx(v), x2: dx(v), y1: F.T, y2: F.H - F.B }, back2);
+    el('text', { class: 'tk', x: dx(v), y: F.H - F.B + 32, 'text-anchor': 'middle', text: v }, back2);
+  });
+  [0, 90, 180, 270, 360].forEach((v) => {
+    el('line', { class: 'gl', x1: F.L, x2: F.W - F.R, y1: dy(v), y2: dy(v) }, back2);
+    el('text', { class: 'tk', x: F.L - 12, y: dy(v) + 8, 'text-anchor': 'end', text: v + '°' }, back2);
+  });
+  el('path', { class: 'ax', d: `M${F.L} ${F.T}V${F.H - F.B}H${F.W - F.R}` }, back2);
+  el('text', { class: 'lb', x: (F.L + F.W - F.R) / 2, y: F.H - F.B + 72, 'text-anchor': 'middle', text: 'distance from the center (new feature)' }, back2);
+  el('text', { class: 'lb', transform: `translate(${F.L - 66} ${(F.T + F.H - F.B) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'angle' }, back2);
+
+  const r = rng(7), pts = [];
+  for (let i = 0; i < 120; i++) {
+    const outer = i % 2, rad = outer ? 1.8 + 0.9 * r() : 0.25 + 0.95 * r(), ang = 2 * Math.PI * r();
+    pts.push({ y: outer, rad, ang, a: [F.sx(rad * Math.cos(ang)), F.sy(rad * Math.sin(ang))], b: [dx(rad), dy((ang * 180) / Math.PI)] });
+  }
+  const circle = el('circle', { cx: F.sx(0), cy: F.sy(0), r: F.sx(1.5) - F.sx(0), style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8;opacity:0;transition:opacity .5s' }, F.plot);
+  const cut = el('line', { x1: dx(1.5), x2: dx(1.5), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8;opacity:0;transition:opacity .5s' }, F.plot);
+  const cutLab = el('text', { class: 'txs', x: dx(1.5) + 14, y: F.T + 34, style: 'opacity:0;transition:opacity .5s', text: 'one cut: distance = 1.5' }, svg);
+  const dots = pts.map((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: p.a[0], cy: p.a[1], r: 10 }, F.plot));
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'class A (inner)'], ['dot', 'fb', 'class B (outer)']]);
+  const ys = pts.map((p) => p.y);
+  const acc2d = Math.max(bestCut(pts.map((p) => p.rad * Math.cos(p.ang)), ys), bestCut(pts.map((p) => p.rad * Math.sin(p.ang)), ys));
+  const accD = bestCut(pts.map((p) => p.rad), ys);
+  let mode = 0, visited = false, busy = false;
+  const btn = document.getElementById('ring-toggle');
+  function readouts() {
+    document.getElementById('ring-feat').textContent = mode ? 'distance' : 'x₁, x₂';
+    document.getElementById('ring-acc').textContent = Math.round((mode ? accD : acc2d) * 100) + '%';
+    btn.textContent = mode ? 'Back to x₁, x₂' : 'Add distance';
+  }
+  btn.addEventListener('click', () => {
+    if (busy) return;
+    busy = true;
+    const to = 1 - mode;
+    cut.style.opacity = 0; cutLab.style.opacity = 0; circle.style.opacity = 0;
+    F.back.style.opacity = to ? 0 : 1; back2.style.opacity = to;
+    animate(1000, (e) => {
+      const t = to ? e : 1 - e;
+      pts.forEach((p, i) => {
+        dots[i].setAttribute('cx', p.a[0] + (p.b[0] - p.a[0]) * t);
+        dots[i].setAttribute('cy', p.a[1] + (p.b[1] - p.a[1]) * t);
+      });
+      if (e === 1) {
+        mode = to; busy = false;
+        if (mode) { visited = true; cut.style.opacity = 1; cutLab.style.opacity = 1; } else if (visited) circle.style.opacity = 1;
+        readouts();
+      }
+    });
+  });
+  readouts();
+  return {};
+})();
+
+DEMOS.bins = (() => {
+  const svg = document.getElementById('bins-svg');
+  const F = frame(svg, { W: 1160, H: 700, t: 60, x: [20, 80], y: [0, 1], xt: [20, 30, 40, 50, 60, 70, 80], yt: [], xl: 'age (years)', yl: 'people' });
+  const r = rng(21);
+  const ages = Array.from({ length: 400 }, (_, i) => Math.floor(clamp(i % 20 < 11 ? 27 + 4.5 * gauss(r) : 53 + 9 * gauss(r), 20, 79.99)));
+  const KS = [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30];
+  const yAxis = el('g', {}, svg), bars = el('g', {}, F.plot), labs = el('g', {}, svg);
+  const slider = document.getElementById('bins-k');
+  function draw() {
+    const k = KS[+slider.value], w = 60 / k;
+    const counts = new Array(k).fill(0);
+    ages.forEach((a) => counts[Math.floor((a - 20) / w)]++);
+    const top = Math.max(...counts);
+    const step = top > 200 ? 100 : top > 80 ? 40 : top > 40 ? 20 : 10;
+    const sy = lin(0, Math.ceil((top * 1.12) / step) * step, F.H - F.B, F.T);
+    [yAxis, bars, labs].forEach((g) => { while (g.firstChild) g.firstChild.remove(); });
+    for (let v = 0; sy(v) >= F.T - 1; v += step) {
+      el('line', { class: 'gl', x1: F.L, x2: F.W - F.R, y1: sy(v), y2: sy(v) }, yAxis);
+      el('text', { class: 'tk', x: F.L - 12, y: sy(v) + 8, 'text-anchor': 'end', text: v }, yAxis);
+    }
+    const exBin = Math.floor((34 - 20) / w);
+    const name = (i) => (w === 1 ? String(20 + i) : `${20 + i * w}–${20 + (i + 1) * w - 1}`);
+    counts.forEach((c, i) => {
+      const x0 = F.sx(20 + i * w), x1 = F.sx(20 + (i + 1) * w);
+      el('rect', { class: i === exBin ? 'fb' : 'fa', x: x0 + 1, y: sy(c), width: Math.max(1, x1 - x0 - 2), height: F.H - F.B - sy(c), style: i === exBin ? '' : 'fill-opacity:.85' }, bars);
+      if (k <= 12) el('text', { class: 'tk', x: (x0 + x1) / 2, y: sy(c) - 10, 'text-anchor': 'middle', text: c }, labs);
+      if (k <= 6 && k > 1) el('text', { class: 'txs', x: (x0 + x1) / 2, y: F.T - 18, 'text-anchor': 'middle', style: i === exBin ? 'fill:var(--c-b);font-weight:600' : '', text: name(i) }, labs);
+    });
+    document.getElementById('bins-k-val').textContent = k;
+    document.getElementById('bins-w').textContent = w === 1 ? '1 year' : w + ' years';
+    document.getElementById('bins-ex').textContent = name(exBin);
+    document.getElementById('bins-min').textContent = Math.min(...counts);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.poly = (() => {
+  const svg = document.getElementById('poly-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [3, 37], y: [4, 30], xt: [5, 10, 15, 20, 25, 30, 35], yt: [5, 10, 15, 20, 25, 30], xl: 'outside temperature (°C)', yl: 'electricity use (kWh)' });
+  const r = rng(9);
+  const data = Array.from({ length: 40 }, () => { const x = 5 + 30 * r(); return [x, 10 + 0.055 * (x - 20) ** 2 + 1.3 * gauss(r)]; });
+  const u = (x) => (x - 20) / 15;
+  const c1 = polyfit(data.map((d) => u(d[0])), data.map((d) => d[1]), 1).concat([0]);
+  const c2 = polyfit(data.map((d) => u(d[0])), data.map((d) => d[1]), 2);
+  const resid = el('g', {}, F.plot);
+  const segs = data.map(() => el('line', { style: 'stroke:var(--c-b);stroke-opacity:.5;stroke-width:2' }, resid));
+  const fit = el('path', { class: 'curve-a' }, F.plot);
+  data.forEach(([x, y]) => el('circle', { class: 'pt ink2', cx: F.sx(x), cy: F.sy(y), r: 9 }, F.plot));
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'ink2', 'one day'], ['line', 'curve-a', 'model prediction']]);
+  let mode = 0, busy = false;
+  const btn = document.getElementById('poly-toggle');
+  function show(t) {
+    const c = c1.map((v, k) => v + (c2[k] - v) * t), m = (x) => polyval(c, u(x));
+    fit.setAttribute('d', curvePath(m, 3, 37, F.sx, F.sy));
+    data.forEach(([x, y], i) => { segs[i].setAttribute('x1', F.sx(x)); segs[i].setAttribute('x2', F.sx(x)); segs[i].setAttribute('y1', F.sy(y)); segs[i].setAttribute('y2', F.sy(m(x))); });
+    return mean(data.map(([x, y]) => Math.abs(m(x) - y)));
+  }
+  function readouts(errv) {
+    document.getElementById('poly-feat').textContent = mode ? 'temp, temp²' : 'temp';
+    document.getElementById('poly-err').textContent = fmt(errv, 1) + ' kWh';
+    btn.textContent = mode ? 'Remove temperature²' : 'Add temperature²';
+  }
+  btn.addEventListener('click', () => {
+    if (busy) return;
+    busy = true;
+    const to = 1 - mode;
+    animate(1000, (e) => {
+      const errv = show(to ? e : 1 - e);
+      if (e === 1) { mode = to; busy = false; readouts(errv); }
+    });
+  });
+  readouts(show(0));
+  return {};
+})();
+
+drawEncoding(); drawSelection(); drawLeak();
+})();
+</script>
+</body>
+</html>

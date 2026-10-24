@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transfer learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.tk{font-size:24px}
+#fz-svg .blk{cursor:pointer}
+#fz-svg .blk:hover rect.body{stroke-width:5}
+.bt:disabled{opacity:.45;cursor:default}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 29</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Transfer learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Starting a new task from a network that already learned a related one</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 29 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why reuse a trained network</li>
+<li class="an-up" style="--d:.15s">Which layers carry over to a new task</li>
+<li class="an-up" style="--d:.25s">Feature extraction and fine-tuning</li>
+<li class="an-up" style="--d:.35s">Choosing a strategy for your data</li>
+<li class="an-up" style="--d:.45s">Inputs, validation, language models and responsible use</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:36%"><col style="width:64%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x}, \ y, \ \hat{y}</span></td><td>Input, its target and the network output</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{W}^{(l)}, \ \mathbf{b}^{(l)}, \ g</span></td><td>Weights and biases of layer <span class="tex">l</span>, activation</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">\boldsymbol{\theta}, \ L, \ J, \ \alpha</span></td><td>All parameters, loss, cost, learning rate</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathcal{D}_S, \ n_S</span></td><td>Source task: its data and number of examples</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\mathcal{D}_T, \ n_T</span></td><td>Target task, usually with <span class="tex">n_T \ll n_S</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\boldsymbol{\theta}_S</span></td><td>Parameters pretrained on the source task</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">\boldsymbol{\phi}(\mathbf{x})</span></td><td>Features from the frozen body of the network</td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">\boldsymbol{\theta}_{\text{head}}, \ \alpha_{\text{ft}}</span></td><td>New head parameters, fine-tuning learning rate</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Subscript <span class="tex">S</span> means source, the task learned first.</p><p>Subscript <span class="tex">T</span> means target, the task we care about now.</p><p><span class="tex">\ll</span> reads "much smaller than".</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Reusing what was learned</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A network trained on one task already knows a lot about the next one.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Recap">
+<div class="hdr" data-s="Reusing"></div>
+<h2>Recap: networks and CNNs</h2>
+<div class="fr">
+<div class="figbox"><svg id="recap-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Each layer computes <span class="tex">g(\mathbf{W}^{(l)}\mathbf{a} + \mathbf{b}^{(l)})</span> from the layer before (Topic 23).</p>
+<p class="small" style="margin:0">Training repeats: forward pass, loss, backpropagation, and the update <span class="tex">\boldsymbol\theta \leftarrow \boldsymbol\theta - \alpha \nabla J</span>.</p>
+<p class="small" style="margin:0">A CNN uses convolution and pooling to read images (Topic 25).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) A small network. (b) The training loop. (c) A CNN for images.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Too little data">
+<div class="hdr" data-s="Reusing"></div>
+<h2>Too little labeled data</h2>
+<div class="fr">
+<div class="figbox"><svg id="data-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Deep networks learn from very many labeled examples and days of computing.</p>
+<p class="small frag up" data-step="t" style="margin:0">A local task may have only <strong>300 photos</strong>, for example coffee leaves with and without rust.</p>
+<p class="small frag up" data-step="o" style="margin:0">From scratch, millions of parameters would memorize 300 photos and overfit.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Each small square is 1000 labeled photos. Sizes are typical for a large photo collection and a small local project.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Source and target">
+<div class="hdr" data-s="Reusing"></div>
+<h2>Source and target tasks</h2>
+<div class="fr">
+<div class="figbox"><svg id="st-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Someone who rides a bike learns a motorcycle faster: balance and steering carry over.</p>
+<p class="small frag up" data-step="n" style="margin:0"><strong>Transfer learning</strong> trains a network on a large <strong>source</strong> task, then reuses its parameters <span class="tex">\boldsymbol\theta_S</span> on a small <strong>target</strong> task.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>(a) Skills move from one task to a related one. (b) The same idea with a network.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="General to specific">
+<div class="hdr" data-s="Reusing"></div>
+<h2>General to specific layers</h2>
+<div class="fr">
+<div class="figbox"><svg id="gs-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Early layers detect edges and textures. Almost every image task needs them.</p>
+<p class="small frag up" data-step="l" style="margin:0">Later layers combine them into parts and objects of the source task, so they are more specific.</p>
+<p class="small frag up" data-step="r" style="margin:0">The output layer only fits the source classes, so we always replace it.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>A CNN from input to output. Color goes from general (blue) to task specific (orange), as measured by Yosinski et al. (2014).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="When it helps">
+<div class="hdr" data-s="Reusing"></div>
+<h2>When transfer helps</h2>
+<div class="fr">
+<div class="figbox"><svg id="help-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The closer the target is to the source, the more the reused features help.</p>
+<p class="small frag up" data-step="n" style="margin:0">With a very different domain, the source features can mislead the target model. This is <strong>negative transfer</strong>: worse than training from scratch.</p>
+<p class="small frag up" data-step="c" style="margin:0">Always compare with a model trained from scratch.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Illustrative sketch, not measured data: gain in accuracy over training from scratch as the domains grow apart.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Three ways to transfer</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Freeze the body, fine-tune it, or pick between them by the data you have.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Feature extraction">
+<div class="hdr" data-s="Three ways"></div>
+<h2>Feature extraction</h2>
+<div class="fr">
+<div class="figbox"><svg id="fe-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Keep the pretrained body <strong>frozen</strong>: its parameters do not change.</p>
+<p class="small frag up" data-step="f" style="margin:0">The body turns each photo into a feature vector <span class="tex">\boldsymbol\phi(\mathbf{x})</span>.</p>
+<p class="small frag up" data-step="h" style="margin:0">Only a new <strong>head</strong> for the target classes is trained, like a logistic regression on those features.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>A 50-layer ResNet body (Topic 25) with a new head for 5 classes of coffee leaves.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Head formula">
+<div class="hdr" data-s="Three ways"></div>
+<h2>The new head</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The frozen body maps an input to features, using the source parameters <span class="tex">\boldsymbol\theta_S</span> without changing them:</p>
+<div class="eq"><div class="m tex-d">\mathbf{x} \;\longmapsto\; \boldsymbol\phi(\mathbf{x}) \in \mathbb{R}^{2048}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="h" style="margin:16px 0 8px">The head turns the features into one probability per class:</p>
+<div class="eq frag up" data-step="h"><div class="m tex-d">\hat{\mathbf{y}} = \text{softmax}\big(\mathbf{W}_{\text{head}}\, \boldsymbol\phi(\mathbf{x}) + \mathbf{b}_{\text{head}}\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="c" style="margin:16px 0 8px">With 5 classes, <span class="tex">\mathbf{W}_{\text{head}}</span> is <span class="tex">5 \times 2048</span> and <span class="tex">\mathbf{b}_{\text{head}}</span> has 5 entries:</p>
+<div class="eq frag up" data-step="c"><div class="m tex-d">|\boldsymbol\theta_{\text{head}}| = 2048 \cdot 5 + 5 = 10\,245</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Two features <span class="tex">\boldsymbol\phi = (1, 2)</span>, two classes, <span class="tex">\mathbf{W}_{\text{head}} = \mathbf{I}</span>, <span class="tex">\mathbf{b}_{\text{head}} = \mathbf{0}</span>.</p><p>Scores <span class="tex">(1, 2)</span>, so</p><p><span class="tex">\hat{y}_2 = \tfrac{e^2}{e^1 + e^2} \approx 0.73</span></p></aside>
+<aside class="am frag up" data-step="c"><div class="t">Count</div><p>Body: 23 508 032 frozen.</p><p>Head: 10 245 trainable, about 0.04% of the total.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Fine-tuning formula">
+<div class="hdr" data-s="Three ways"></div>
+<h2>Fine-tuning</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Fine-tuning also trains the body. Gradient descent starts at the source parameters instead of random ones:</p>
+<div class="eq"><div class="m tex-d">\boldsymbol\theta^{(0)} = \boldsymbol\theta_S</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="u" style="margin:16px 0 8px">Each step lowers the target cost <span class="tex">J_T</span>, the average loss on the <span class="tex">n_T</span> target examples:</p>
+<div class="eq frag up" data-step="u"><div class="m tex-d">\boldsymbol\theta \leftarrow \boldsymbol\theta - \alpha_{\text{ft}}\, \nabla J_T(\boldsymbol\theta), \qquad J_T(\boldsymbol\theta) = \frac{1}{n_T} \sum_{i=1}^{n_T} L(y_i, \hat{y}_i)</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="s" style="margin:16px 0 0">A small <span class="tex">\alpha_{\text{ft}}</span> keeps the useful source features. Unfreeze gradually: first the head, then the last block, then earlier blocks.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A weight starts at <span class="tex">\theta_S = 0.80</span> with gradient <span class="tex">0.5</span>.</p><p>With <span class="tex">\alpha_{\text{ft}} = 0.001</span>:</p><p><span class="tex">0.80 - 0.001 \cdot 0.5 = 0.7995</span></p><p>With <span class="tex">\alpha = 0.1</span>:</p><p><span class="tex">0.80 - 0.1 \cdot 0.5 = 0.75</span></p><p>The large step moves the weight 100 times farther from what it learned.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="How many layers to freeze" data-demo="freeze">
+<div class="hdr" data-s="Three ways"></div>
+<h2>How many layers to freeze</h2>
+<div class="fr">
+<div class="figbox"><svg id="fz-svg" class="interactive" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Click a block, or move the slider. Locked blocks keep <span class="tex">\boldsymbol\theta_S</span>; open ones are fine-tuned.</p>
+<div class="ctl"><label><span>Frozen blocks</span><b id="fz-k-val">5</b></label><input type="range" id="fz-k" min="0" max="5" step="1" value="5"></div>
+<div class="ro"><span>Trainable parameters</span><b id="fz-tr" class="bb">10 245</b></div>
+<div class="ro"><span>Share of the network</span><b id="fz-sh" class="a">0.04%</b></div>
+<div><span class="tag" id="fz-name">Feature extraction</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Parameter counts of a 50-layer ResNet with a 5-class head. The bars below are a qualitative sketch.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Learning curves" data-demo="curves">
+<div class="hdr" data-s="Three ways"></div>
+<h2>Accuracy and data size</h2>
+<div class="fr">
+<div class="figbox"><svg id="lc-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Transfer gives its largest gain when the target set is small. With many examples, training from scratch catches up.</p>
+<div class="ctl"><label><span>Target examples <span class="tex">n_T</span></span><b id="lc-n-val">300</b></label><input type="range" id="lc-n" min="0" max="1000" step="1" value="259"></div>
+<div class="ro"><span>From scratch</span><b id="lc-s" class="bb">0%</b></div>
+<div class="ro"><span>With transfer</span><b id="lc-t" class="a">0%</b></div>
+<div class="ro"><span>Gain</span><b id="lc-g">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Illustrative curves with the shape usually reported, not measured results. Five classes, so chance is 20%.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Staying near the source">
+<div class="hdr" data-s="Three ways"></div>
+<h2>Staying near the source</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Another way to keep what was learned: add a penalty for moving away from <span class="tex">\boldsymbol\theta_S</span>.</p>
+<div class="eq"><div class="m tex-d">J_T(\boldsymbol\theta) + \lambda \,\lVert \boldsymbol\theta - \boldsymbol\theta_S \rVert^2</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="a" style="margin:12px 0 0">The first term asks for a good fit to the few target examples. The second is the squared distance to the source solution.</p>
+<p class="small frag up" data-step="b" style="margin:12px 0 0"><span class="tex">\lambda = 0</span> ignores the source; a large <span class="tex">\lambda</span> keeps <span class="tex">\boldsymbol\theta</span> at <span class="tex">\boldsymbol\theta_S</span>. A model from scratch uses the usual penalty toward zero:</p>
+<div class="eq frag up" data-step="b"><div class="m tex-d">J_T(\boldsymbol\theta) + \lambda \,\lVert \boldsymbol\theta \rVert^2</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>One parameter. The target data alone give <span class="tex">J_T = (\theta - 4)^2</span>, and <span class="tex">\theta_S = 2</span>.</p><p>Minimizing</p><p><span class="tex">(\theta - 4)^2 + \lambda(\theta - 2)^2</span></p><p>gives <span class="tex">\theta = \tfrac{4 + 2\lambda}{1 + \lambda}</span>:</p><p><span class="tex">\lambda = 0</span>: <span class="tex">\theta = 4</span></p><p><span class="tex">\lambda = 1</span>: <span class="tex">\theta = 3</span></p><p><span class="tex">\lambda = 3</span>: <span class="tex">\theta = 2.5</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A toy transfer" data-demo="toy">
+<div class="hdr" data-s="Three ways"></div>
+<h2>A toy transfer</h2>
+<div class="fr">
+<div class="figbox"><svg id="toy-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Same 10 features. Scratch: (7). Transfer: (6).</p>
+<div class="ctl"><label><span>Target points <span class="tex">n_T</span></span><b id="toy-n-val">5</b></label><input type="range" id="toy-n" min="2" max="40" step="1" value="5"></div>
+<div class="ctl"><label><span>Penalty <span class="tex">\lambda</span></span><b id="toy-l-val">0.03</b></label><input type="range" id="toy-l" min="-3" max="0" step="0.1" value="-1.5"></div>
+<div class="ro"><span>Test error, scratch</span><b id="toy-es" class="bb">0</b></div>
+<div class="ro"><span>Test error, transfer</span><b id="toy-et" class="a">0</b></div>
+<div class="ro"><span>Transfer wins, 200 draws</span><b id="toy-w">0%</b></div>
+<div class="btns"><button class="bt chip" id="toy-new">New sample</button></div>
+<p class="cap"><b>Figure 9:</b>Computed live. Source model: fit to 200 points of a similar curve. Test error: squared error to the true curve.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing a strategy">
+<div class="hdr" data-s="Three ways"></div>
+<h2>Choosing a strategy</h2>
+<div class="fr">
+<div class="figbox"><svg id="grid-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Two questions decide: how much target data, and how close is it to the source?</p>
+<p class="small frag up" data-step="v" style="margin:0">These are starting points. Compare the options on a validation set.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>The bars show which blocks stay frozen (gray) and which are trained (color).</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">In practice</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Prepare the inputs, guard against overfitting, and use pretrained models with care.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Preparing the inputs">
+<div class="hdr" data-s="In practice"></div>
+<h2>Preparing the inputs</h2>
+<div class="fr">
+<div class="figbox"><svg id="prep-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Feed the target photos exactly as the source photos were fed: same size, same normalization (Topic 4):</p>
+<div class="small" style="text-align:center"><span class="tex">x' = \dfrac{x - \mu_S}{\sigma_S}</span></div>
+<p class="small" style="margin:0">Red value 0.60 with <span class="tex">\mu_S = 0.485</span>, <span class="tex">\sigma_S = 0.229</span>: <span class="tex">x' \approx 0.50</span>.</p>
+<p class="small frag up" data-step="a" style="margin:0"><strong>Augmentation</strong> makes new training photos from old ones.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>(a) Resize and normalize with the source statistics. (b) Four variants of one leaf photo.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Validation">
+<div class="hdr" data-s="In practice"></div>
+<h2>Validation with few examples</h2>
+<div class="fr">
+<div class="figbox"><svg id="val-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">With 300 photos the network can memorize the training set within a few passes.</p>
+<p class="small frag up" data-step="s" style="margin:0">Keep a validation set and stop when its accuracy stops improving.</p>
+<p class="small frag up" data-step="k" style="margin:0">Choose <span class="tex">\alpha_{\text{ft}}</span> and the frozen layers there too. With tiny data, use k-fold cross-validation (Topic 6).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>Illustrative training run on a 240/60 split of the 300 photos.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Domain shift">
+<div class="hdr" data-s="In practice"></div>
+<h2>Domain shift</h2>
+<div class="fr">
+<div class="figbox"><svg id="shift-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Source photos are often clean and centered. Field photos have shadows, mud and other leaves.</p>
+<p class="small frag up" data-step="b" style="margin:0">The features then take different values, and a rule learned on the source lands in the wrong place.</p>
+<p class="small frag up" data-step="c" style="margin:0">Fix: fine-tune with photos taken in the real setting.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 13:</b>(a) Source and target photos. (b) One feature in each domain; the dashed line is the rule learned on the source.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Language models">
+<div class="hdr" data-s="In practice"></div>
+<h2>Pretrained language models</h2>
+<div class="fr">
+<div class="figbox"><svg id="lm-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Text works the same way. First, a network reads a huge amount of text and learns to predict hidden words. No labels are needed.</p>
+<p class="small frag up" data-step="f" style="margin:0">Then it is fine-tuned on a small labeled set, such as 2000 reviews marked positive or negative.</p>
+<p class="small frag up" data-step="t" style="margin:0">Topic 31 shows the networks behind these models.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>Pretraining on unlabeled text, then fine-tuning for one task.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Foundation models">
+<div class="hdr" data-s="In practice"></div>
+<h2>Foundation models</h2>
+<div class="fr">
+<div class="figbox"><svg id="fm-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A <strong>foundation model</strong> is one very large network pretrained on very varied data.</p>
+<p class="small frag up" data-step="a" style="margin:0">Many tasks start from it: by fine-tuning, by training a small head, or by describing the task in words.</p>
+<p class="small frag up" data-step="c" style="margin:0">Pretraining costs a lot once; each new task then costs little.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 15:</b>One pretrained model at the center, adapted to many target tasks.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Responsible use">
+<div class="hdr" data-s="In practice"></div>
+<h2>Responsible use</h2>
+<div class="fr">
+<div class="figbox"><svg id="resp-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A pretrained model carries its source data with it, including its gaps and biases.</p>
+<p class="small frag up" data-step="l" style="margin:0">Weights and data come with licenses. Read the terms before using them, above all for commercial work.</p>
+<p class="small frag up" data-step="d" style="margin:0">Test on every group of users and write down where the model came from.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 16:</b>(a) Bias inherited from the source (illustrative numbers). (b) Licenses. (c) Documentation.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="In practice"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Transfer learning at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Good accuracy from a few hundred examples</td><td>Needs a source task related to the target</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Training takes minutes or hours, not days</td><td>Negative transfer when domains are far apart</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Feature extraction trains very few parameters</td><td>Inputs must match the source size and normalization</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Works for images, text and sound</td><td>Inherits the biases of the source data</td></tr>
+<tr class="an-up" style="--d:.45s"><td>One pretrained model serves many tasks</td><td>Large pretrained models are slow and subject to licenses</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>The default start for images and text when labeled data are scarce and a related pretrained network exists.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:32px">
+<li class="an-up" style="--d:.05s">Transfer learning reuses parameters <span class="tex">\boldsymbol\theta_S</span> learned on a large source task for a small target task.</li>
+<li class="an-up" style="--d:.15s">Early layers learn general features; later layers and the output are task specific.</li>
+<li class="an-up" style="--d:.25s">Feature extraction freezes the body and trains a new head; fine-tuning also updates the body with a small <span class="tex">\alpha_{\text{ft}}</span>.</li>
+<li class="an-up" style="--d:.35s">Little data and a similar domain favor freezing more layers; validate every choice.</li>
+<li class="an-up" style="--d:.45s">Match the source inputs, watch for domain shift, and check bias and licenses.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">A survey, three papers that shaped the practice, and a textbook section.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Pan, S. J., &amp; Yang, Q. (2010). A survey on transfer learning. <em>IEEE Transactions on Knowledge and Data Engineering</em>, 22(10), 1345-1359.</li>
+<li style="margin:.4em 0">Yosinski, J., Clune, J., Bengio, Y., &amp; Lipson, H. (2014). How transferable are features in deep neural networks? <em>Advances in Neural Information Processing Systems</em>, 27, 3320-3328.</li>
+<li style="margin:.4em 0">Razavian, A. S., Azizpour, H., Sullivan, J., &amp; Carlsson, S. (2014). CNN features off-the-shelf: An astounding baseline for recognition. <em>IEEE CVPR Workshops</em>, 806-813.</li>
+<li style="margin:.4em 0">Howard, J., &amp; Ruder, S. (2018). Universal language model fine-tuning for text classification. <em>Proceedings of ACL</em>, 328-339.</li>
+<li style="margin:.4em 0">Devlin, J., Chang, M.-W., Lee, K., &amp; Toutanova, K. (2019). BERT: Pre-training of deep bidirectional transformers for language understanding. <em>Proceedings of NAACL-HLT</em>, 4171-4186.</li>
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Section 15.2. MIT Press.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 30: deep reinforcement learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, lin, clamp, mean, fmt, solve, curvePath, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const $ = (id) => document.getElementById(id);
+const nfmt = (v) => Math.round(v).toLocaleString('en-US').replace(/,/g, ' ');
+function txt(g, x, y, s, cls = 'txs', extra = {}) { return el('text', { class: cls, x, y, text: s, ...extra }, g); }
+function arrow(g, x1, y1, x2, y2, cls = 'wire', mk = 'ah') { return el('path', { class: cls, d: `M${x1} ${y1}L${x2} ${y2}`, 'marker-end': `url(#${mk})` }, g); }
+function box(g, x, y, w, h, cls = 'box', rx = 8) { return el('rect', { class: cls, x, y, width: w, height: h, rx }, g); }
+/* padlock centered at (x, y); open = shackle lifted on one side */
+function lock(g, x, y, open = false, s = 1, col = 'var(--myst-color-text-secondary)') {
+  const G = el('g', { transform: `translate(${x} ${y}) scale(${s})` }, g);
+  el('path', { d: open ? 'M-9 -4V-12a9 9 0 0 1 18 0V-10' : 'M-9 -4V-12a9 9 0 0 1 18 0V-4', style: `fill:none;stroke:${col};stroke-width:4`, transform: open ? 'translate(0 -6)' : '' }, G);
+  el('rect', { x: -14, y: -4, width: 28, height: 22, rx: 4, style: `fill:${col}` }, G);
+  return G;
+}
+/* a leaf at (cx, cy); spots are rust marks */
+function leaf(g, cx, cy, s = 1, rot = 0, spots = [], style = {}) {
+  const G = el('g', { transform: `translate(${cx} ${cy}) rotate(${rot}) scale(${s})` }, g);
+  el('path', { d: 'M-50 0C-30 -30 20 -34 52 0C20 34 -30 30 -50 0Z', 'vector-effect': 'non-scaling-stroke', style: `fill:var(--c-c);fill-opacity:${style.op ?? 0.35};stroke:var(--c-c);stroke-width:3` }, G);
+  el('path', { d: 'M-62 0H46M-10 0L8 -14M-10 0L8 14M14 0L28 -10M14 0L28 10', 'vector-effect': 'non-scaling-stroke', style: 'fill:none;stroke:var(--c-c);stroke-width:2' }, G);
+  spots.forEach(([x, y, r]) => el('circle', { cx: x, cy: y, r, style: 'fill:var(--c-b);fill-opacity:.85' }, G));
+  return G;
+}
+const RUST = [[-18, -8, 5], [4, 10, 6], [24, -6, 4], [-30, 6, 3.5]];
+
+/* ResNet-50 parameter counts: stem, four blocks, and a new 5-class head */
+const BLOCKS = [
+  { name: 'stem', p: 9536 },
+  { name: 'block 1', p: 215808 },
+  { name: 'block 2', p: 1219584 },
+  { name: 'block 3', p: 7098368 },
+  { name: 'block 4', p: 14964736 },
+];
+const HEAD = 2048 * 5 + 5;
+const BODY = BLOCKS.reduce((s, b) => s + b.p, 0);
+
+/* ───────── static figures ───────── */
+function drawRecap() {
+  const svg = $('recap-svg');
+  // (a) a small network
+  txt(svg, 0, 30, '(a) a network', 'ttl');
+  const layers = [[3, 60], [4, 190], [4, 320], [1, 450]];
+  const ys = (n) => Array.from({ length: n }, (_, i) => 200 + (i - (n - 1) / 2) * 76);
+  const g = el('g', { class: 'an-fade' }, svg);
+  for (let l = 0; l < 3; l++) {
+    const [n0, x0] = layers[l], [n1, x1] = layers[l + 1];
+    ys(n0).forEach((y0) => ys(n1).forEach((y1) => el('line', { x1: x0, y1: y0, x2: x1, y2: y1, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, g)));
+  }
+  layers.forEach(([n, x], l) => ys(n).forEach((y) => el('circle', { cx: x, cy: y, r: 20, class: l === 0 ? 'box' : l === 3 ? 'box-b' : 'box-a' }, g)));
+  txt(svg, 60, 330, 'x', 'tx', { 'text-anchor': 'middle', 'font-style': 'italic', 'font-weight': 700 });
+  txt(svg, 125, 72, 'W⁽¹⁾, b⁽¹⁾', 'txs', { 'text-anchor': 'middle' });
+  txt(svg, 385, 72, 'W⁽³⁾, b⁽³⁾', 'txs', { 'text-anchor': 'middle' });
+  txt(svg, 450, 260, 'ŷ', 'tx', { 'text-anchor': 'middle', 'font-style': 'italic', 'font-weight': 700 });
+  // (b) training loop
+  txt(svg, 600, 30, '(b) training', 'ttl');
+  const B = [[600, 70, 'forward pass'], [890, 70, 'loss L(y, ŷ)'], [890, 260, 'backpropagation'], [600, 260, 'update θ']];
+  B.forEach(([x, y, s], i) => {
+    const gb = el('g', { class: 'an-up', style: `--d:${0.2 + i * 0.15}s` }, svg);
+    box(gb, x, y, 250, 80, i === 3 ? 'box-a' : 'box');
+    txt(gb, x + 125, y + 50, s, 'txs', { 'text-anchor': 'middle' });
+  });
+  arrow(svg, 856, 110, 884, 110); arrow(svg, 1015, 156, 1015, 254);
+  arrow(svg, 884, 300, 856, 300); arrow(svg, 725, 254, 725, 156);
+  txt(svg, 870, 212, 'repeat', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)' });
+  // (c) a CNN
+  txt(svg, 0, 470, '(c) a CNN', 'ttl');
+  const C = [['image', 'box', 120], ['conv', 'box-a', 110], ['pool', 'box', 90], ['conv', 'box-a', 110], ['pool', 'box', 90], ['dense', 'box-a', 110], ['classes', 'box-b', 120]];
+  let x = 0;
+  C.forEach(([s, cls, w], i) => {
+    const h = s === 'image' ? 120 : s === 'pool' ? 80 : s === 'classes' ? 70 : 110;
+    const gc = el('g', { class: 'an-up', style: `--d:${0.5 + i * 0.08}s` }, svg);
+    box(gc, x, 590 - h / 2, w, h, cls);
+    txt(gc, x + w / 2, 680, s, 'txs', { 'text-anchor': 'middle' });
+    if (i < C.length - 1) arrow(svg, x + w + 4, 590, x + w + 44, 590);
+    x += w + 50;
+  });
+}
+
+function drawData() {
+  const svg = $('data-svg');
+  txt(svg, 0, 30, 'source: 1.2 million labeled photos, 1000 classes', 'ttl');
+  const COLS = 40, ROWS = 30, S = 14;
+  const g = el('g', { class: 'an-fade' }, svg);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    el('rect', { x: c * S, y: 60 + r * S, width: S - 3, height: S - 3, class: 'fa', style: 'fill-opacity:.55' }, g);
+  }
+  // target: 300 photos = 0.3 of one square
+  const gt = el('g', { class: 'frag', 'data-step': 't' }, svg);
+  txt(gt, 640, 30, 'target: 300 photos, 5 classes', 'ttl');
+  el('rect', { x: 640, y: 60, width: S - 3, height: S - 3, style: 'fill:none;stroke:var(--c-b);stroke-width:1.5' }, gt);
+  el('rect', { x: 640, y: 60, width: (S - 3) * 0.3, height: S - 3, class: 'fb' }, gt);
+  el('path', { d: `M${640 + S} ${60}L780 120M${640 + S} ${60 + S - 3}L780 400`, style: 'stroke:var(--c-b);stroke-width:1.5;stroke-dasharray:6 6;fill:none' }, gt);
+  el('rect', { x: 780, y: 120, width: 280, height: 280, style: 'fill:none;stroke:var(--c-b);stroke-width:3' }, gt);
+  el('rect', { x: 780, y: 120, width: 84, height: 280, class: 'fb', style: 'fill-opacity:.85' }, gt);
+  txt(gt, 920, 440, 'zoom: 300 of 1000', 'txs', { 'text-anchor': 'middle' });
+  // parameters per example
+  const go = el('g', { class: 'frag', 'data-step': 'o' }, svg);
+  box(go, 0, 520, 1140, 150, 'box-b');
+  txt(go, 30, 575, 'A 50-layer CNN has about 25.6 million parameters.', 'tx');
+  txt(go, 30, 630, '25 557 032 / 300 ≈ 85 000 parameters for each target photo', 'tx');
+}
+
+function drawSourceTarget() {
+  const svg = $('st-svg');
+  txt(svg, 0, 30, '(a) people', 'ttl');
+  // bike and motorcycle
+  function wheels(g, x, w) {
+    el('circle', { cx: x, cy: 170, r: 44, style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:5' }, g);
+    el('circle', { cx: x + w, cy: 170, r: 44, style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:5' }, g);
+  }
+  const gb = el('g', { class: 'an-up' }, svg);
+  wheels(gb, 60, 150);
+  el('path', { d: 'M60 170L110 100L180 100L210 170M110 100L135 170L180 100M100 82H124M180 100L172 74H196', style: 'fill:none;stroke:var(--c-a);stroke-width:6;stroke-linejoin:round;stroke-linecap:round' }, gb);
+  txt(gb, 135, 250, 'bicycle', 'tx', { 'text-anchor': 'middle' });
+  const gm = el('g', { class: 'an-up', style: '--d:.3s' }, svg);
+  wheels(gm, 720, 190);
+  el('path', { d: 'M720 170L790 110H880L910 170M780 110L800 80H860L880 110M880 110L900 76H930', style: 'fill:none;stroke:var(--c-b);stroke-width:6;stroke-linejoin:round;stroke-linecap:round' }, gm);
+  el('rect', { x: 790, y: 120, width: 70, height: 40, rx: 8, class: 'fb' }, gm);
+  txt(gm, 815, 250, 'motorcycle', 'tx', { 'text-anchor': 'middle' });
+  arrow(svg, 300, 150, 620, 150, 'wire-a', 'ah-a');
+  txt(svg, 460, 130, 'balance, steering', 'txs', { 'text-anchor': 'middle' });
+  txt(svg, 460, 190, 'carry over', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)' });
+  // (b) networks
+  const g2 = el('g', { class: 'frag', 'data-step': 'n' }, svg);
+  txt(g2, 0, 330, '(b) networks', 'ttl');
+  box(g2, 0, 360, 300, 150, 'box');
+  txt(g2, 150, 405, 'source task 𝒟ₛ', 'tx', { 'text-anchor': 'middle' });
+  txt(g2, 150, 445, 'everyday objects', 'txs', { 'text-anchor': 'middle' });
+  txt(g2, 150, 485, 'nₛ = 1 200 000', 'txs', { 'text-anchor': 'middle' });
+  box(g2, 860, 360, 300, 150, 'box');
+  txt(g2, 1010, 405, 'target task 𝒟ₜ', 'tx', { 'text-anchor': 'middle' });
+  txt(g2, 1010, 445, 'coffee leaf disease', 'txs', { 'text-anchor': 'middle' });
+  txt(g2, 1010, 485, 'nₜ = 300', 'txs', { 'text-anchor': 'middle' });
+  // the network in the middle
+  box(g2, 420, 380, 320, 110, 'box-a');
+  for (let i = 0; i < 5; i++) el('rect', { x: 440 + i * 58, y: 400, width: 44, height: 70, rx: 4, class: 'fa', style: `fill-opacity:${0.25 + i * 0.12}` }, g2);
+  txt(g2, 580, 530, 'pretrained θₛ', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--c-a)' });
+  arrow(g2, 304, 435, 414, 435);
+  txt(g2, 360, 420, 'train', 'txs', { 'text-anchor': 'middle' });
+  arrow(g2, 744, 435, 854, 435, 'wire-a', 'ah-a');
+  txt(g2, 800, 420, 'reuse', 'txs', { 'text-anchor': 'middle' });
+  box(g2, 860, 580, 300, 90, 'box-b');
+  txt(g2, 1010, 635, 'adapted model', 'tx', { 'text-anchor': 'middle' });
+  arrow(g2, 1010, 514, 1010, 574);
+  txt(g2, 0, 630, 'nₜ ≪ nₛ: the target has far fewer examples', 'txs');
+}
+
+function drawGeneral() {
+  const svg = $('gs-svg');
+  const N = 6, X = (i) => 20 + i * 188, W = 150;
+  const names = ['edges', 'textures', 'patterns', 'parts', 'objects', 'classes'];
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1), x = X(i);
+    const g = el('g', { class: 'an-up', style: `--d:${i * 0.12}s` }, svg);
+    // icon tile
+    el('rect', { x, y: 40, width: W, height: 150, rx: 8, class: 'box' }, g);
+    const cx = x + W / 2, cy = 115;
+    if (i === 0) [[-40, -30, 20, 30], [-10, -45, -10, 40], [10, 30, 50, -20], [-50, 20, -5, 45]].forEach(([a, b, c, d]) => el('line', { x1: cx + a, y1: cy + b, x2: cx + c, y2: cy + d, style: 'stroke:var(--myst-color-text);stroke-width:5;stroke-linecap:round' }, g));
+    if (i === 1) for (let k = -3; k <= 3; k++) el('path', { d: `M${cx - 55} ${cy + k * 16}q14 -10 28 0t28 0t28 0t28 0`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g);
+    if (i === 2) [[-30, -25], [25, -30], [0, 10], [-35, 35], [35, 35]].forEach(([a, b]) => { el('circle', { cx: cx + a, cy: cy + b, r: 16, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g); el('circle', { cx: cx + a, cy: cy + b, r: 6, class: 'ink' }, g); });
+    if (i === 3) { el('path', { d: `M${cx - 55} ${cy}C${cx - 30} ${cy - 30} ${cx + 20} ${cy - 30} ${cx + 55} ${cy}`, style: 'fill:none;stroke:var(--c-c);stroke-width:5' }, g); el('path', { d: `M${cx - 50} ${cy + 10}H${cx + 50}`, style: 'stroke:var(--c-c);stroke-width:3' }, g); el('circle', { cx: cx - 10, cy: cy + 36, r: 14, class: 'fb' }, g); el('circle', { cx: cx + 26, cy: cy + 30, r: 9, class: 'fb' }, g); }
+    if (i === 4) leaf(g, cx, cy, 1.1, -20, RUST);
+    if (i === 5) [0.15, 0.7, 0.1].forEach((v, k) => el('rect', { x: cx - 50 + k * 36, y: cy + 50 - v * 100, width: 28, height: v * 100, class: k === 1 ? 'fb' : 'fa' }, g));
+    txt(g, cx, 228, names[i], 'txs', { 'text-anchor': 'middle' });
+    // block
+    el('rect', { x, y: 260, width: W, height: 150, rx: 8, style: `fill:var(--c-a);fill-opacity:${(1 - t) * 0.75 + 0.05}` }, g);
+    el('rect', { x, y: 260, width: W, height: 150, rx: 8, style: `fill:var(--c-b);fill-opacity:${t * 0.75};stroke:var(--myst-color-border-strong);stroke-width:2` }, g);
+    txt(g, cx, 345, i < 5 ? `block ${i + 1}` : 'output', 'tx', { 'text-anchor': 'middle', 'font-weight': 600 });
+    if (i < N - 1) arrow(svg, x + W + 4, 335, x + 188 - 4, 335);
+  }
+  // general -> specific bar
+  const gb = el('g', { class: 'frag', 'data-step': 'l' }, svg);
+  const gid = 'gs-grad';
+  const lg = el('linearGradient', { id: gid }, svg);
+  el('stop', { offset: '0', style: 'stop-color:var(--c-a)' }, lg);
+  el('stop', { offset: '1', style: 'stop-color:var(--c-b)' }, lg);
+  el('rect', { x: 20, y: 450, width: X(5) + W - 20, height: 16, rx: 8, fill: `url(#${gid})` }, gb);
+  txt(gb, 20, 500, 'general', 'tx', { style: 'fill:var(--c-a)', 'font-weight': 600 });
+  txt(gb, X(5) + W, 500, 'specific', 'tx', { 'text-anchor': 'end', style: 'fill:var(--c-b)', 'font-weight': 600 });
+  // brackets
+  function bracket(g, x0, x1, label, col) {
+    el('path', { d: `M${x0} 560v20H${x1}v-20`, style: `fill:none;stroke:${col};stroke-width:3` }, g);
+    txt(g, (x0 + x1) / 2, 630, label, 'tx', { 'text-anchor': 'middle', style: `fill:${col}` });
+  }
+  bracket(gb, X(0), X(2) + W, 'reuse as they are', 'var(--c-a)');
+  bracket(gb, X(3), X(4) + W, 'adapt', 'var(--c-d)');
+  const gr = el('g', { class: 'frag', 'data-step': 'r' }, svg);
+  bracket(gr, X(5), X(5) + W, 'replace', 'var(--c-b)');
+}
+
+function drawHelp() {
+  const svg = $('help-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 120, t: 40, x: [0, 1], y: [-10, 30], xt: [0.03, 0.97], yt: [-10, 0, 10, 20, 30], fx: (v) => (v < 0.5 ? 'very different' : 'very similar'), fy: (v) => (v > 0 ? '+' : '') + v, xl: 'similarity between source and target', yl: 'gain in accuracy (points)' });
+  const f = (s) => -8 + 36 * s ** 1.3;
+  const s0 = (8 / 36) ** (1 / 1.3);
+  const gn = el('g', { class: 'frag', 'data-step': 'n' }, svg);
+  el('rect', { x: F.sx(0), y: F.sy(0), width: F.sx(s0) - F.sx(0), height: F.sy(-10) - F.sy(0), style: 'fill:var(--c-b);fill-opacity:.15' }, gn);
+  txt(gn, F.sx(0) + 14, F.sy(0) + 34, 'negative', 'txs', { style: 'fill:var(--c-b)', 'font-weight': 600 });
+  txt(gn, F.sx(0) + 14, F.sy(0) + 66, 'transfer', 'txs', { style: 'fill:var(--c-b)', 'font-weight': 600 });
+  el('line', { x1: F.sx(0), x2: F.sx(1), y1: F.sy(0), y2: F.sy(0), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2' }, F.plot);
+  txt(svg, F.sx(1) - 10, F.sy(0) - 14, 'same as from scratch', 'txs', { 'text-anchor': 'end', style: 'fill:var(--myst-color-text-tertiary)' });
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath(f, 0, 1, F.sx, F.sy) }, F.plot);
+  [0.9, 0.55, 0.1].forEach((s, i) => {
+    const g = el('g', { class: 'an-pop', style: `--d:${0.6 + i * 0.2}s` }, svg);
+    el('circle', { class: 'pt fa', cx: F.sx(s), cy: F.sy(f(s)), r: 12 }, g);
+  });
+  [[0.9, 'photos → leaf photos', -30, 'end'], [0.55, 'photos → microscope slides', -30, 'end'], [0.1, 'photos → unrelated data', 46, 'start']].forEach(([s, label, dy, a]) => {
+    txt(svg, F.sx(s) + (a === 'end' ? -20 : 10), F.sy(f(s)) + dy, label, 'txs', { 'text-anchor': a });
+  });
+}
+
+function drawFeatureExtraction() {
+  const svg = $('fe-svg');
+  // input photo
+  box(svg, 0, 190, 150, 150, 'box');
+  leaf(svg, 75, 265, 1.1, -30, RUST);
+  txt(svg, 75, 380, 'photo x', 'txs', { 'text-anchor': 'middle' });
+  arrow(svg, 156, 265, 186, 265);
+  // frozen body
+  const gb = el('g', { class: 'an-fade' }, svg);
+  box(gb, 192, 150, 470, 230, 'box');
+  for (let i = 0; i < 5; i++) {
+    el('rect', { x: 212 + i * 90, y: 200, width: 70, height: 130, rx: 6, style: 'fill:var(--c-a);fill-opacity:.25;stroke:var(--myst-color-border-strong);stroke-width:2' }, gb);
+    lock(gb, 247 + i * 90, 262, false, 1);
+  }
+  txt(gb, 427, 130, 'frozen body, θₛ', 'tx', { 'text-anchor': 'middle' });
+  txt(gb, 427, 420, '23.5 M parameters, fixed', 'txs', { 'text-anchor': 'middle' });
+  // features
+  const gf = el('g', { class: 'frag', 'data-step': 'f' }, svg);
+  arrow(gf, 668, 265, 712, 265);
+  const vals = [0.2, 0.9, 0.4, 0.1, 0.7, 0.3, 0.6, 0.15];
+  vals.forEach((v, i) => el('rect', { x: 720, y: 155 + i * 28, width: 44, height: 24, class: 'fa', style: `fill-opacity:${0.15 + v * 0.8}` }, gf));
+  txt(gf, 742, 130, 'φ(x)', 'tx', { 'text-anchor': 'middle', 'font-style': 'italic' });
+  txt(gf, 742, 420, '2048', 'txs', { 'text-anchor': 'middle' });
+  txt(gf, 742, 452, 'numbers', 'txs', { 'text-anchor': 'middle' });
+  // head
+  const gh = el('g', { class: 'frag', 'data-step': 'h' }, svg);
+  arrow(gh, 770, 265, 806, 265);
+  box(gh, 812, 205, 110, 120, 'box-b');
+  txt(gh, 867, 260, 'new', 'txs', { 'text-anchor': 'middle' });
+  txt(gh, 867, 292, 'head', 'txs', { 'text-anchor': 'middle' });
+  lock(gh, 867, 172, true, 0.9, 'var(--c-b)');
+  txt(gh, 867, 380, '10 245', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--c-b)', 'font-weight': 700 });
+  txt(gh, 867, 412, 'trained', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--c-b)' });
+  arrow(gh, 926, 265, 950, 265);
+  const P = [['healthy', 0.05], ['rust', 0.78], ['eye spot', 0.08], ['leaf miner', 0.06], ['other', 0.03]];
+  P.forEach(([s, p], i) => {
+    const y = 160 + i * 46;
+    el('rect', { x: 960, y: y, width: Math.max(4, p * 190), height: 30, class: i === 1 ? 'fb' : 'fa', style: i === 1 ? '' : 'fill-opacity:.5' }, gh);
+  });
+  P.forEach(([s, p], i) => txt(gh, 960 + Math.max(4, p * 190) + 8, 160 + i * 46 + 25, i === 1 ? `${s} ${p.toFixed(2)}` : s, 'txs'));
+  // bottom note
+  const gn = el('g', { class: 'frag', 'data-step': 'h' }, svg);
+  box(gn, 0, 520, 1140, 140, 'box');
+  txt(gn, 30, 575, 'φ(x) is computed once per photo and stored.', 'tx');
+  txt(gn, 30, 625, 'Training the head is then as fast as a logistic regression.', 'tx');
+}
+
+function drawGrid() {
+  const svg = $('grid-svg');
+  const X0 = 300, Y0 = 90, CW = 420, CH = 260;
+  txt(svg, X0 + CW / 2, 60, 'similar domain', 'tx', { 'text-anchor': 'middle', 'font-weight': 600 });
+  txt(svg, X0 + CW * 1.5 + 20, 60, 'different domain', 'tx', { 'text-anchor': 'middle', 'font-weight': 600 });
+  [['small target set', '(hundreds)'], ['large target set', '(many thousands)']].forEach(([a, b], r) => {
+    txt(svg, 0, Y0 + r * (CH + 20) + CH / 2 - 6, a, 'tx', { 'font-weight': 600 });
+    txt(svg, 0, Y0 + r * (CH + 20) + CH / 2 + 30, b, 'txs');
+  });
+  const cells = [
+    ['Feature extraction', ['freeze the body,', 'train only the head'], 5, 'box-a'],
+    ['Fine-tune the top', ['keep early blocks frozen;', 'or find a closer source'], 3, 'box'],
+    ['Fine-tune all layers', ['start at θₛ with a', 'small learning rate'], 0, 'box-a'],
+    ['Fine-tune or scratch', ['compare both on', 'a validation set'], 0, 'box-b'],
+  ];
+  cells.forEach(([title, lines, frozen, cls], k) => {
+    const r = Math.floor(k / 2), c = k % 2, x = X0 + c * (CW + 20), y = Y0 + r * (CH + 20);
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + k * 0.15}s` }, svg);
+    box(g, x, y, CW, CH, cls);
+    txt(g, x + 24, y + 50, title, 'tx', { 'font-weight': 700 });
+    lines.forEach((s, i) => txt(g, x + 24, y + 96 + i * 34, s, 'txs'));
+    for (let i = 0; i < 6; i++) {
+      const fz = i < frozen;
+      el('rect', { x: x + 24 + i * 52, y: y + CH - 64, width: 44, height: 40, rx: 4, style: fz ? 'fill:var(--myst-color-border-strong)' : `fill:var(${i === 5 ? '--c-b' : '--c-a'});fill-opacity:.8` }, g);
+      if (fz) lock(g, x + 46 + i * 52, y + CH - 46, false, 0.6, 'var(--myst-color-bg)');
+    }
+  });
+}
+
+function drawPrep() {
+  const svg = $('prep-svg');
+  txt(svg, 0, 30, '(a) same size and scale as the source', 'ttl');
+  box(svg, 0, 60, 280, 210, 'box');
+  leaf(svg, 140, 165, 1.6, -15, RUST);
+  txt(svg, 140, 305, '4000 × 3000 pixels', 'txs', { 'text-anchor': 'middle' });
+  arrow(svg, 290, 165, 380, 165);
+  txt(svg, 335, 145, 'resize', 'txs', { 'text-anchor': 'middle' });
+  box(svg, 390, 95, 140, 140, 'box-a');
+  leaf(svg, 460, 165, 0.95, -15, RUST);
+  txt(svg, 460, 305, '224 × 224', 'txs', { 'text-anchor': 'middle' });
+  arrow(svg, 540, 165, 630, 165);
+  txt(svg, 585, 145, 'normalize', 'txs', { 'text-anchor': 'middle' });
+  // per channel bars before/after
+  const ch = [['R', 0.60, 0.485, 0.229], ['G', 0.55, 0.456, 0.224], ['B', 0.30, 0.406, 0.225]];
+  ch.forEach(([n, v, m, s], i) => {
+    const y = 90 + i * 66, z = (v - m) / s;
+    txt(svg, 650, y + 30, n, 'txs', { 'font-weight': 700 });
+    el('line', { x1: 880, x2: 880, y1: y, y2: y + 44, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2' }, svg);
+    const w = z * 160;
+    el('rect', { x: w >= 0 ? 880 : 880 + w, y: y + 8, width: Math.abs(w), height: 28, class: w >= 0 ? 'fa' : 'fb' }, svg);
+    txt(svg, w >= 0 ? 880 + w + 10 : 880 + w - 10, y + 32, (z >= 0 ? '+' : '−') + Math.abs(z).toFixed(2), 'txs', { 'text-anchor': w >= 0 ? 'start' : 'end' });
+  });
+  txt(svg, 880, 305, 'centered at 0', 'txs', { 'text-anchor': 'middle' });
+  // (b) augmentation
+  const ga = el('g', { class: 'frag', 'data-step': 'a' }, svg);
+  txt(ga, 0, 390, '(b) augmentation', 'ttl');
+  const V = [
+    ['original', (g, cx, cy) => leaf(g, cx, cy, 1, -15, RUST)],
+    ['flip', (g, cx, cy) => { const G = el('g', { transform: `translate(${2 * cx} 0) scale(-1 1)` }, g); leaf(G, cx, cy, 1, -15, RUST); }],
+    ['rotate', (g, cx, cy) => leaf(g, cx, cy, 1, 50, RUST)],
+    ['crop', (g, cx, cy) => leaf(g, cx + 20, cy + 10, 1.6, -15, RUST)],
+    ['brightness', (g, cx, cy) => leaf(g, cx, cy, 1, -15, RUST, { op: 0.75 })],
+  ];
+  V.forEach(([name, draw], i) => {
+    const x = i * 232, g = el('g', {}, ga);
+    const cid = 'prep-c' + i, cp = el('clipPath', { id: cid }, svg);
+    el('rect', { x, y: 420, width: 200, height: 180, rx: 8 }, cp);
+    box(g, x, 420, 200, 180, i === 0 ? 'box-a' : 'box');
+    const gi = el('g', { 'clip-path': `url(#${cid})` }, g);
+    if (name === 'brightness') el('rect', { x, y: 420, width: 200, height: 180, style: 'fill:#facc15;fill-opacity:.25' }, gi);
+    draw(gi, x + 100, 510);
+    txt(g, x + 100, 645, name, 'txs', { 'text-anchor': 'middle' });
+  });
+}
+
+function drawVal() {
+  const svg = $('val-svg');
+  txt(svg, 0, 30, '300 target photos', 'ttl');
+  el('rect', { x: 0, y: 50, width: 912, height: 56, rx: 6, class: 'fa', style: 'fill-opacity:.7' }, svg);
+  el('rect', { x: 916, y: 50, width: 224, height: 56, rx: 6, class: 'fb', style: 'fill-opacity:.8' }, svg);
+  txt(svg, 456, 88, 'train: 240', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-bg)', 'font-weight': 700 });
+  txt(svg, 1028, 88, 'valid: 60', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-bg)', 'font-weight': 700 });
+  const g = el('g', { id: 'val-plot' }, svg);
+  const F = frame(g, { W: 1160, H: 700, l: 110, t: 170, x: [0, 20], y: [0.5, 1], xt: [0, 5, 10, 15, 20], yt: [0.5, 0.75, 1], fy: (v) => Math.round(v * 100) + '%', xl: 'passes over the training set (epochs)', yl: 'accuracy' });
+  const tr = (e) => 1 - 0.42 * Math.exp(-e / 3.2);
+  const va = (e) => 0.58 + 0.3 * (1 - Math.exp(-e / 2.2)) - 0.0035 * Math.max(0, e - 5) ** 1.5;
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath(tr, 0, 20, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.3s', d: curvePath(va, 0, 20, F.sx, F.sy) }, F.plot);
+  legend(svg, 800, 500, [['line', 'curve-a', 'training'], ['line', 'curve-b', 'validation']]);
+  let best = 0;
+  for (let e = 0; e <= 20; e += 0.1) if (va(e) > va(best)) best = e;
+  const gs = el('g', { class: 'frag', 'data-step': 's' }, svg);
+  el('line', { x1: F.sx(best), x2: F.sx(best), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--c-c);stroke-width:3;stroke-dasharray:8 8' }, gs);
+  el('circle', { cx: F.sx(best), cy: F.sy(va(best)), r: 12, class: 'fc' }, gs);
+  txt(gs, F.sx(best) + 16, F.sy(va(best)) + 50, 'stop here', 'tx', { style: 'fill:var(--c-c)', 'font-weight': 700 });
+}
+
+function drawShift() {
+  const svg = $('shift-svg');
+  txt(svg, 0, 30, '(a) photos', 'ttl');
+  // source card
+  box(svg, 0, 60, 240, 220, 'box');
+  leaf(svg, 120, 170, 1.4, -10, RUST);
+  txt(svg, 120, 320, 'source', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--c-a)' });
+  // target card
+  const cp = el('clipPath', { id: 'shift-c' }, svg);
+  el('rect', { x: 280, y: 60, width: 240, height: 220, rx: 8 }, cp);
+  box(svg, 280, 60, 240, 220, 'box');
+  const gt = el('g', { 'clip-path': 'url(#shift-c)' }, svg);
+  el('rect', { x: 280, y: 200, width: 240, height: 80, style: 'fill:#92400e;fill-opacity:.35' }, gt);
+  leaf(gt, 330, 110, 1.0, 40, []);
+  leaf(gt, 470, 240, 1.0, -60, []);
+  leaf(gt, 420, 160, 1.3, 20, RUST);
+  el('path', { d: 'M280 60L400 280H280Z', style: 'fill:#000;fill-opacity:.22' }, gt);
+  txt(svg, 400, 320, 'target (field)', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--c-b)' });
+  // (b) densities
+  const gb = el('g', { class: 'frag', 'data-step': 'b' }, svg);
+  txt(gb, 600, 30, '(b) one feature', 'ttl');
+  const sx = lin(-4, 6, 620, 1150), sy = lin(0, 0.45, 300, 60);
+  el('path', { class: 'ax', d: `M620 300H1150` }, gb);
+  const pdf = (m, s) => (x) => Math.exp(-0.5 * ((x - m) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+  [['a', -1, 1], ['b', 2.2, 1.2]].forEach(([c, m, s]) => {
+    const f = pdf(m, s);
+    el('path', { d: curvePath(f, -4, 6, sx, sy) + `L${sx(6)} ${sy(0)}L${sx(-4)} ${sy(0)}Z`, style: `fill:var(--c-${c});fill-opacity:.2;stroke:var(--c-${c});stroke-width:4` }, gb);
+  });
+  el('line', { x1: sx(0.5), x2: sx(0.5), y1: 50, y2: 300, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8' }, gb);
+  txt(gb, sx(-1), 340, 'source', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--c-a)' });
+  txt(gb, sx(2.2), 340, 'target', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--c-b)' });
+  txt(gb, 600, 400, 'feature value, such as image brightness', 'txs');
+  // bottom message
+  const gc = el('g', { class: 'frag', 'data-step': 'c' }, svg);
+  box(gc, 0, 470, 1140, 190, 'box-a');
+  txt(gc, 30, 530, 'Collect some target photos in real conditions.', 'tx');
+  txt(gc, 30, 580, 'Fine-tune with them, and validate on photos', 'tx');
+  txt(gc, 30, 625, 'from the same setting where the model will be used.', 'tx');
+}
+
+function drawLM() {
+  const svg = $('lm-svg');
+  txt(svg, 0, 30, '1. pretraining: no labels', 'ttl');
+  // text stack
+  const g1 = el('g', { class: 'an-fade' }, svg);
+  for (let i = 0; i < 6; i++) box(g1, 10 + i * 8, 60 + i * 8, 200, 150, 'box', 4);
+  for (let k = 0; k < 5; k++) el('line', { x1: 70, x2: 230 - (k % 2) * 40, y1: 140 + k * 24, y2: 140 + k * 24, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:4' }, g1);
+  txt(g1, 130, 290, 'huge amount of text', 'txs', { 'text-anchor': 'middle' });
+  arrow(svg, 270, 140, 320, 140);
+  box(svg, 330, 70, 470, 140, 'box');
+  txt(svg, 350, 125, 'Costa Rica grows ____', 'tx');
+  txt(svg, 350, 175, 'in the highlands.', 'tx');
+  arrow(svg, 810, 140, 860, 140);
+  box(svg, 870, 90, 270, 100, 'box-a');
+  txt(svg, 1005, 150, '"coffee"', 'tx', { 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-a)' });
+  txt(svg, 565, 250, 'the network learns to fill the gap', 'txs', { 'text-anchor': 'middle' });
+  // fine-tuning
+  const g2 = el('g', { class: 'frag', 'data-step': 'f' }, svg);
+  txt(g2, 0, 360, '2. fine-tuning: a small labeled set', 'ttl');
+  box(g2, 0, 400, 300, 150, 'box-a');
+  txt(g2, 150, 465, 'pretrained', 'tx', { 'text-anchor': 'middle' });
+  txt(g2, 150, 505, 'language model θₛ', 'txs', { 'text-anchor': 'middle' });
+  arrow(g2, 310, 475, 380, 475);
+  box(g2, 390, 400, 390, 150, 'box');
+  txt(g2, 410, 450, '"Great coffee, fast service"', 'txs');
+  txt(g2, 410, 490, '"Cold food, long wait"', 'txs');
+  txt(g2, 410, 530, '2000 labeled reviews', 'txs', { style: 'fill:var(--myst-color-text-tertiary)' });
+  arrow(g2, 790, 475, 860, 475);
+  box(g2, 870, 400, 270, 150, 'box-b');
+  txt(g2, 1005, 465, 'positive', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--c-c)', 'font-weight': 700 });
+  txt(g2, 1005, 510, 'negative', 'tx', { 'text-anchor': 'middle', style: 'fill:var(--c-b)', 'font-weight': 700 });
+  txt(g2, 0, 630, 'nₜ = 2000 labeled reviews; the pretraining text had no labels at all.', 'txs');
+}
+
+function drawFM() {
+  const svg = $('fm-svg');
+  const cx = 580, cy = 350;
+  const tasks = ['classify photos', 'summarize text', 'answer questions', 'translate', 'describe an image', 'find objects'];
+  tasks.forEach((s, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / tasks.length;
+    const x = cx + 430 * Math.cos(a), y = cy + 270 * Math.sin(a);
+    const g = el('g', { class: 'frag', 'data-step': 'a' }, svg);
+    const dx = x - cx, dy = y - cy, t = Math.min(dx ? 138 / Math.abs(dx) : 1e9, dy ? 46 / Math.abs(dy) : 1e9);
+    const e = 1 / Math.hypot(dx / 170, dy / 130);
+    arrow(g, cx + dx * e, cy + dy * e, x - dx * t, y - dy * t);
+    box(g, x - 130, y - 36, 260, 72, 'box-b');
+    txt(g, x, y + 9, s, 'txs', { 'text-anchor': 'middle' });
+  });
+  el('ellipse', { cx, cy, rx: 170, ry: 130, class: 'box-a' }, svg);
+  txt(svg, cx, cy - 20, 'foundation', 'tx', { 'text-anchor': 'middle', 'font-weight': 700 });
+  txt(svg, cx, cy + 18, 'model', 'tx', { 'text-anchor': 'middle', 'font-weight': 700 });
+  txt(svg, cx, cy + 56, 'pretrained once', 'txs', { 'text-anchor': 'middle' });
+}
+
+function drawResp() {
+  const svg = $('resp-svg');
+  const W = 360, G = 30;
+  ['(a) bias', '(b) licenses', '(c) documentation'].forEach((t, i) => {
+    const x = i * (W + G);
+    const g = el('g', i === 0 ? { class: 'an-up' } : { class: 'frag', 'data-step': i === 1 ? 'l' : 'd' }, svg);
+    box(g, x, 0, W, 690, 'box');
+    txt(g, x + 20, 40, t, 'ttl');
+    if (i === 0) {
+      txt(g, x + 20, 90, 'source photos', 'txs');
+      el('rect', { x: x + 20, y: 110, width: 256, height: 40, class: 'fa' }, g);
+      el('rect', { x: x + 276, y: 110, width: 64, height: 40, class: 'fb' }, g);
+      txt(g, x + 20, 185, 'region A 80%', 'txs', { style: 'fill:var(--c-a)' });
+      txt(g, x + 340, 185, 'B 20%', 'txs', { 'text-anchor': 'end', style: 'fill:var(--c-b)' });
+      txt(g, x + 20, 260, 'error of the model', 'txs');
+      el('rect', { x: x + 20, y: 280, width: 70, height: 40, class: 'fa' }, g);
+      txt(g, x + 100, 310, 'A: 5%', 'txs');
+      el('rect', { x: x + 20, y: 340, width: 210, height: 40, class: 'fb' }, g);
+      txt(g, x + 240, 370, 'B: 15%', 'txs');
+      ['The gap travels with', 'the weights into', 'every target task.'].forEach((s, k) => txt(g, x + 20, 470 + k * 36, s, 'txs'));
+    }
+    if (i === 1) {
+      el('path', { d: `M${x + 110} 80h110l40 40v190h-150z`, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text-secondary);stroke-width:3' }, g);
+      el('path', { d: `M${x + 220} 80v40h40`, style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:3' }, g);
+      for (let k = 0; k < 5; k++) el('line', { x1: x + 130, x2: x + 240 - (k % 2) * 30, y1: 150 + k * 30, y2: 150 + k * 30, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:4' }, g);
+      ['Weights and data', 'have terms of use.', 'Some forbid', 'commercial use or', 'ask for credit.'].forEach((s, k) => txt(g, x + 20, 390 + k * 36, s, 'txs'));
+    }
+    if (i === 2) {
+      ['source model', 'source data', 'changes made', 'test groups'].forEach((s, k) => {
+        const y = 100 + k * 64;
+        el('rect', { x: x + 20, y: y - 26, width: 34, height: 34, rx: 4, style: 'fill:none;stroke:var(--c-c);stroke-width:3' }, g);
+        el('path', { d: `M${x + 27} ${y - 9}l8 8l14 -18`, style: 'fill:none;stroke:var(--c-c);stroke-width:4' }, g);
+        txt(g, x + 70, y, s, 'txs');
+      });
+      ['Write it down so', 'others can check', 'and reuse it.'].forEach((s, k) => txt(g, x + 20, 390 + k * 36, s, 'txs'));
+    }
+  });
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.freeze = (() => {
+  const svg = $('fz-svg');
+  const slider = $('fz-k');
+  const ALL = [...BLOCKS, { name: 'head', p: HEAD }];
+  const X = (i) => 10 + i * 192, W = 160, BASE = 330, MAXP = BLOCKS[4].p;
+  const items = ALL.map((b, i) => {
+    const h = 50 + 190 * Math.sqrt(b.p / MAXP);
+    const g = el('g', { class: 'blk', role: 'button', 'aria-label': b.name }, svg);
+    const body = el('rect', { class: 'body', x: X(i), y: BASE - h, width: W, height: h, rx: 8, style: 'stroke-width:3' }, g);
+    txt(g, X(i) + W / 2, BASE + 38, b.name, 'txs', { 'text-anchor': 'middle', 'font-weight': 600 });
+    const pl = b.p >= 1e6 ? (b.p / 1e6).toFixed(1) + ' M' : nfmt(b.p);
+    txt(g, X(i) + W / 2, BASE + 72, pl, 'txs', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)' });
+    const lk = el('g', {}, g);
+    if (i < ALL.length - 1) arrow(svg, X(i) + W + 2, BASE - 25, X(i + 1) - 2, BASE - 25);
+    return { g, body, lk, h };
+  });
+  txt(svg, 10, 30, 'input → body → head', 'ttl');
+  // qualitative sketch
+  txt(svg, 10, 470, 'expected behavior (sketch, not measured)', 'ttl');
+  const ROWS = [
+    ['safe with few examples', [0.3, 0.35, 0.42, 0.55, 0.78, 0.95]],
+    ['can adapt to a new domain', [0.92, 0.88, 0.8, 0.62, 0.4, 0.15]],
+    ['training cost per step', [1, 0.95, 0.88, 0.7, 0.45, 0.15]],
+  ];
+  const bars = ROWS.map(([label], r) => {
+    const y = 510 + r * 62;
+    txt(svg, 10, y + 30, label, 'txs');
+    el('rect', { x: 430, y, width: 720, height: 40, rx: 6, style: 'fill:var(--myst-color-surface)' }, svg);
+    return el('rect', { x: 430, y, height: 40, rx: 6, class: r === 0 ? 'fc' : r === 1 ? 'fa' : 'fb', style: 'fill-opacity:.8;transition:width .4s' }, svg);
+  });
+  function draw(k) {
+    slider.value = k;
+    $('fz-k-val').textContent = k;
+    items.forEach((it, i) => {
+      const frozen = i < k;
+      it.body.style.fill = frozen ? 'var(--myst-color-border)' : `var(${i === 5 ? '--c-b-soft' : '--c-a-soft'})`;
+      it.body.style.stroke = frozen ? 'var(--myst-color-border-strong)' : `var(${i === 5 ? '--c-b' : '--c-a'})`;
+      clear(it.lk);
+      const cx = X(i) + W / 2, cy = BASE - it.h / 2 + 4;
+      lock(it.lk, cx, it.h < 90 ? BASE - it.h - 34 : cy, !frozen, 1.1, frozen ? 'var(--myst-color-text-secondary)' : `var(${i === 5 ? '--c-b' : '--c-a'})`);
+    });
+    const tr = HEAD + BLOCKS.slice(k).reduce((s, b) => s + b.p, 0);
+    $('fz-tr').textContent = nfmt(tr);
+    const sh = (100 * tr) / (BODY + HEAD);
+    $('fz-sh').textContent = (sh < 1 ? sh.toFixed(2) : sh.toFixed(0)) + '%';
+    $('fz-name').textContent = k === 5 ? 'Feature extraction' : k === 0 ? 'Fine-tune everything' : 'Fine-tune the top blocks';
+    bars.forEach((b, r) => b.setAttribute('width', 720 * ROWS[r][1][5 - k]));
+  }
+  items.forEach((it, i) => it.g.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (i === 5) draw(5); else draw(+slider.value === i + 1 ? i : i + 1);
+  }));
+  slider.addEventListener('input', () => draw(+slider.value));
+  draw(5);
+  return {};
+})();
+
+DEMOS.curves = (() => {
+  const svg = $('lc-svg');
+  const L0 = Math.log10(50), L1 = Math.log10(50000);
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [L0, L1], y: [0, 1], xt: [2, 3, 4], yt: [0, 0.2, 0.4, 0.6, 0.8, 1], fx: (v) => nfmt(10 ** v), fy: (v) => Math.round(v * 100) + '%', xl: 'target examples nₜ (log scale)', yl: 'test accuracy' });
+  const scratch = (n) => 0.2 + 0.72 / (1 + (n / 6000) ** -0.9);
+  const transfer = (n) => 0.2 + 0.73 / (1 + (n / 60) ** -0.8);
+  el('line', { class: 'curve-t', x1: F.sx(L0), x2: F.sx(L1), y1: F.sy(0.2), y2: F.sy(0.2) }, F.plot);
+  txt(svg, F.sx(L1) - 10, F.sy(0.2) - 14, 'chance', 'txs', { 'text-anchor': 'end', style: 'fill:var(--myst-color-text-tertiary)' });
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d: curvePath((l) => scratch(10 ** l), L0, L1, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath((l) => transfer(10 ** l), L0, L1, F.sx, F.sy) }, F.plot);
+  legend(svg, F.L + 24, F.T + 30, [['line', 'curve-a', 'with transfer'], ['line', 'curve-b', 'from scratch']]);
+  const vl = el('line', { style: 'stroke:var(--myst-color-text-secondary);stroke-width:2;stroke-dasharray:6 6' }, F.plot);
+  const gap = el('line', { style: 'stroke:var(--c-c);stroke-width:6' }, F.plot);
+  const da = el('circle', { class: 'pt fa', r: 12 }, F.plot), db = el('circle', { class: 'pt fb', r: 12 }, F.plot);
+  const slider = $('lc-n');
+  const toN = (v) => { const n = 10 ** (L0 + ((L1 - L0) * v) / 1000), q = 10 ** (Math.floor(Math.log10(n)) - 1); return Math.round(n / q) * q; };
+  function draw() {
+    const n = toN(+slider.value), x = F.sx(Math.log10(n));
+    const a = transfer(n), b = scratch(n);
+    vl.setAttribute('x1', x); vl.setAttribute('x2', x); vl.setAttribute('y1', F.T); vl.setAttribute('y2', F.H - F.B);
+    gap.setAttribute('x1', x); gap.setAttribute('x2', x); gap.setAttribute('y1', F.sy(a)); gap.setAttribute('y2', F.sy(b));
+    da.setAttribute('cx', x); da.setAttribute('cy', F.sy(a)); db.setAttribute('cx', x); db.setAttribute('cy', F.sy(b));
+    $('lc-n-val').textContent = nfmt(n);
+    $('lc-s').textContent = Math.round(b * 100) + '%';
+    $('lc-t').textContent = Math.round(a * 100) + '%';
+    $('lc-g').textContent = '+' + Math.round((a - b) * 100) + ' points';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.toy = (() => {
+  const svg = $('toy-svg');
+  const CENT = Array.from({ length: 9 }, (_, i) => -1 + i * 0.25), WD = 0.25, P = 10;
+  const feats = (x) => [1, ...CENT.map((c) => Math.exp(-((x - c) ** 2) / (2 * WD * WD)))];
+  const fS = (x) => Math.sin(3 * x) + 0.5 * x;
+  const fT = (x) => 1.1 * Math.sin(3 * x + 0.25) + 0.5 * x + 0.25;
+  const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+  /* minimize (1/n) sum (y - theta.phi)^2 + lam * ||theta - anchor||^2 */
+  function fit(xs, ys, lam, anchor) {
+    const n = xs.length, A = Array.from({ length: P }, () => new Array(P).fill(0)), b = new Array(P).fill(0);
+    xs.forEach((x, i) => {
+      const f = feats(x);
+      for (let r = 0; r < P; r++) { b[r] += (f[r] * ys[i]) / n; for (let c = 0; c < P; c++) A[r][c] += (f[r] * f[c]) / n; }
+    });
+    for (let r = 0; r < P; r++) { A[r][r] += lam; b[r] += lam * anchor[r]; }
+    return solve(A, b);
+  }
+  // source model: 200 points of fS
+  const rs = rng(5), SX = [], SY = [];
+  for (let i = 0; i < 200; i++) { const x = -1 + 2 * rs(); SX.push(x); SY.push(fS(x) + 0.1 * gauss(rs)); }
+  const thS = fit(SX, SY, 1e-4, new Array(P).fill(0));
+  const ZERO = new Array(P).fill(0);
+  const GRID = Array.from({ length: 201 }, (_, i) => -1 + i / 100), GF = GRID.map(feats), GT = GRID.map(fT);
+  const testErr = (th) => mean(GF.map((f, i) => (dot(th, f) - GT[i]) ** 2));
+  const F = frame(svg, { W: 1160, H: 700, l: 100, t: 30, x: [-1, 1], y: [-2.5, 2.5], xt: [-1, -0.5, 0, 0.5, 1], yt: [-2, -1, 0, 1, 2], xl: 'input x', yl: 'output y' });
+  el('path', { d: curvePath(fT, -1, 1, F.sx, F.sy), style: 'fill:none;stroke:var(--c-c);stroke-width:10;stroke-opacity:.3;stroke-linecap:round' }, F.plot);
+  el('path', { class: 'curve-t', d: curvePath((x) => dot(thS, feats(x)), -1, 1, F.sx, F.sy) }, F.plot);
+  const pS = el('path', { class: 'curve-b' }, F.plot), pT = el('path', { class: 'curve-a' }, F.plot);
+  const dots = el('g', {}, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.L + 10, y: F.T + 8, width: 330, height: 196, rx: 6, style: 'fill:var(--myst-color-bg);fill-opacity:.85' }, lg);
+  legend(lg, F.L + 24, F.T + 30, [['line', 'curve-t', 'source model θₛ'], ['line', 'curve-a', 'transfer, (6)'], ['line', 'curve-b', 'from scratch, (7)'], ['dot', 'fb', 'target points']]);
+  el('line', { x1: F.L + 24, x2: F.L + 50, y1: F.T + 30 + 4 * 36, y2: F.T + 30 + 4 * 36, style: 'stroke:var(--c-c);stroke-width:10;stroke-opacity:.3' }, lg);
+  txt(lg, F.L + 62, F.T + 38 + 4 * 36, 'true target curve', 'txs');
+  const sn = $('toy-n'), sl = $('toy-l');
+  let seed = 11;
+  function sample(n, s) {
+    const r = rng(s), xs = [], ys = [];
+    for (let i = 0; i < n; i++) { const x = -1 + 2 * r(); xs.push(x); ys.push(fT(x) + 0.15 * gauss(r)); }
+    return [xs, ys];
+  }
+  function draw() {
+    const n = +sn.value, lam = 10 ** +sl.value;
+    $('toy-n-val').textContent = n;
+    $('toy-l-val').textContent = lam < 0.01 ? lam.toFixed(3) : lam.toFixed(2);
+    const [xs, ys] = sample(n, seed);
+    const a = fit(xs, ys, lam, ZERO), b = fit(xs, ys, lam, thS);
+    pS.setAttribute('d', curvePath((x) => dot(a, feats(x)), -1, 1, F.sx, F.sy, 300));
+    pT.setAttribute('d', curvePath((x) => dot(b, feats(x)), -1, 1, F.sx, F.sy, 300));
+    clear(dots);
+    xs.forEach((x, i) => el('circle', { class: 'pt fb', cx: F.sx(x), cy: F.sy(ys[i]), r: 11 }, dots));
+    $('toy-es').textContent = fmt(testErr(a), 3);
+    $('toy-et').textContent = fmt(testErr(b), 3);
+    let wins = 0;
+    for (let k = 0; k < 200; k++) {
+      const [u, v] = sample(n, 1000 + k);
+      if (testErr(fit(u, v, lam, thS)) < testErr(fit(u, v, lam, ZERO))) wins++;
+    }
+    $('toy-w').textContent = Math.round(wins / 2) + '%';
+  }
+  sn.addEventListener('input', draw);
+  sl.addEventListener('input', draw);
+  $('toy-new').addEventListener('click', () => { seed += 1; draw(); });
+  draw();
+  return {};
+})();
+
+function subscripts() {
+  const MAP = { 'ₛ': 'S', 'ₜ': 'T' };
+  document.querySelectorAll('deck-stage svg text').forEach((t) => {
+    if (t.children.length || !/[ₛₜ]/.test(t.textContent)) return;
+    const parts = t.textContent.split(/([ₛₜ])/);
+    t.textContent = '';
+    parts.forEach((p) => {
+      if (!p) return;
+      if (MAP[p]) {
+        el('tspan', { 'baseline-shift': 'sub', 'font-size': '0.85em', 'font-style': 'italic', text: MAP[p] }, t);
+      } else el('tspan', { text: p }, t);
+    });
+  });
+}
+drawRecap(); drawData(); drawSourceTarget(); drawGeneral(); drawHelp(); drawFeatureExtraction();
+drawGrid(); drawPrep(); drawVal(); drawShift(); drawLM(); drawFM(); drawResp();
+subscripts();
+})();
+</script>
+</body>
+</html>

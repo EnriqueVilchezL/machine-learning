@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k-nearest neighbors</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+#nb-svg,#knr-svg{cursor:crosshair}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 8</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">k-nearest neighbors</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Predict a new example by looking at the most similar examples you already have</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 8 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Keep the examples, ask the neighbors</li>
+<li class="an-up" style="--d:.15s">Distance and scaling</li>
+<li class="an-up" style="--d:.25s">Choosing k</li>
+<li class="an-up" style="--d:.35s">Weighted votes</li>
+<li class="an-up" style="--d:.45s">Regression and limits</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: a class or a number</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">d(\mathbf{x}, \mathbf{x}_i)</span></td><td>Distance between two examples</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">N_k(\mathbf{x})</span></td><td>The <span class="tex">k</span> training examples closest to <span class="tex">\mathbf{x}</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Ask the neighbors</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Keep every example and compare when a question arrives.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Lazy learning">
+<div class="hdr" data-s="Neighbors"></div>
+<h2>Lazy learning</h2>
+<div class="fr">
+<div class="figbox"><svg id="lazy-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Most methods learn a model and can forget the data. <strong>Instance-based</strong> methods keep the examples and do the work at prediction time.</p>
+<p class="small frag up" data-step="lazy" style="margin:0">To guess the price of a house, look at the most similar houses that were sold. That is k-nearest neighbors (k-NN).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) A model summarizes the data. (b) Lazy learning stores the data and compares.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The k nearest neighbors" data-demo="nb">
+<div class="hdr" data-s="Neighbors"></div>
+<h2>The k nearest neighbors</h2>
+<div class="fr">
+<div class="figbox"><svg id="nb-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Click anywhere to place a new example. Its <span class="tex">k</span> closest training examples vote, and the majority wins.</p>
+<div class="ctl"><label><span>Neighbors <span class="tex">k</span></span><b id="nb-k-val">5</b></label><input type="range" id="nb-k" min="1" max="15" step="2" value="5"></div>
+<div class="ro"><span>Blue votes</span><b id="nb-va" class="a">0</b></div>
+<div class="ro"><span>Orange votes</span><b id="nb-vb" class="bb">0</b></div>
+<div><span class="tag" id="nb-pred">Prediction</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>40 labeled examples. The dashed circle reaches the k-th nearest neighbor.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Majority vote">
+<div class="hdr" data-s="Neighbors"></div>
+<h2>The vote as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Count, for each class <span class="tex">c</span>, how many of the <span class="tex">k</span> neighbors have that class, and keep the class with the most votes:</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \underset{c}{\arg\max} \sum_{i \in N_k(\mathbf{x})} \mathbb{I}(y_i = c)</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="v1" style="margin:16px 0 0">The indicator <span class="tex">\mathbb{I}(y_i = c)</span> is 1 when neighbor <span class="tex">i</span> belongs to class <span class="tex">c</span> and 0 otherwise, so the sum is a vote count.</p>
+<p class="small frag up" data-step="v2" style="margin:16px 0 0"><span class="tex">\arg\max_c</span> returns the class with the largest count, not the count itself.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>With <span class="tex">k = 5</span>: three orange and two blue neighbors.</p><p>Votes: orange 3, blue 2.</p><p><span class="tex">\Rightarrow \ \hat{y} = \text{orange}</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distance and scaling">
+<div class="hdr" data-s="Neighbors"></div>
+<h2>Distance and scaling</h2>
+<p class="small" style="margin:-8px 0 8px">Straight-line distance between two examples, one term per feature: <span class="tex">d = \sqrt{(a_1-b_1)^2 + (a_2-b_2)^2 + \cdots}</span></p>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:64px;row-gap:8px">
+<div class="figbox"><svg id="dist-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox"><svg id="raw-svg" viewBox="0 0 520 520"></svg></div>
+<div class="figbox frag" data-step="sc"><svg id="sc-svg" viewBox="0 0 520 520"></svg></div>
+<div class="subcap">(a) Straight line 5; Manhattan 3 + 4 = 7</div>
+<div class="subcap">(b) Raw units: income in dollars dominates</div>
+<div class="subcap frag" data-step="sc">(c) Both features scaled to 0–1</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 3:</b>A one-year gap in age counts as much as a one-dollar gap in income, so in (b) the nearest example to Q is A. After min-max scaling (Topic 4) it is B.</p>
+</section>
+
+<section class="s ats-prose" data-label="Distance formulas">
+<div class="hdr" data-s="Neighbors"></div>
+<h2>Distance formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Euclidean distance: the straight line, adding one squared gap per feature.</p>
+<div class="eq"><div class="m tex-d">d_2(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_{j=1}^{d} (a_j - b_j)^2}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="d1" style="margin:0">Manhattan distance: walk along the grid, adding the absolute gaps.</p>
+<div class="eq frag up" data-step="d1"><div class="m tex-d">d_1(\mathbf{a}, \mathbf{b}) = \sum_{j=1}^{d} |a_j - b_j|</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="d2" style="margin:0">Both are cases of the Minkowski distance, with <span class="tex">p = 2</span> and <span class="tex">p = 1</span>.</p>
+<div class="eq frag up" data-step="d2"><div class="m tex-d">d_p(\mathbf{a}, \mathbf{b}) = \Big(\sum_{j=1}^{d} |a_j - b_j|^p\Big)^{1/p}</div><div class="n">(4)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>For <span class="tex">P = (1, 1)</span> and <span class="tex">R = (4, 5)</span> of Figure 3a:</p><p><span class="tex">d_2 = \sqrt{3^2 + 4^2} = 5</span></p><p><span class="tex">d_1 = 3 + 4 = 7</span></p></aside>
+<aside class="am"><div class="t">Why scale first</div><p>Every term in the sum uses the raw units of its feature, so a feature measured in thousands drowns the others.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Choosing k</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">How many neighbors to ask, and how much each one counts.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Decision regions" data-demo="reg">
+<div class="hdr" data-s="Choosing k"></div>
+<h2>Decision regions</h2>
+<div class="fr">
+<div class="figbox"><svg id="reg-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each small square is colored by the class k-NN would predict there.</p>
+<div class="ctl"><label><span>Neighbors <span class="tex">k</span></span><b id="reg-k-val">1</b></label><input type="range" id="reg-k" min="1" max="25" step="2" value="1"></div>
+<div class="ro"><span>Training accuracy</span><b id="reg-tr" class="a">0%</b></div>
+<div class="ro"><span>Test accuracy</span><b id="reg-te" class="bb">0%</b></div>
+<div><span class="tag" id="reg-diag">Jagged</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>90 training examples; accuracy on 300 new ones. Small k follows every point, large k smooths the border.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing k">
+<div class="hdr" data-s="Choosing k"></div>
+<h2>Choosing k with cross-validation</h2>
+<div class="fr">
+<div class="figbox"><svg id="cv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Try several values of <span class="tex">k</span> with 5-fold cross-validation (Topic 6) on the training data and keep the best.</p>
+<p class="small frag up" data-step="cv" style="margin:0">With <span class="tex">k = 1</span> training accuracy is always 100%: each point is its own nearest neighbor. Never choose k on the training score.</p>
+<div class="ro"><span>Best k</span><b id="cv-best" class="bb">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>The data of Figure 4. Odd values of k avoid ties between two classes.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Weighted votes">
+<div class="hdr" data-s="Choosing k"></div>
+<h2>Weighted votes</h2>
+<div class="fr">
+<div class="figbox"><svg id="wv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A plain vote gives every neighbor the same say, even the far ones.</p>
+<p class="small frag up" data-step="wv" style="margin:0">A weighted vote lets closer neighbors count more, for example with weight <span class="tex">1/d</span>.</p>
+<p class="small frag up" data-step="wv" style="margin:0">The result depends less on the exact value of <span class="tex">k</span>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The same 5 neighbors. Line width shows each vote. (a) Plain vote: orange, 3 to 2. (b) Weighted vote: blue.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Regression and limits</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Averaging numbers, and where neighbors stop helping.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="k-NN for regression" data-demo="knr">
+<div class="hdr" data-s="Regression and limits"></div>
+<h2>k-NN for regression</h2>
+<div class="fr">
+<div class="figbox"><svg id="knr-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">For a number, the prediction is the <strong>average</strong> of the neighbors' values. Click to move the new example.</p>
+<div class="ctl"><label><span>Neighbors <span class="tex">k</span></span><b id="knr-k-val">5</b></label><input type="range" id="knr-k" min="1" max="30" step="1" value="5"></div>
+<div class="ro"><span>New example at</span><b id="knr-x">0</b></div>
+<div class="ro"><span>Prediction</span><b id="knr-y" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>30 examples with one feature. The blue steps are the predictions for every position.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Prediction formulas">
+<div class="hdr" data-s="Regression and limits"></div>
+<h2>Averages and weights</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Regression: the prediction is the mean of the neighbors' values.</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \frac{1}{k} \sum_{i \in N_k(\mathbf{x})} y_i</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="w1" style="margin:0">Weighted vote: each neighbor counts with weight <span class="tex">w_i</span>, larger when it is closer.</p>
+<div class="eq frag up" data-step="w1"><div class="m tex-d">\hat{y} = \underset{c}{\arg\max} \sum_{i \in N_k(\mathbf{x})} w_i \, \mathbb{I}(y_i = c), \qquad w_i = \frac{1}{d(\mathbf{x}, \mathbf{x}_i)}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="w2" style="margin:0">Weighted mean for regression: divide by the total weight instead of by <span class="tex">k</span>.</p>
+<div class="eq frag up" data-step="w2"><div class="m tex-d">\hat{y} = \frac{\sum_{i \in N_k(\mathbf{x})} w_i \, y_i}{\sum_{i \in N_k(\mathbf{x})} w_i}</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Neighbors with values 2, 4 and 9, at distances 1, 1 and 2:</p><p><span class="tex">\text{plain}: \tfrac{2 + 4 + 9}{3} = 5</span></p><p><span class="tex">\text{weighted}: \tfrac{2 + 4 + 4.5}{1 + 1 + 0.5} = 4.2</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two practical limits">
+<div class="hdr" data-s="Regression and limits"></div>
+<h2>Two practical limits</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="cost-svg" viewBox="0 0 792 600"></svg></div>
+<div class="figbox"><svg id="noise-svg" viewBox="0 0 792 600"></svg></div>
+<div class="subcap">(a) Slow predictions: compare with every stored example</div>
+<div class="subcap">(b) Irrelevant features: noise columns blur the distances</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>(a) Training is free, but prediction work grows with the data. (b) The data of Figure 4 plus random features, k = 5, average of 5 runs.</p>
+</section>
+
+<section class="s ats-prose" data-label="Curse of dimensionality" data-demo="cod">
+<div class="hdr" data-s="Regression and limits"></div>
+<h2>Curse of dimensionality</h2>
+<div class="fr">
+<div class="figbox"><svg id="cod-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">400 random points. How far are they from a new point? Move the slider to add features.</p>
+<div class="ctl"><label><span>Number of features</span><b id="cod-d-val">2</b></label><input type="range" id="cod-d" min="0" max="9" step="1" value="1"></div>
+<div class="ro"><span>Nearest / farthest</span><b id="cod-ratio" class="bb">0</b></div>
+<p class="small" style="margin:0">With many features, all points are about equally far, so "nearest" means little.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>Distances from one new point, divided by their average. Blue: nearest point. Orange: farthest.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Regression and limits"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>k-NN at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Simple to explain: "look at similar cases"</td><td>Slow predictions when there are many examples</td></tr>
+<tr class="an-up" style="--d:.15s"><td>No training step; new data is just added</td><td>Must keep all the training data in memory</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Can follow borders of any shape</td><td>Needs scaled features and a sensible distance</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Works for classification and regression</td><td>Hurt by irrelevant features and by many features</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Only one main setting: k</td><td>Gives no simple summary of how features matter</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>A good first baseline for small or medium data sets with a few meaningful, scaled features.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">k-NN keeps the training examples and predicts from the k most similar ones.</li>
+<li class="an-up" style="--d:.15s">Classification uses a vote of the neighbors; regression uses their average.</li>
+<li class="an-up" style="--d:.25s">Similarity is a distance, so features must be on comparable scales.</li>
+<li class="an-up" style="--d:.35s">Small k gives jagged borders and overfits; large k smooths too much. Choose k with cross-validation.</li>
+<li class="an-up" style="--d:.45s">Prediction is slow on large data, and distances lose meaning with many or irrelevant features.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers other distances, weighted votes and faster neighbor search.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Cover, T. M., &amp; Hart, P. E. (1967). Nearest neighbor pattern classification. <em>IEEE Transactions on Information Theory</em>, 13(1), 21–27.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Sections 2.2 and 3.5. Springer.</li>
+<li style="margin:.4em 0">Mitchell, T. M. (1997). <em>Machine Learning</em>, Chapter 8: Instance-based learning. McGraw-Hill.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 13. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 9: regression.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared data and k-NN helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+function shuffle(n, r) {
+  const p = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  return p;
+}
+/* Two classes split by a wavy border, with some label noise near it. Domain 16 × 9. */
+const border = (x) => 4.5 + 2.2 * Math.sin(x * 0.62);
+function wave(seed, n, flip) {
+  const r = rng(seed);
+  return Array.from({ length: n }, () => {
+    const x1 = 0.3 + 15.4 * r(), x2 = 0.3 + 8.4 * r();
+    let y = x2 > border(x1) ? 1 : 0;
+    if (r() < 2 * flip * Math.exp(-Math.abs(x2 - border(x1)) / 1.2)) y = 1 - y;
+    return { x: [x1, x2], y };
+  });
+}
+const dist2 = (a, b) => a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
+function order(P, q, m) {
+  const o = P.map((p, i) => [dist2(p.x, q), i]).sort((a, b) => a[0] - b[0]);
+  return (m ? o.slice(0, m) : o).map((a) => a[1]);
+}
+function vote(P, o, k) {
+  let s = 0;
+  for (let j = 0; j < k; j++) s += P[o[j]].y;
+  return 2 * s > k ? 1 : 0;
+}
+const acc = (P, Q, k) => Q.filter((q) => vote(P, order(P, q.x, k), k) === q.y).length / Q.length;
+const TRAIN = wave(4, 90, 0.15), TEST = wave(17, 300, 0.15);
+const DOM = { x: [0, 16], y: [0, 9] };
+
+/* ───────── static figures ───────── */
+function drawLazy() {
+  const svg = document.getElementById('lazy-svg');
+  const BW = 260, XS = [0, 450, 900], ROWS = [[60, '(a) model-based learning', null], [400, '(b) lazy learning (instance-based)', 'lazy']];
+  const r = rng(8), mini = Array.from({ length: 10 }, () => [r(), r(), r() < 0.5]);
+  const dots = (g, x, y) => mini.forEach(([a, b, c]) => el('circle', { class: `pt ${c ? 'fb' : 'fa'}`, cx: x + 40 + a * (BW - 80), cy: y + 60 + b * 90, r: 10 }, g));
+  ROWS.forEach(([y, title, step], row) => {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : { class: 'an-up' }, svg);
+    el('text', { class: 'ttl', x: 0, y: y - 18, text: title }, g);
+    el('rect', { class: 'box', x: XS[0], y, width: BW, height: 200, rx: 6 }, g);
+    el('text', { class: 'txs', x: XS[0] + BW / 2, y: y + 36, 'text-anchor': 'middle', text: 'training data' }, g);
+    dots(g, XS[0], y);
+    el('rect', { class: 'box-a', x: XS[1], y, width: BW, height: 200, rx: 6 }, g);
+    el('rect', { class: 'box-b', x: XS[2], y, width: BW, height: 200, rx: 6 }, g);
+    el('text', { class: 'txs', x: XS[2] + BW / 2, y: y + 36, 'text-anchor': 'middle', text: 'prediction' }, g);
+    el('text', { class: 'tx', x: XS[2] + BW / 2, y: y + 120, 'text-anchor': 'middle', 'font-weight': 700, text: 'class A' }, g);
+    if (row === 0) {
+      el('text', { class: 'txs', x: XS[1] + BW / 2, y: y + 36, 'text-anchor': 'middle', text: 'model' }, g);
+      el('path', { class: 'curve-a', d: `M${XS[1] + 30} ${y + 170}C${XS[1] + 110} ${y + 70} ${XS[1] + 160} ${y + 150} ${XS[1] + 230} ${y + 70}` }, g);
+      [['train', 0], ['predict', 1]].forEach(([t, i]) => {
+        el('path', { class: 'wire', d: `M${XS[i] + BW + 8} ${y + 100}H${XS[i + 1] - 10}`, 'marker-end': 'url(#ah)' }, g);
+        el('text', { class: 'txs', x: (XS[i] + BW + XS[i + 1]) / 2, y: y + 84, 'text-anchor': 'middle', text: t }, g);
+      });
+      el('text', { class: 'txs', x: XS[0] + BW / 2, y: y + 240, 'text-anchor': 'middle', style: 'font-style:italic', text: 'can be thrown away' }, g);
+    } else {
+      el('text', { class: 'txs', x: XS[1] + BW / 2, y: y + 36, 'text-anchor': 'middle', text: 'memory: all examples' }, g);
+      dots(g, XS[1], y);
+      el('path', { class: 'wire', d: `M${XS[0] + BW + 8} ${y + 100}H${XS[1] - 10}`, 'marker-end': 'url(#ah)' }, g);
+      el('text', { class: 'txs', x: (XS[0] + BW + XS[1]) / 2, y: y + 84, 'text-anchor': 'middle', text: 'store' }, g);
+      el('path', { class: 'wire-a', d: `M${XS[1] + BW + 8} ${y + 100}H${XS[2] - 10}`, 'marker-end': 'url(#ah-a)' }, g);
+      el('text', { class: 'txs', x: (XS[1] + BW + XS[2]) / 2, y: y + 84, 'text-anchor': 'middle', text: 'compare' }, g);
+      const qx = XS[1] + BW / 2, qy = y + 260;
+      el('path', { class: 'wire-a', d: `M${qx} ${qy - 14}V${y + 210}`, 'marker-end': 'url(#ah-a)' }, g);
+      el('text', { class: 'txs', x: qx, y: qy + 20, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'new example' }, g);
+      const d = `M${qx} ${qy - 14}V${y + 210}`;
+      const m = el('circle', { r: 8, class: 'fa' }, g);
+      el('animateMotion', { dur: '1.8s', repeatCount: 'indefinite', path: d }, m);
+    }
+  });
+}
+
+function drawDistance() {
+  /* (a) straight line vs city blocks */
+  const svg = document.getElementById('dist-svg');
+  const U = 80, X0 = 40, Y0 = 470, sx = (v) => X0 + v * U, sy = (v) => Y0 - v * U;
+  for (let i = 0; i <= 5; i++) el('line', { class: 'gl', x1: sx(i), x2: sx(i), y1: sy(0), y2: sy(5.5) }, svg);
+  for (let j = 0; j <= 5; j++) el('line', { class: 'gl', x1: sx(0), x2: sx(5.5), y1: sy(j), y2: sy(j) }, svg);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.6s', d: `M${sx(1)} ${sy(1)}H${sx(4)}V${sy(5)}` }, svg);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: `M${sx(1)} ${sy(1)}L${sx(4)} ${sy(5)}` }, svg);
+  el('text', { class: 'txs', x: sx(2.5), y: sy(1) + 36, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: '3' }, svg);
+  el('text', { class: 'txs', x: sx(4) + 18, y: sy(3) + 8, style: 'fill:var(--c-b)', text: '4' }, svg);
+  el('text', { class: 'txs', x: sx(2.2) - 14, y: sy(3.3), 'text-anchor': 'end', style: 'fill:var(--c-a)', text: '5' }, svg);
+  [[1, 1, 'P'], [4, 5, 'R']].forEach(([a, b, t]) => {
+    el('circle', { class: 'pt ink an-pop', cx: sx(a), cy: sy(b), r: 12 }, svg);
+    el('text', { class: 'tx', x: sx(a) - 22, y: sy(b) - 14, 'text-anchor': 'end', 'font-weight': 700, text: t }, svg);
+  });
+  /* (b) raw units and (c) scaled: same picture, different nearest neighbor */
+  const Q = [30, 50000], A = [60, 51000], B = [32, 58000];
+  const R = [[20, 70], [20000, 100000]];
+  const bg = (() => { const r = rng(12); return Array.from({ length: 30 }, () => [20 + 50 * r(), 20000 + 80000 * r()]).filter(([a, b]) => !(a < 46 && b > 66000) && !(a < 40 && b > 44000 && b < 64000) && !(a > 54 && b > 44000 && b < 58000)).slice(0, 14); })();
+  const draw = (id, scaled) => {
+    const s = document.getElementById(id);
+    const F = frame(s, { W: 520, H: 520, l: 96, t: 20, r: 20, b: 84, x: [20, 70], y: [20000, 100000], xt: [20, 45, 70], yt: [20000, 60000, 100000],
+      fx: scaled ? (v) => fmt((v - 20) / 50, 1) : String, fy: scaled ? (v) => fmt((v - 20000) / 80000, 1) : (v) => v / 1000 + 'k',
+      xl: scaled ? 'age (scaled)' : 'age (years)', yl: scaled ? 'income (scaled)' : 'income ($)' });
+    bg.forEach(([a, b]) => el('circle', { cx: F.sx(a), cy: F.sy(b), r: 7, style: 'fill:var(--myst-color-border-strong)' }, F.plot));
+    const d = (p) => scaled ? Math.hypot((p[0] - Q[0]) / 50, (p[1] - Q[1]) / 80000) : Math.hypot(p[0] - Q[0], p[1] - Q[1]);
+    const near = d(A) < d(B) ? A : B;
+    [A, B].forEach((p) => el('line', { class: p === near ? 'curve-a an-draw' : 'curve-t', pathLength: 1, x1: F.sx(Q[0]), y1: F.sy(Q[1]), x2: F.sx(p[0]), y2: F.sy(p[1]), style: p === near ? 'stroke-width:4' : '' }, F.plot));
+    [[Q, 'Q', 'ink'], [A, 'A', 'fb'], [B, 'B', 'fb']].forEach(([p, t, c]) => {
+      el('circle', { class: `pt ${c}`, cx: F.sx(p[0]), cy: F.sy(p[1]), r: 12 }, F.plot);
+      el('text', { class: 'tx', x: F.sx(p[0]) + (t === 'Q' ? -20 : 18), y: F.sy(p[1]) + (t === 'B' ? -14 : t === 'Q' ? 30 : -14), 'text-anchor': t === 'Q' ? 'end' : 'start', 'font-weight': 700, text: t }, s);
+    });
+    const f = (v) => scaled ? fmt(v, 2) : Math.round(v).toLocaleString('en-US');
+    el('text', { class: 'txs', x: F.L + 16, y: F.T + 34, text: `Q to A: ${f(d(A))}` }, s);
+    el('text', { class: 'txs', x: F.L + 16, y: F.T + 68, text: `Q to B: ${f(d(B))}` }, s);
+    el('text', { class: 'txs', x: F.L + 16, y: F.T + 102, style: 'fill:var(--c-a);font-weight:600', text: `nearest: ${near === A ? 'A' : 'B'}` }, s);
+  };
+  draw('raw-svg', false); draw('sc-svg', true);
+}
+
+function drawCV() {
+  const svg = document.getElementById('cv-svg');
+  const KS = []; for (let k = 1; k <= 41; k += 2) KS.push(k);
+  const perm = shuffle(TRAIN.length, rng(9)), FOLDS = 5;
+  const cv = {}, tr = {};
+  KS.forEach((k) => {
+    let s = 0;
+    for (let f = 0; f < FOLDS; f++) {
+      const te = perm.filter((_, i) => i % FOLDS === f).map((i) => TRAIN[i]), trn = perm.filter((_, i) => i % FOLDS !== f).map((i) => TRAIN[i]);
+      s += acc(trn, te, k) / FOLDS;
+    }
+    cv[k] = s; tr[k] = acc(TRAIN, TRAIN, k);
+  });
+  const best = KS.reduce((a, b) => (cv[b] > cv[a] ? b : a));
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0, 42], y: [0.6, 1.02], xt: [1, 11, 21, 31, 41], yt: [0.6, 0.7, 0.8, 0.9, 1], fy: pct, xl: 'number of neighbors k', yl: 'accuracy' });
+  [[tr, 'curve-a', 'fa', 0], [cv, 'curve-b', 'fb', 0.6]].forEach(([e, cc, fc, dl]) => {
+    el('path', { class: `${cc} an-draw`, pathLength: 1, style: `--d:${dl}s`, d: KS.map((k, i) => (i ? 'L' : 'M') + F.sx(k) + ' ' + F.sy(e[k])).join('') }, F.plot);
+    KS.forEach((k, i) => el('circle', { class: `${fc} an-pop`, cx: F.sx(k), cy: F.sy(e[k]), r: 6, style: `--d:${dl + i * 0.03}s` }, F.plot));
+  });
+  const bg = el('g', { class: 'an-fade', style: '--d:1.6s' }, svg);
+  el('circle', { cx: F.sx(best), cy: F.sy(cv[best]), r: 16, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, bg);
+  el('text', { class: 'txs', x: F.sx(best), y: F.sy(cv[best]) - 30, 'text-anchor': 'middle', text: `best: k = ${best}` }, bg);
+  el('text', { class: 'txs', x: F.sx(3), y: F.H - F.B - 20, style: 'font-style:italic', text: '← jagged, overfits' }, svg);
+  el('text', { class: 'txs', x: F.sx(41), y: F.H - F.B - 20, 'text-anchor': 'end', style: 'font-style:italic', text: 'too smooth, underfits →' }, svg);
+  legend(svg, F.sx(22), F.T + 30, [['line', 'curve-a', 'training accuracy'], ['line', 'curve-b', 'cross-validation accuracy']]);
+  const note = el('g', { class: 'frag', 'data-step': 'cv' }, svg);
+  el('circle', { cx: F.sx(1), cy: F.sy(1), r: 16, style: 'fill:none;stroke:var(--c-a);stroke-width:3' }, note);
+  el('text', { class: 'txs', x: F.sx(1) + 28, y: F.sy(1) + 40, style: 'fill:var(--c-a)', text: '100% on training data' }, note);
+  document.getElementById('cv-best').textContent = best;
+}
+
+function drawWeighted() {
+  const svg = document.getElementById('wv-svg');
+  const NB = [[0, 1.1, 0], [200, 1.4, 0], [60, 3.0, 1], [150, 3.2, 1], [270, 3.4, 1]];
+  const U = 70;
+  [[0, '(a) plain vote', false], [600, '(b) weighted vote, weight 1/d', true]].forEach(([x0, title, w]) => {
+    const g = el('g', w ? { class: 'frag', 'data-step': 'wv' } : { class: 'an-fade' }, svg);
+    el('text', { class: 'ttl', x: x0, y: 36, text: title }, g);
+    const cx = x0 + 280, cy = 330;
+    el('circle', { cx, cy, r: 3.6 * U, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:8 8' }, g);
+    let sa = 0, sb = 0;
+    NB.forEach(([ang, d, c]) => {
+      const a = (ang * Math.PI) / 180, px = cx + Math.cos(a) * d * U, py = cy - Math.sin(a) * d * U;
+      const wt = w ? 1 / d : 1;
+      if (c) sb += wt; else sa += wt;
+      el('line', { x1: cx, y1: cy, x2: px, y2: py, style: `stroke:var(${c ? '--c-b' : '--c-a'});stroke-width:${w ? 2 + 16 * wt : 5};stroke-linecap:round;opacity:.75` }, g);
+      el('circle', { class: `pt ${c ? 'fb' : 'fa'}`, cx: px, cy: py, r: 16 }, g);
+      el('text', { class: 'tk', x: px + (Math.cos(a) >= 0 ? 24 : -24), y: py - 18, 'text-anchor': Math.cos(a) >= 0 ? 'start' : 'end', text: w ? `d ${fmt(d, 1)}, w ${fmt(wt, 2)}` : `d ${fmt(d, 1)}` }, g);
+    });
+    el('rect', { x: cx - 14, y: cy - 14, width: 28, height: 28, rx: 3, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:4' }, g);
+    const win = sa > sb ? 'blue' : 'orange';
+    el('text', { class: 'tx', x: cx, y: 640, 'text-anchor': 'middle', text: w ? `blue ${fmt(sa, 2)}  vs  orange ${fmt(sb, 2)}` : `blue ${sa}  vs  orange ${sb}` }, g);
+    el('text', { class: 'tx', x: cx, y: 682, 'text-anchor': 'middle', 'font-weight': 700, style: `fill:var(${win === 'blue' ? '--c-a' : '--c-b'})`, text: `prediction: ${win}` }, g);
+  });
+}
+
+function drawLimits() {
+  /* (a) prediction work vs number of stored examples */
+  const svg = document.getElementById('cost-svg');
+  const F = frame(svg, { W: 792, H: 600, l: 110, t: 30, r: 30, x: [0, 1000], y: [0, 1100], xt: [0, 250, 500, 750, 1000], yt: [0, 1000], fx: (v) => v ? v + 'k' : '0', fy: (v) => v ? '1M' : '0', xl: 'stored examples', yl: 'distances per prediction' });
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d: `M${F.sx(0)} ${F.sy(0)}L${F.sx(1000)} ${F.sy(1000)}` }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, style: '--d:.5s', d: `M${F.sx(0)} ${F.sy(8)}L${F.sx(1000)} ${F.sy(8)}` }, F.plot);
+  el('text', { class: 'txs', x: F.sx(560), y: F.sy(640), 'text-anchor': 'end', style: 'fill:var(--c-b)', text: 'k-NN: one per example' }, svg);
+  el('text', { class: 'txs', x: F.sx(980), y: F.sy(8) - 16, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: 'fitted model: fixed work' }, svg);
+  /* (b) accuracy vs number of irrelevant features */
+  const s2 = document.getElementById('noise-svg');
+  const MS = [0, 1, 2, 4, 6, 8, 10, 15, 20], K = 5, REP = 5;
+  const cut = (P, m) => P.map((p) => ({ y: p.y, x: p.x.slice(0, 2 + m) }));
+  const A = MS.map(() => 0);
+  for (let t = 0; t < REP; t++) {
+    const r = rng(31 + t);
+    const extra = (P) => P.map((p) => ({ y: p.y, x: [...p.x, ...Array.from({ length: 20 }, () => 16 * r())] }));
+    const TR = extra(TRAIN), TE = extra(TEST);
+    MS.forEach((m, i) => { A[i] += acc(cut(TR, m), cut(TE, m), K) / REP; });
+  }
+  const G = frame(s2, { W: 792, H: 600, l: 110, t: 30, r: 30, x: [-1, 21], y: [0.5, 1], xt: [0, 5, 10, 15, 20], yt: [0.5, 0.6, 0.7, 0.8, 0.9, 1], fy: pct, xl: 'irrelevant features added', yl: 'test accuracy' });
+  el('line', { class: 'curve-t', x1: G.sx(-1), x2: G.sx(21), y1: G.sy(0.5) - 1, y2: G.sy(0.5) - 1 }, G.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d: MS.map((m, i) => (i ? 'L' : 'M') + G.sx(m) + ' ' + G.sy(A[i])).join('') }, G.plot);
+  MS.forEach((m, i) => el('circle', { class: 'fb an-pop', cx: G.sx(m), cy: G.sy(A[i]), r: 8, style: `--d:${0.2 + i * 0.1}s` }, G.plot));
+  el('text', { class: 'tk', x: G.sx(0) + 14, y: G.sy(A[0]) - 16, text: pct(A[0]) }, s2);
+  el('text', { class: 'tk', x: G.sx(20), y: G.sy(A[A.length - 1]) - 18, 'text-anchor': 'middle', text: pct(A[A.length - 1]) }, s2);
+  el('text', { class: 'tk', x: G.sx(20.5), y: G.sy(0.5) - 12, 'text-anchor': 'end', text: 'coin flip' }, s2);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.nb = (() => {
+  const svg = document.getElementById('nb-svg');
+  const P = wave(21, 40, 0.06);
+  const F = frame(svg, { W: 1160, H: 700, l: 70, t: 20, x: DOM.x, y: DOM.y, xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const links = el('g', {}, F.plot), dots = el('g', {}, F.plot), top = el('g', {}, F.plot);
+  const circ = el('circle', { style: 'fill:var(--myst-color-surface);fill-opacity:.5;stroke:var(--myst-color-text-tertiary);stroke-width:2.5;stroke-dasharray:10 8' }, links);
+  const marks = P.map((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x[0]), cy: F.sy(p.x[1]), r: 11 }, dots));
+  const q = el('rect', { width: 34, height: 34, rx: 4, style: 'stroke:var(--myst-color-text);stroke-width:4' }, top);
+  legend(svg, F.L + 20, F.T + 30, [['dot', 'fa', 'class blue'], ['dot', 'fb', 'class orange']]);
+  const slider = document.getElementById('nb-k'), tag = document.getElementById('nb-pred');
+  let Q = [8.6, 4.3];
+  function draw() {
+    const k = +slider.value, o = order(P, Q, k);
+    while (links.childNodes.length > 1) links.lastChild.remove();
+    const rad = Math.sqrt(dist2(P[o[k - 1]].x, Q));
+    circ.setAttribute('cx', F.sx(Q[0])); circ.setAttribute('cy', F.sy(Q[1]));
+    circ.setAttribute('r', F.sx(rad) - F.sx(0) + 14);
+    marks.forEach((m) => { m.setAttribute('r', 11); m.style.opacity = '.55'; });
+    let nb = 0;
+    o.forEach((i) => {
+      nb += P[i].y;
+      el('line', { x1: F.sx(Q[0]), y1: F.sy(Q[1]), x2: F.sx(P[i].x[0]), y2: F.sy(P[i].x[1]), style: `stroke:var(${P[i].y ? '--c-b' : '--c-a'});stroke-width:4` }, links);
+      marks[i].setAttribute('r', 15); marks[i].style.opacity = '1';
+    });
+    const y = 2 * nb > k ? 1 : 0, col = y ? 'var(--c-b)' : 'var(--c-a)';
+    q.setAttribute('x', F.sx(Q[0]) - 17); q.setAttribute('y', F.sy(Q[1]) - 17); q.style.fill = col;
+    document.getElementById('nb-k-val').textContent = k;
+    document.getElementById('nb-va').textContent = k - nb;
+    document.getElementById('nb-vb').textContent = nb;
+    tag.textContent = `Prediction: ${y ? 'orange' : 'blue'}`; tag.style.color = col;
+  }
+  svg.addEventListener('click', (ev) => {
+    const p = toSvgPoint(svg, ev);
+    Q = [clamp(F.ix(p.x), 0.2, 15.8), clamp(F.iy(p.y), 0.2, 8.8)];
+    draw();
+  });
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.reg = (() => {
+  const svg = document.getElementById('reg-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 70, t: 56, x: DOM.x, y: DOM.y, xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const MAXK = 25, CELL = 16;
+  const cells = [];
+  for (let px = F.L; px < F.W - F.R; px += CELL) {
+    for (let py = F.T; py < F.H - F.B; py += CELL) {
+      const c = [F.ix(px + CELL / 2), F.iy(py + CELL / 2)];
+      cells.push({ o: order(TRAIN, c, MAXK), node: el('rect', { x: px, y: py, width: CELL, height: CELL, 'shape-rendering': 'crispEdges', style: 'fill-opacity:.28' }, F.plot) });
+    }
+  }
+  const trO = TRAIN.map((p) => order(TRAIN, p.x, MAXK)), teO = TEST.map((p) => order(TRAIN, p.x, MAXK));
+  TRAIN.forEach((p) => el('circle', { class: `pt ${p.y ? 'fb' : 'fa'}`, cx: F.sx(p.x[0]), cy: F.sy(p.x[1]), r: 9 }, F.plot));
+  el('path', { class: 'curve-t', d: curvePath(border, 0, 16, F.sx, F.sy) }, F.plot);
+  legend(svg, F.L, 24, [['line', 'curve-t', 'true border']]);
+  legend(svg, F.L + 260, 24, [['dot', 'fa', 'class blue']]);
+  legend(svg, F.L + 500, 24, [['dot', 'fb', 'class orange']]);
+  const slider = document.getElementById('reg-k'), tag = document.getElementById('reg-diag');
+  function draw() {
+    const k = +slider.value;
+    cells.forEach((c) => c.node.setAttribute('class', vote(TRAIN, c.o, k) ? 'fb' : 'fa'));
+    const tr = TRAIN.filter((p, i) => vote(TRAIN, trO[i], k) === p.y).length / TRAIN.length;
+    const te = TEST.filter((p, i) => vote(TRAIN, teO[i], k) === p.y).length / TEST.length;
+    document.getElementById('reg-k-val').textContent = k;
+    document.getElementById('reg-tr').textContent = pct(tr);
+    document.getElementById('reg-te').textContent = pct(te);
+    let label = 'Balanced border', col = 'var(--c-c)';
+    if (k <= 3) { label = 'Jagged: overfits'; col = 'var(--c-d)'; }
+    if (k >= 19) { label = 'Smoother: starts to underfit'; col = 'var(--c-b)'; }
+    tag.textContent = label; tag.style.color = col;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.knr = (() => {
+  const svg = document.getElementById('knr-svg');
+  const f = (x) => 3 + 2 * Math.sin(0.7 * x) + 0.12 * x, r = rng(5);
+  const P = Array.from({ length: 30 }, () => { const x = 0.2 + 9.6 * r(); return { x: [x], v: f(x) + 0.5 * gauss(r) }; });
+  const F = frame(svg, { W: 1160, H: 700, l: 96, t: 20, x: [0, 10], y: [0, 7], xt: [0, 2, 4, 6, 8, 10], yt: [0, 1, 2, 3, 4, 5, 6, 7], xl: 'feature', yl: 'value' });
+  const stepPath = el('path', { class: 'curve-a', style: 'stroke-width:3;opacity:.7' }, F.plot);
+  const span = el('rect', { y: F.T, height: F.H - F.B - F.T, class: 'zone', style: 'opacity:.7' }, F.plot);
+  const links = el('g', {}, F.plot);
+  const marks = P.map((p) => el('circle', { class: 'pt fb', cx: F.sx(p.x[0]), cy: F.sy(p.v), r: 10 }, F.plot));
+  const vline = el('line', { y1: F.T, y2: F.H - F.B, class: 'curve-t' }, F.plot);
+  const avg = el('line', { style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6' }, F.plot);
+  const dot = el('circle', { r: 15, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:5' }, F.plot);
+  legend(svg, F.sx(6.9), F.sy(1.35), [['dot', 'fb', 'training examples'], ['line', 'curve-a', 'k-NN prediction'], ['ring', '', 'prediction (average)']]);
+  const predict = (x, k) => mean(order(P, [x], k).map((i) => P[i].v));
+  const slider = document.getElementById('knr-k');
+  let X = 4.2;
+  function draw() {
+    const k = +slider.value, o = order(P, [X], k);
+    let d = '';
+    for (let i = 0; i <= 500; i++) { const x = (10 * i) / 500; d += (i ? 'L' : 'M') + F.sx(x).toFixed(1) + ' ' + F.sy(predict(x, k)).toFixed(1); }
+    stepPath.setAttribute('d', d);
+    const xs = o.map((i) => P[i].x[0]), lo = Math.min(...xs), hi = Math.max(...xs), y = mean(o.map((i) => P[i].v));
+    span.setAttribute('x', F.sx(lo) - 14); span.setAttribute('width', F.sx(hi) - F.sx(lo) + 28);
+    clear(links);
+    marks.forEach((m) => { m.setAttribute('r', 9); m.style.opacity = '.5'; });
+    o.forEach((i) => {
+      marks[i].setAttribute('r', 13); marks[i].style.opacity = '1';
+      el('line', { x1: F.sx(P[i].x[0]), x2: F.sx(P[i].x[0]), y1: F.sy(P[i].v), y2: F.sy(y), style: 'stroke:var(--c-b);stroke-width:2.5;opacity:.8' }, links);
+    });
+    vline.setAttribute('x1', F.sx(X)); vline.setAttribute('x2', F.sx(X));
+    avg.setAttribute('x1', F.sx(lo) - 14); avg.setAttribute('x2', F.sx(hi) + 14); avg.setAttribute('y1', F.sy(y)); avg.setAttribute('y2', F.sy(y));
+    dot.setAttribute('cx', F.sx(X)); dot.setAttribute('cy', F.sy(y));
+    document.getElementById('knr-k-val').textContent = k;
+    document.getElementById('knr-x').textContent = fmt(X, 1);
+    document.getElementById('knr-y').textContent = fmt(y, 2);
+  }
+  svg.addEventListener('click', (ev) => { X = clamp(F.ix(toSvgPoint(svg, ev).x), 0, 10); draw(); });
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.cod = (() => {
+  const svg = document.getElementById('cod-svg');
+  const DIMS = [1, 2, 3, 5, 10, 20, 50, 100, 500, 1000], N = 400, BIN = 0.05, NB = 40;
+  const r = rng(77);
+  const pts = Array.from({ length: N }, () => Float64Array.from({ length: 1000 }, () => r()));
+  const q = Float64Array.from({ length: 1000 }, () => r());
+  const DATA = DIMS.map((d) => {
+    const ds = pts.map((p) => { let s = 0; for (let j = 0; j < d; j++) s += (p[j] - q[j]) ** 2; return Math.sqrt(s); });
+    const m = mean(ds), rel = ds.map((v) => v / m), h = new Array(NB).fill(0);
+    rel.forEach((v) => { h[clamp(Math.floor(v / BIN), 0, NB - 1)]++; });
+    return { h: h.map((c) => c / N), lo: Math.min(...rel), hi: Math.max(...rel), ratio: Math.min(...ds) / Math.max(...ds) };
+  });
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0, 2], y: [0, 0.6], xt: [0, 0.5, 1, 1.5, 2], yt: [0, 0.2, 0.4, 0.6], fx: (v) => fmt(v, 1), fy: pct, xl: 'distance ÷ average distance', yl: 'share of points' });
+  const bars = Array.from({ length: NB }, (_, i) => el('rect', { class: 'fd', x: F.sx(i * BIN) + 1, width: F.sx(BIN) - F.sx(0) - 2, rx: 2, style: 'fill-opacity:.8' }, F.plot));
+  const ln = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--c-a);stroke-width:5' }, F.plot);
+  const lf = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--c-b);stroke-width:5' }, F.plot);
+  const tn = el('text', { class: 'txs', y: F.T + 64, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: 'nearest' }, svg);
+  const tf = el('text', { class: 'txs', y: F.T + 64, style: 'fill:var(--c-b)', text: 'farthest' }, svg);
+  const slider = document.getElementById('cod-d');
+  function draw() {
+    const i = +slider.value, D = DATA[i];
+    D.h.forEach((v, j) => { bars[j].setAttribute('y', F.sy(Math.min(v, 0.6))); bars[j].setAttribute('height', F.sy(0) - F.sy(Math.min(v, 0.6))); });
+    ln.setAttribute('x1', F.sx(D.lo)); ln.setAttribute('x2', F.sx(D.lo));
+    lf.setAttribute('x1', F.sx(D.hi)); lf.setAttribute('x2', F.sx(D.hi));
+    tn.setAttribute('x', F.sx(D.lo) - 12); tf.setAttribute('x', F.sx(D.hi) + 12);
+    document.getElementById('cod-d-val').textContent = DIMS[i];
+    document.getElementById('cod-ratio').textContent = fmt(D.ratio, 2);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawLazy(); drawDistance(); drawCV(); drawWeighted(); drawLimits();
+})();
+</script>
+</body>
+</html>

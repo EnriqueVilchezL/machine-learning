@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data cleaning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+/* problem cells in the messy tables */
+.ats-prose table.tb td.mk{opacity:1;transform:none}
+.ats-prose table.tb td.mk.on,.ats-prose table.tb td.bad{background:color-mix(in srgb,var(--c-b) 18%,transparent);box-shadow:inset 0 0 0 3px var(--c-b)}
+.ats-prose table.tb td.fixed{background:color-mix(in srgb,var(--c-c) 20%,transparent);transition:background-color .6s}
+.ats-prose table.tb tr.gone td{opacity:.35;text-decoration:line-through}
+.ats-prose table.tb td.num{text-align:right;font-variant-numeric:tabular-nums}
+.ats-prose table.tb td.id{color:var(--myst-color-text-tertiary)}
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.steps>div{font-size:20px;line-height:1.4;padding:5px 9px;border-radius:var(--radius);border:1px solid var(--myst-color-border-strong);color:var(--myst-color-text-tertiary);transition:background-color .4s,color .4s}
+.steps>div.done{background:var(--c-c-soft);border-color:var(--c-c);color:var(--myst-color-text)}
+.steps>div.now{border:3px solid var(--c-c);font-weight:600}
+.mdot{transition:transform .6s var(--ease-out),opacity .4s,fill .4s}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 2</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Data cleaning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Finding and fixing the problems in real data before a model learns from them</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 2 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why data needs cleaning</li>
+<li class="an-up" style="--d:.15s">Missing values</li>
+<li class="an-up" style="--d:.25s">Duplicates and inconsistent text</li>
+<li class="an-up" style="--d:.35s">Outliers</li>
+<li class="an-up" style="--d:.45s">Wrong types and formats</li>
+<li class="an-up" style="--d:.55s">A repeatable cleaning workflow</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>: one row with <span class="tex">d</span> values</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">x_{ij}</span></td><td>Value of feature <span class="tex">j</span> for example <span class="tex">i</span>: one cell</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">y_i</span></td><td>Its label: the value a model will predict</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\bar{x}_j, \ \tilde{x}_j</span></td><td>Mean and median of feature <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">s_j</span></td><td>Standard deviation of feature <span class="tex">j</span>: typical distance to the mean</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">Q_1, \ Q_3</span></td><td>Quartiles: 25% and 75% of the values lie below them</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>A bar marks an average, a tilde marks a median.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why data needs cleaning</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Real data is collected by people and machines, and both make mistakes.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Messy data">
+<div class="hdr" data-s="Why clean"></div>
+<h2>Real data is messy</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Seven records from weather stations in Costa Rica. Each arrow press marks one kind of problem.</p>
+<table class="tb">
+<thead><tr><th>#</th><th>Station</th><th>Date</th><th>Temp (°C)</th><th>Rain (mm)</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td class="id">1</td><td>San José</td><td>2024-03-01</td><td class="num">24.1</td><td class="num">0.0</td></tr>
+<tr class="an-up" style="--d:.1s"><td class="id">2</td><td class="mk frag" data-step="txt">san jose</td><td>2024-03-02</td><td class="num mk frag" data-step="miss">&nbsp;</td><td class="num">2.5</td></tr>
+<tr class="an-up" style="--d:.15s"><td class="id">3</td><td>Limón</td><td class="mk frag" data-step="fmt">03/02/2024</td><td class="num">27.8</td><td class="num">41.0</td></tr>
+<tr class="an-up" style="--d:.2s"><td class="id">4</td><td class="mk frag" data-step="txt">S. José</td><td>2024-03-03</td><td class="num mk frag" data-step="unit">75.2 °F</td><td class="num">1.2</td></tr>
+<tr class="an-up" style="--d:.25s"><td class="id mk frag" data-step="dup">5</td><td class="mk frag" data-step="dup">Limón</td><td class="mk frag" data-step="dup">2024-03-02</td><td class="num mk frag" data-step="dup">27.8</td><td class="num mk frag" data-step="dup">41.0</td></tr>
+<tr class="an-up" style="--d:.3s"><td class="id">6</td><td>Cartago</td><td>2024-03-04</td><td class="num mk frag" data-step="imp">210</td><td class="num">5.1</td></tr>
+<tr class="an-up" style="--d:.35s"><td class="id">7</td><td>Heredia</td><td>2024-03-04</td><td class="num">22.5</td><td class="num mk frag" data-step="fmt">12,4</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:14px;padding-top:8px">
+<aside class="am"><div class="t">What is wrong</div></aside>
+<div class="small frag up" data-step="txt"><strong>Inconsistent text:</strong> three spellings of San José.</div>
+<div class="small frag up" data-step="miss"><strong>Missing value:</strong> row 2 has no temperature.</div>
+<div class="small frag up" data-step="fmt"><strong>Mixed formats:</strong> another date style and a decimal comma.</div>
+<div class="small frag up" data-step="unit"><strong>Wrong units:</strong> one value in Fahrenheit.</div>
+<div class="small frag up" data-step="dup"><strong>Duplicate:</strong> row 5 repeats row 3.</div>
+<div class="small frag up" data-step="imp"><strong>Impossible value:</strong> 210 °C.</div>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Garbage in, garbage out">
+<div class="hdr" data-s="Why clean"></div>
+<h2>Garbage in, garbage out</h2>
+<div class="figbox"><svg id="gigo-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 1:</b>The same model trained twice. One wrong value (an extra zero) pulls the fitted line away from the other points; after cleaning, the line follows the data.</p>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Fixing common problems</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Gaps, repeats, spelling, extreme values and formats.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why values go missing">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Why values go missing</h2>
+<div class="figbox"><svg id="missopt-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 2:</b>Three common causes, and three ways to handle the gap. Dropping loses a row, filling invents a value, and a flag column lets the model know the value was filled.</p>
+</section>
+
+<section class="s ats-prose" data-label="Missing values demo" data-demo="missing">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Drop or fill?</h2>
+<div class="fr">
+<div class="figbox"><svg id="miss-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side">
+<div class="btns"><button class="bt" id="miss-drop">Drop rows</button><button class="bt" id="miss-mean">Fill with mean</button><button class="bt" id="miss-median">Fill with median</button><button class="bt chip" id="miss-reset">Reset</button></div>
+<div class="ro"><span>Rows kept</span><b id="miss-rows">40</b></div>
+<div class="ro"><span>Filled values</span><b id="miss-filled" class="bb">0</b></div>
+<div class="ro"><span>Mean</span><b id="miss-mu" class="a">0</b></div>
+<div class="ro"><span>Median</span><b id="miss-md" style="color:var(--c-d)">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Commute times of 40 people; 10 did not answer. Filling keeps every row but piles the filled values on one spot.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Mean and median fill">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Filling with mean or median</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Let <span class="tex">O_j</span> be the examples where feature <span class="tex">j</span> is known, and <span class="tex">m</span> their count. The mean adds the known values and divides by <span class="tex">m</span>:</p>
+<div class="eq"><div class="m tex-d">\bar{x}_j = \frac{1}{m} \sum_{i \in O_j} x_{ij}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="f1" style="margin:0">The median sorts the known values, <span class="tex">x_{(1)} \le \dots \le x_{(m)}</span>, and takes the middle one:</p>
+<div class="eq frag up" data-step="f1"><div class="m tex-d">\tilde{x}_j = \begin{cases} x_{((m+1)/2)} &amp; m \text{ odd} \\ \tfrac{1}{2}\big(x_{(m/2)} + x_{(m/2+1)}\big) &amp; m \text{ even} \end{cases}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="f2" style="margin:0">Every gap then receives the chosen value:</p>
+<div class="eq frag up" data-step="f2"><div class="m tex-d">x_{ij} \leftarrow \bar{x}_j \ \text{ or } \ \tilde{x}_j \qquad \text{for each } i \notin O_j</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Known commute times: 10, 15, 20, 25 and 80 minutes, so <span class="tex">m = 5</span>.</p><p><span class="tex">\bar{x} = \tfrac{150}{5} = 30</span></p><p><span class="tex">\tilde{x} = x_{(3)} = 20</span></p></aside>
+<aside class="am"><div class="t">Why the median</div><p>The single 80-minute commute pulls the mean up to 30. The median stays at 20.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Duplicates and categories">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Duplicates and spelling</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="dup-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="map-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) A repeated record is kept only once</div>
+<div class="subcap">(b) A mapping turns every spelling into one standard value</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 4:</b>Duplicates count the same event twice. Different spellings make one place look like several categories, so the model learns them separately.</p>
+</section>
+
+<section class="s ats-prose" data-label="Outliers demo" data-demo="outlier">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Outliers</h2>
+<div class="fr">
+<div class="figbox"><svg id="out-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side">
+<div class="ctl">
+<label><span>Fence distance (box lengths)</span><b id="out-k-val">1.5</b></label>
+<input type="range" id="out-k" min="0.5" max="5" step="0.25" value="1.5">
+</div>
+<div class="ro"><span>Points flagged</span><b id="out-n" class="bb">0</b></div>
+<div class="ro"><span>Mean of the rest</span><b id="out-mu" class="a">0</b></div>
+<div class="ro"><span>Median of the rest</span><b id="out-md" style="color:var(--c-d)">0</b></div>
+<aside class="adm k-note sm"><div class="h"><i data-i="note"></i><span>Error or rare case?</span></div><div class="b"><p>Ask someone who knows the data.</p></div></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Electricity use of 40 homes. All data: mean <span id="out-all-mu">0</span>, median <span id="out-all-md">0</span> kWh.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Outlier rules">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Two outlier rules</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The z-score counts how many standard deviations a value lies from the mean. Flag the value when it is more than 3:</p>
+<div class="eq"><div class="m tex-d">z_{ij} = \frac{x_{ij} - \bar{x}_j}{s_j}, \qquad \text{flag if } |z_{ij}| &gt; 3</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="o1" style="margin:0">The box in Figure 5 goes from <span class="tex">Q_1</span> to <span class="tex">Q_3</span>. Its length is the interquartile range:</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">\text{IQR} = Q_3 - Q_1</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="o2" style="margin:0">Flag the values below <span class="tex">L</span> or above <span class="tex">U</span>. Here <span class="tex">k</span> is the slider of Figure 5; the usual choice is 1.5.</p>
+<div class="eq frag up" data-step="o2"><div class="m tex-d">L = Q_1 - k \cdot \text{IQR}, \qquad U = Q_3 + k \cdot \text{IQR}</div><div class="n">(6)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">Q_1 = 200</span> and <span class="tex">Q_3 = 300</span> kWh, so <span class="tex">\text{IQR} = 100</span>.</p><p>With <span class="tex">k = 1.5</span>: <span class="tex">L = 50</span>, <span class="tex">U = 450</span>. A home using 520 kWh is flagged.</p><p>With <span class="tex">\bar{x} = 250</span>, <span class="tex">s = 60</span>: <span class="tex">z = \tfrac{520 - 250}{60} = 4.5</span>, flagged too.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Types and formats">
+<div class="hdr" data-s="Common problems"></div>
+<h2>Wrong types and formats</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Values that look right to a person but that a computer cannot compare or average.</p>
+<table class="tb">
+<colgroup><col style="width:24%"><col style="width:24%"><col style="width:16%"><col style="width:36%"></colgroup>
+<thead><tr><th>Problem</th><th>Before</th><th>After</th><th>Fix</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Number as text</strong></td><td>"12,4"</td><td>12.4</td><td>Replace the comma, convert to number</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Mixed units</strong></td><td>75.2 °F</td><td>24.0 °C</td><td>(°F − 32) / 1.8</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Many date styles</strong></td><td>03/02/2024, 2 Mar 2024</td><td>2024-03-02</td><td>Read every style into one date type</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Money as text</strong></td><td>₡1.250.000</td><td>1250000</td><td>Remove the symbol and the dots</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Many ways to say yes</strong></td><td>yes, Y, TRUE, 1</td><td>True</td><td>Map every variant to one value</td></tr>
+</tbody>
+</table>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:28px">
+<aside class="adm k-warn sm frag up"><div class="h"><i data-i="warning"></i><span>Ambiguous dates</span></div><div class="b"><p>Is 03/02/2024 the 3rd of February or the 2nd of March? Ask how the data was recorded.</p></div></aside>
+<aside class="adm k-tip sm frag up"><div class="h"><i data-i="hint"></i><span>Check first</span></div><div class="b"><p>Look at the type of every column before cleaning: numbers stored as text are a common surprise.</p></div></aside>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">A repeatable workflow</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Clean one step at a time, write each step down, and keep the original file.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Cleaning pipeline" data-demo="pipe">
+<div class="hdr" data-s="Workflow"></div>
+<h2>Cleaning step by step</h2>
+<div class="fr">
+<div class="col" style="gap:28px">
+<table class="tb" id="pipe-tb" style="width:100%">
+<thead><tr><th>#</th><th>Station</th><th>Date</th><th>Temp (°C)</th><th>Rain (mm)</th></tr></thead>
+<tbody id="pipe-body"></tbody>
+</table>
+<div class="steps" id="pipe-steps"></div>
+</div>
+<div class="side">
+<div class="btns"><button class="bt" id="pipe-next">Next step</button><button class="bt chip" id="pipe-reset">Reset</button></div>
+<div class="ro"><span>Step</span><b id="pipe-step">0 / 6</b></div>
+<div class="ro"><span>Problems left</span><b id="pipe-left" class="bb">8</b></div>
+<div class="ro"><span>Rows</span><b id="pipe-rows" class="a">7</b></div>
+<p class="small" id="pipe-msg" style="margin:0">Orange cells have a problem. Each click applies one cleaning step.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The records of Table 2, cleaned in six steps. Order matters: row 5 only matches row 3 once the dates share one format.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Workflow rules">
+<div class="hdr" data-s="Workflow"></div>
+<h2>Keep the raw data safe</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 560">
+<g class="an-fade">
+<text class="ttl" x="0" y="30">every run starts from the original file</text>
+<rect class="box" x="0" y="60" width="300" height="110" rx="4"/><text class="tx" x="150" y="112" text-anchor="middle" font-weight="600">Raw data</text><text class="txs" x="150" y="148" text-anchor="middle">never edited</text>
+<rect x="262" y="76" width="22" height="18" rx="3" class="ink3"/><path d="M266 76v-6a7 7 0 0 1 14 0v6" style="fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:3"/>
+<rect class="box-a" x="420" y="60" width="380" height="110" rx="4"/><text class="tx" x="610" y="112" text-anchor="middle" font-weight="600">Cleaning steps</text><text class="txs" x="610" y="148" text-anchor="middle">written down, repeatable</text>
+<rect class="box" x="920" y="60" width="300" height="110" rx="4"/><text class="tx" x="1070" y="112" text-anchor="middle" font-weight="600">Clean data</text><text class="txs" x="1070" y="148" text-anchor="middle">a new file</text>
+<rect class="box" x="1340" y="60" width="340" height="110" rx="4"/><text class="tx" x="1510" y="112" text-anchor="middle" font-weight="600">Model</text><text class="txs" x="1510" y="148" text-anchor="middle">later topics</text>
+<path class="wire" d="M300 115H412" marker-end="url(#ah)"/><path class="wire" d="M800 115H912" marker-end="url(#ah)"/><path class="wire" d="M1220 115H1332" marker-end="url(#ah)"/>
+<path class="wire" d="M610 170V206" stroke-dasharray="6 6"/>
+<rect class="box" x="420" y="210" width="380" height="64" rx="4" style="stroke-dasharray:8 6"/><text class="txs" x="610" y="250" text-anchor="middle">notes: each step and why</text>
+<circle r="8" class="fa"><animateMotion dur="1.6s" repeatCount="indefinite" path="M300 115H412"/></circle><circle r="8" class="fa"><animateMotion dur="1.6s" repeatCount="indefinite" path="M800 115H912"/></circle><circle r="8" class="fa"><animateMotion dur="1.6s" repeatCount="indefinite" path="M1220 115H1332"/></circle>
+</g>
+<g class="frag" data-step="split">
+<line class="gl" x1="0" y1="310" x2="1680" y2="310"/>
+<text class="ttl" x="0" y="350">with a train-test split</text>
+<rect class="box-a" x="0" y="370" width="300" height="80" rx="4"/><text class="tx" x="150" y="420" text-anchor="middle">Training data</text>
+<rect class="box-b" x="0" y="474" width="300" height="80" rx="4"/><text class="tx" x="150" y="524" text-anchor="middle">Test data</text>
+<rect class="box-a" x="420" y="370" width="380" height="80" rx="4"/><text class="tx" x="610" y="420" text-anchor="middle" font-weight="600">Compute the median</text>
+<rect class="box" x="920" y="370" width="300" height="80" rx="4"/><text class="tx" x="1070" y="420" text-anchor="middle">Fill training</text>
+<rect class="box" x="920" y="474" width="300" height="80" rx="4"/><text class="tx" x="1070" y="524" text-anchor="middle">Fill test</text>
+<path class="wire-a" d="M300 410H412" marker-end="url(#ah-a)"/><path class="wire-a" d="M800 410H912" marker-end="url(#ah-a)"/>
+<path class="wire-a" d="M800 430C860 430 860 500 912 500" marker-end="url(#ah-a)"/>
+<path class="wire" d="M300 530H912" marker-end="url(#ah)"/>
+<text class="txs" x="606" y="556" text-anchor="middle">test rows are filled, never used to compute</text>
+<text class="txs" x="1260" y="420">same median for both</text>
+<text class="txs" x="1260" y="452">(Topic 5: train-test split)</text>
+<circle r="8" class="fa"><animateMotion dur="1.6s" repeatCount="indefinite" path="M300 410H412"/></circle><circle r="8" class="fa"><animateMotion dur="1.6s" repeatCount="indefinite" path="M800 430C860 430 860 500 912 500"/></circle>
+</g>
+</svg>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 7:</b>The raw file stays untouched and the written steps rebuild the clean file. Values used for cleaning, like a median, come from the training rows only.</p>
+<aside class="adm k-warn sm frag up" data-step="split" style="margin-top:16px;max-width:1400px"><div class="h"><i data-i="warning"></i><span>Data leakage</span></div><div class="b"><p>If test rows help choose the filling value, the test score looks better than it really is.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Training statistics">
+<div class="hdr" data-s="Workflow"></div>
+<h2>Statistics from training rows</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Let <span class="tex">T_j</span> be the training examples where feature <span class="tex">j</span> is known. The filling value comes from them alone:</p>
+<div class="eq"><div class="m tex-d">\tilde{x}_j = \operatorname{median}\{\, x_{ij} : i \in T_j \,\}</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="t1" style="margin:0">The same number fills every gap, in the training rows and in the test rows:</p>
+<div class="eq frag up" data-step="t1"><div class="m tex-d">x_{ij} \leftarrow \tilde{x}_j \qquad \text{for every missing } x_{ij}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="t2" style="margin:16px 0 0">Test values never enter (7). The test rows stay unseen, like new data that arrives after the model is in use.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Training temperatures: 22.5, 24.1 and 27.8 °C.</p><p><span class="tex">\tilde{x} = 24.1</span></p><p>A test row with no temperature also gets 24.1, whatever the other test values are.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Real data has gaps, repeats, typos, mixed units and impossible values.</li>
+<li class="an-up" style="--d:.15s">A model learns from whatever it gets, errors included.</li>
+<li class="an-up" style="--d:.25s">Missing values can be dropped, filled or flagged; each choice has a cost.</li>
+<li class="an-up" style="--d:.35s">An outlier can be an error or a real rare case: check before removing it.</li>
+<li class="an-up" style="--d:.45s">Keep the raw file and write down each cleaning step so it can be repeated.</li>
+<li class="an-up" style="--d:.55s">Compute filling values from the training data only.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic walks through the cleaning of the weather-station table step by step.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Wickham, H. (2014). Tidy data. <em>Journal of Statistical Software</em>, 59(10), 1–23.</li>
+<li style="margin:.4em 0">Géron, A. (2022). <em>Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow</em> (3rd ed.), chapter 2. O'Reilly.</li>
+<li style="margin:.4em 0">Little, R. J. A., &amp; Rubin, D. B. (2019). <em>Statistical Analysis with Missing Data</em> (3rd ed.). Wiley.</li>
+<li style="margin:.4em 0">Tukey, J. W. (1977). <em>Exploratory Data Analysis</em>. Addison-Wesley.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 3: feature engineering.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+const median = (a) => {
+  const s = [...a].sort((x, y) => x - y), n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+};
+const quantile = (a, q) => {
+  const s = [...a].sort((x, y) => x - y), p = (s.length - 1) * q, i = Math.floor(p);
+  return s[i] + (s[Math.min(i + 1, s.length - 1)] - s[i]) * (p - i);
+};
+
+/* a small table of rects and text; cells: array of rows, row 0 is the header */
+function miniTable(parent, x, y, widths, rows, opts = {}) {
+  const RH = opts.rh || 36, g = el('g', opts.attrs || {}, parent);
+  rows.forEach((row, i) => {
+    let cx = x;
+    row.forEach((cell, j) => {
+      const mark = opts.mark && opts.mark(i, j);
+      el('rect', { x: cx, y: y + i * RH, width: widths[j], height: RH, style: `fill:${i === 0 ? 'var(--myst-color-bg-secondary)' : mark ? 'color-mix(in srgb,var(--c-b) 18%,var(--myst-color-bg))' : 'var(--myst-color-bg)'};stroke:${mark ? 'var(--c-b)' : 'var(--myst-color-border-strong)'};stroke-width:${mark ? 3 : 1.5}` }, g);
+      el('text', { class: 'txs', x: cx + widths[j] / 2, y: y + i * RH + RH / 2 + 8, 'text-anchor': 'middle', 'font-weight': i === 0 ? 600 : 400, style: opts.color && opts.color(i, j) ? `fill:${opts.color(i, j)};font-weight:700` : '', text: cell }, g);
+      cx += widths[j];
+    });
+  });
+  return g;
+}
+
+/* ───────── static figures ───────── */
+function drawGigo() {
+  const svg = document.getElementById('gigo-svg');
+  const pts = [[1, 1.9], [2, 2.5], [3, 3.6], [4, 4.0], [5, 5.1], [6, 5.6], [7, 6.9], [8, 7.3]];
+  const fitLine = (P) => {
+    const xm = mean(P.map((p) => p[0])), ym = mean(P.map((p) => p[1]));
+    const w = P.reduce((s, [x, y]) => s + (x - xm) * (y - ym), 0) / P.reduce((s, [x]) => s + (x - xm) ** 2, 0);
+    return [w, ym - w * xm];
+  };
+  function row(g, y0, title, bad) {
+    el('text', { class: 'ttl', x: 0, y: y0 - 14, text: title }, g);
+    const cells = [['x', 'y'], ['1', '1.9'], ['4', '4.0'], ['6', bad ? '56' : '5.6'], ['8', '7.3']];
+    miniTable(g, 0, y0, [150, 150], cells, { rh: 40, mark: (i, j) => bad && i === 3 && j === 1 });
+    el('text', { class: 'txs', x: 150, y: y0 + 5 * 40 + 30, 'text-anchor': 'middle', text: bad ? 'one typo: 56 instead of 5.6' : 'the typo fixed' }, g);
+    el('rect', { class: bad ? 'box' : 'box', x: 560, y: y0 + 45, width: 300, height: 110, rx: 4 }, g);
+    el('text', { class: 'tx', x: 710, y: y0 + 97, 'text-anchor': 'middle', 'font-weight': 600, text: 'Model' }, g);
+    el('text', { class: 'txs', x: 710, y: y0 + 133, 'text-anchor': 'middle', text: 'fits a straight line' }, g);
+    el('path', { class: 'wire', d: `M300 ${y0 + 115}H552`, 'marker-end': 'url(#ah)' }, g);
+    el('path', { class: 'wire', d: `M860 ${y0 + 115}H1052`, 'marker-end': 'url(#ah)' }, g);
+    el('circle', { r: 8, class: bad ? 'fb' : 'fa' }, g).appendChild(motion(`M300 ${y0 + 115}H552`));
+    el('circle', { r: 8, class: bad ? 'fb' : 'fa' }, g).appendChild(motion(`M860 ${y0 + 115}H1052`));
+    /* mini plot */
+    const X0 = 1100, W = 520, H = 200, sx = lin(0, 9, X0, X0 + W), sy = lin(0, bad ? 12 : 9, y0 + H, y0);
+    el('path', { class: 'ax', d: `M${X0} ${y0}V${y0 + H}H${X0 + W}` }, g);
+    const P = pts.map(([x, y]) => [x, bad && x === 6 ? 56 : y]);
+    const [w, b] = fitLine(P);
+    const clipId = 'gigo-clip-' + (bad ? 'a' : 'b');
+    const cp = el('clipPath', { id: clipId }, g);
+    el('rect', { x: X0, y: y0 - 10, width: W, height: H + 10 }, cp);
+    const pg = el('g', { 'clip-path': `url(#${clipId})` }, g);
+    el('line', { class: bad ? 'curve-b' : 'curve-a', x1: sx(0), y1: sy(b), x2: sx(9), y2: sy(b + 9 * w) }, pg);
+    P.forEach(([x, y]) => {
+      if (y > 12) return;
+      el('circle', { class: 'pt ink3', cx: sx(x), cy: sy(y), r: 9 }, pg);
+    });
+    if (bad) {
+      el('path', { class: 'wire', d: `M${sx(6)} ${y0 + 40}V${y0 + 4}`, 'marker-end': 'url(#ah)', style: 'stroke:var(--c-b)' }, g);
+      el('text', { class: 'txs', x: sx(6) + 14, y: y0 + 34, style: 'fill:var(--c-b)', text: 'y = 56, far above' }, g);
+    }
+    el('text', { class: 'txs', x: X0 + W / 2, y: y0 + H + 40, 'text-anchor': 'middle', style: `fill:var(${bad ? '--c-b' : '--c-a'})`, text: bad ? 'the line misses most points' : 'the line follows the points' }, g);
+  }
+  row(el('g', { class: 'an-fade' }, svg), 40, 'messy data', true);
+  row(el('g', { class: 'frag', 'data-step': 'clean' }, svg), 350, 'clean data', false);
+}
+function motion(path) {
+  const m = document.createElementNS(NS, 'animateMotion');
+  m.setAttribute('dur', '1.8s'); m.setAttribute('repeatCount', 'indefinite'); m.setAttribute('path', path);
+  return m;
+}
+
+function drawMissingOptions() {
+  const svg = document.getElementById('missopt-svg');
+  el('text', { class: 'ttl', x: 0, y: 26, text: 'why it happens' }, svg);
+  [['A sensor failed', 'a station lost power in a storm'], ['A person skipped it', 'income is often left blank'], ['It does not apply', 'car model for people with no car']].forEach(([t, s], i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + i * 0.15}s` }, svg), y = 50 + i * 160;
+    el('rect', { class: 'box', x: 0, y, width: 500, height: 130, rx: 4 }, g);
+    el('text', { class: 'tx', x: 30, y: y + 54, 'font-weight': 600, text: t }, g);
+    el('text', { class: 'txs', x: 30, y: y + 96, text: s }, g);
+  });
+  el('text', { class: 'txs an-fade', style: '--d:.7s', x: 0, y: 560, 'font-style': 'italic', text: 'The reason matters: a gap can carry information.' }, svg);
+  el('text', { class: 'ttl', x: 600, y: 26, text: 'what we can do' }, svg);
+  const W2 = [160, 110];
+  miniTable(svg, 600, 244, W2, [['station', 'temp'], ['San José', '24.1'], ['Limón', '?'], ['Cartago', '19.6']], { mark: (i, j) => i === 2 && j === 1, attrs: { class: 'an-fade', style: '--d:.3s' } });
+  const opts = [
+    ['a', '(a) drop the row', 30, [['station', 'temp'], ['San José', '24.1'], ['Cartago', '19.6']], W2, null],
+    ['b', '(b) fill with the median', 222, [['station', 'temp'], ['San José', '24.1'], ['Limón', '21.9'], ['Cartago', '19.6']], W2, (i, j) => (i === 2 && j === 1 ? 'var(--c-b)' : null)],
+    ['c', '(c) fill and flag', 430, [['station', 'temp', 'was missing'], ['San José', '24.1', '0'], ['Limón', '21.9', '1'], ['Cartago', '19.6', '0']], [160, 110, 170], (i, j) => (i === 2 && j >= 1 ? 'var(--c-b)' : null)],
+  ];
+  opts.forEach(([step, label, y, rows, widths, color]) => {
+    const g = el('g', { class: 'frag', 'data-step': step }, svg);
+    const tY = y + 12, mid = tY + (rows.length * 36) / 2;
+    el('path', { class: 'wire', d: `M870 334C960 334 980 ${mid} 1052 ${mid}`, 'marker-end': 'url(#ah)' }, g);
+    el('text', { class: 'tx', x: 1060, y, 'font-weight': 600, style: 'font-size:26px', text: label }, g);
+    miniTable(g, 1060, tY, widths, rows, { color });
+  });
+}
+
+function drawDuplicates() {
+  const svg = document.getElementById('dup-svg');
+  const recs = [['San José', '2024-03-01', '24.1'], ['Limón', '2024-03-02', '27.8'], ['Cartago', '2024-03-04', '19.6'], ['Limón', '2024-03-02', '27.8'], ['Heredia', '2024-03-04', '22.5']];
+  const W = [230, 220, 120], X = 120;
+  el('text', { class: 'ttl', x: X, y: 22, text: 'before' }, svg);
+  recs.forEach((r, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${i * 0.08}s` }, svg);
+    miniTable(g, X, 34 + i * 46, W, [r], { rh: 46 });
+  });
+  const hl = el('g', { class: 'frag', 'data-step': 'dup' }, svg);
+  [1, 3].forEach((i) => el('rect', { x: X - 4, y: 34 + i * 46 - 2, width: 578, height: 50, rx: 4, style: 'fill:var(--c-b);fill-opacity:.15;stroke:var(--c-b);stroke-width:3' }, hl));
+  el('path', { d: `M${X - 10} ${34 + 46 + 23}C${X - 70} ${34 + 46 + 23} ${X - 70} ${34 + 3 * 46 + 23} ${X - 10} ${34 + 3 * 46 + 23}`, style: 'fill:none;stroke:var(--c-b);stroke-width:3;stroke-dasharray:8 6' }, hl);
+  el('text', { class: 'txs', x: X - 80, y: 34 + 2 * 46 + 30, 'text-anchor': 'end', style: 'fill:var(--c-b)', text: 'same' }, hl);
+  const res = el('g', { class: 'frag', 'data-step': 'merge' }, svg);
+  el('path', { class: 'wire', d: `M${X + 285} 276V316`, 'marker-end': 'url(#ah)' }, res);
+  el('text', { class: 'ttl', x: X, y: 330, text: 'after' }, res);
+  [recs[0], recs[1], recs[2], recs[4]].forEach((r, i) => miniTable(res, X, 344 + i * 46, W, [r], { rh: 46 }));
+  el('rect', { x: X - 4, y: 344 + 46 - 2, width: 578, height: 50, rx: 4, style: 'fill:none;stroke:var(--c-c);stroke-width:3' }, res);
+  el('text', { class: 'txs', x: X + 586, y: 344 + 46 + 32, style: 'fill:var(--c-c)', text: 'once' }, res);
+}
+
+function drawMapping() {
+  const svg = document.getElementById('map-svg');
+  const raw = ['San José', 'san jose', 'S. José', '" San Jose "', 'LIMON', 'Limon'];
+  el('text', { class: 'ttl', x: 0, y: 22, text: 'raw values' }, svg);
+  el('text', { class: 'ttl', x: 500, y: 22, text: 'standard value' }, svg);
+  const RY = (i) => 44 + i * 78 + (i >= 4 ? 20 : 0);
+  const targets = [[500, (RY(0) + RY(3)) / 2 + 24, 'San José'], [500, (RY(4) + RY(5)) / 2 + 24, 'Limón']];
+  raw.forEach((t, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${i * 0.1}s` }, svg);
+    el('rect', { class: 'box', x: 0, y: RY(i), width: 290, height: 48, rx: 4 }, g);
+    el('text', { class: 'txs', x: 145, y: RY(i) + 32, 'text-anchor': 'middle', text: t }, g);
+    const [tx, ty] = targets[i < 4 ? 0 : 1];
+    el('path', { class: 'wire an-draw', pathLength: 1, style: `--d:${0.7 + i * 0.1}s`, d: `M290 ${RY(i) + 24}C400 ${RY(i) + 24} 390 ${ty} ${tx - 8} ${ty}`, 'marker-end': 'url(#ah)' }, svg);
+  });
+  targets.forEach(([x, y, t], k) => {
+    const g = el('g', { class: 'an-pop', style: `--d:${1.3 + k * 0.2}s` }, svg);
+    el('rect', { class: 'box-a', x, y: y - 32, width: 270, height: 64, rx: 4 }, g);
+    el('text', { class: 'tx', x: x + 135, y: y + 10, 'text-anchor': 'middle', 'font-weight': 600, text: t }, g);
+  });
+  el('text', { class: 'txs an-fade', style: '--d:1.8s', x: 0, y: 545, text: 'Before: 6 categories. After: 2.' }, svg);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.missing = (() => {
+  const svg = document.getElementById('miss-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [0, 120], y: [0, 18], xt: [0, 20, 40, 60, 80, 100, 120], yt: [0, 5, 10, 15], xl: 'commute time (minutes)', yl: 'number of people' });
+  const r = rng(21), N = 40;
+  const MISS = [3, 7, 12, 16, 21, 25, 29, 33, 36, 39];
+  const isMiss = new Set(MISS);
+  const vals = Array.from({ length: N }, () => clamp(Math.round(Math.exp(3.2 + 0.5 * gauss(r))), 4, 115));
+  const obs = vals.filter((_, i) => !isMiss.has(i));
+  /* tray for the missing answers */
+  const tx = (k) => F.sx(80 + (k % 5) * 8), ty = (k) => F.sy(k < 5 ? 12.3 : 10.1);
+  el('rect', { x: F.sx(75), y: F.sy(13.2), width: F.sx(117) - F.sx(75), height: F.sy(9.2) - F.sy(13.2), rx: 6, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:8 6' }, F.plot);
+  const trayLab = el('text', { class: 'txs', x: F.sx(96), y: F.sy(9.2) + 32, 'text-anchor': 'middle', text: '' }, F.plot);
+  const muLine = el('line', { class: 'curve-a', y1: F.T, y2: F.H - F.B, style: 'stroke-width:4' }, F.plot);
+  const mdLine = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--c-d);stroke-width:4;stroke-dasharray:12 8' }, F.plot);
+  const dots = vals.map(() => el('circle', { class: 'mdot', cx: 0, cy: 0, r: 11, style: 'stroke:var(--myst-color-bg);stroke-width:2' }, F.plot));
+  const lg = legend(svg, F.sx(76), F.T + 26, [['dot', 'fa', 'answered'], ['dot', 'fb', 'filled in'], ['line', 'curve-a', 'mean'], ['line', '', 'median']]);
+  lg.querySelectorAll('line')[1].setAttribute('style', 'stroke:var(--c-d);stroke-width:4;stroke-dasharray:8 5');
+  const btnIds = ['miss-drop', 'miss-mean', 'miss-median'];
+  function render(mode) {
+    const fill = mode === 'mean' ? mean(obs) : mode === 'median' ? median(obs) : null;
+    const counts = new Array(24).fill(0), used = [];
+    const order = [...vals.keys()].sort((a, b) => (isMiss.has(a) - isMiss.has(b)) || (a - b));
+    order.forEach((i) => {
+      const d = dots[i], miss = isMiss.has(i);
+      if (miss && fill === null) {
+        const k = MISS.indexOf(i);
+        d.style.transform = `translate(${tx(k)}px,${ty(k)}px)`;
+        d.style.opacity = mode === 'drop' ? 0 : 1;
+        d.style.fill = 'var(--myst-color-bg)'; d.style.stroke = 'var(--myst-color-text-tertiary)'; d.style.strokeDasharray = '5 4';
+        return;
+      }
+      const v = miss ? fill : vals[i], b = clamp(Math.floor(v / 5), 0, 23), c = counts[b]++;
+      d.style.transform = `translate(${F.sx(b * 5 + 2.5)}px,${F.sy(c + 0.5)}px)`;
+      d.style.opacity = 1;
+      d.style.fill = miss ? 'var(--c-b)' : 'var(--c-a)'; d.style.stroke = 'var(--myst-color-bg)'; d.style.strokeDasharray = 'none';
+      used.push(v);
+    });
+    const mu = mean(used), md = median(used);
+    [[muLine, mu], [mdLine, md]].forEach(([ln, v]) => { ln.setAttribute('x1', F.sx(v)); ln.setAttribute('x2', F.sx(v)); });
+    trayLab.textContent = mode === 'orig' ? '10 missing answers' : mode === 'drop' ? '10 rows dropped' : `filled with ${fmt(fill, 1)} min`;
+    document.getElementById('miss-rows').textContent = mode === 'drop' ? '30' : '40';
+    document.getElementById('miss-filled').textContent = fill === null ? '0' : '10';
+    document.getElementById('miss-mu').textContent = fmt(mu, 1);
+    document.getElementById('miss-md').textContent = fmt(md, 1);
+    btnIds.forEach((id) => document.getElementById(id).classList.toggle('chip', id !== 'miss-' + mode));
+  }
+  document.getElementById('miss-drop').addEventListener('click', () => render('drop'));
+  document.getElementById('miss-mean').addEventListener('click', () => render('mean'));
+  document.getElementById('miss-median').addEventListener('click', () => render('median'));
+  document.getElementById('miss-reset').addEventListener('click', () => { render('orig'); btnIds.forEach((id) => document.getElementById(id).classList.remove('chip')); });
+  render('orig');
+  btnIds.forEach((id) => document.getElementById(id).classList.remove('chip'));
+  return {};
+})();
+
+DEMOS.outlier = (() => {
+  const svg = document.getElementById('out-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 40, x: [0, 2000], y: [0, 10], xt: [0, 500, 1000, 1500, 2000], yt: [], xl: 'monthly electricity use (kWh)' });
+  const r = rng(9);
+  const vals = Array.from({ length: 38 }, () => clamp(Math.round(330 + 75 * gauss(r)), 140, 560));
+  vals.push(820, 1850);
+  const ys = vals.map((v, i) => (v === 820 ? 3.4 : v === 1850 ? 2.2 : 0.8 + 4.4 * r()));
+  const q1 = quantile(vals, 0.25), q3 = quantile(vals, 0.75), iqr = q3 - q1, md = median(vals);
+  const BY0 = 7.3, BY1 = 8.9, BM = (BY0 + BY1) / 2;
+  el('text', { class: 'ttl', x: F.W - F.R - 8, y: F.sy(BM) + 8, 'text-anchor': 'end', text: 'box plot' }, svg);
+  el('text', { class: 'ttl', x: F.W - F.R - 8, y: F.sy(6.3), 'text-anchor': 'end', text: 'one dot per home' }, svg);
+  const whisk = el('path', { style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:3' }, F.plot);
+  el('rect', { class: 'box', x: F.sx(q1), y: F.sy(BY1), width: F.sx(q3) - F.sx(q1), height: F.sy(BY0) - F.sy(BY1) }, F.plot);
+  el('line', { x1: F.sx(md), x2: F.sx(md), y1: F.sy(BY1), y2: F.sy(BY0), style: 'stroke:var(--myst-color-text);stroke-width:4' }, F.plot);
+  const fences = [0, 1].map(() => el('line', { y1: F.sy(9.9), y2: F.sy(0), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2.5;stroke-dasharray:10 8' }, F.plot));
+  const fLabs = [0, 1].map(() => el('text', { class: 'txs', y: F.sy(9.5), text: 'fence' }, F.plot));
+  const muLine = el('line', { class: 'curve-a', y1: F.sy(6), y2: F.sy(0), style: 'stroke-width:4' }, F.plot);
+  const mdLine = el('line', { y1: F.sy(6), y2: F.sy(0), style: 'stroke:var(--c-d);stroke-width:4;stroke-dasharray:12 8' }, F.plot);
+  const dots = vals.map((v, i) => el('circle', { cx: F.sx(v), cy: F.sy(ys[i]), r: 10, class: 'pt fa' }, F.plot));
+  el('text', { class: 'txs', x: F.sx(1850) + 16, y: F.sy(2.2) - 26, 'text-anchor': 'end', text: '1850: an extra zero?' }, F.plot);
+  el('text', { class: 'txs', x: F.sx(820), y: F.sy(3.4) - 26, 'text-anchor': 'middle', text: '820: error or a big family?' }, F.plot);
+  const lg = legend(svg, F.sx(1100), F.T + 28, [['dot', 'fb', 'flagged'], ['line', 'curve-a', 'mean of the rest'], ['line', '', 'median of the rest']]);
+  lg.querySelectorAll('line')[1].setAttribute('style', 'stroke:var(--c-d);stroke-width:4;stroke-dasharray:8 5');
+  document.getElementById('out-all-mu').textContent = Math.round(mean(vals));
+  document.getElementById('out-all-md').textContent = Math.round(md);
+  const slider = document.getElementById('out-k');
+  function draw() {
+    const k = +slider.value, lo = q1 - k * iqr, hi = q3 + k * iqr;
+    document.getElementById('out-k-val').textContent = k.toFixed(2).replace(/0$/, '');
+    const keep = [];
+    vals.forEach((v, i) => {
+      const out = v < lo || v > hi;
+      dots[i].setAttribute('class', 'pt ' + (out ? 'fb' : 'fa'));
+      dots[i].setAttribute('r', out ? 13 : 10);
+      if (!out) keep.push(v);
+    });
+    [lo, hi].forEach((v, j) => {
+      fences[j].setAttribute('x1', F.sx(v)); fences[j].setAttribute('x2', F.sx(v));
+      fLabs[j].setAttribute('x', F.sx(v) + (j ? 10 : -10));
+      fLabs[j].setAttribute('text-anchor', j ? 'start' : 'end');
+    });
+    const wlo = Math.min(...keep), whi = Math.max(...keep), ym = F.sy(BM), t = F.sy(BY1 - 0.4), b = F.sy(BY0 + 0.4);
+    whisk.setAttribute('d', `M${F.sx(wlo)} ${ym}H${F.sx(q1)}M${F.sx(q3)} ${ym}H${F.sx(whi)}M${F.sx(wlo)} ${t}V${b}M${F.sx(whi)} ${t}V${b}`);
+    const mu = mean(keep), m2 = median(keep);
+    muLine.setAttribute('x1', F.sx(mu)); muLine.setAttribute('x2', F.sx(mu));
+    mdLine.setAttribute('x1', F.sx(m2)); mdLine.setAttribute('x2', F.sx(m2));
+    document.getElementById('out-n').textContent = vals.length - keep.length;
+    document.getElementById('out-mu').textContent = Math.round(mu);
+    document.getElementById('out-md').textContent = Math.round(m2);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.pipe = (() => {
+  const START = [
+    ['1', 'San José', '2024-03-01', '24.1', '0.0'],
+    ['2', 'san jose', '2024-03-02', '', '2.5'],
+    ['3', 'Limón', '03/02/2024', '27.8', '41.0'],
+    ['4', 'S. José', '2024-03-03', '75.2 °F', '1.2'],
+    ['5', 'Limón', '2024-03-02', '27.8', '41.0'],
+    ['6', 'Cartago', '2024-03-04', '210', '5.1'],
+    ['7', 'Heredia', '2024-03-04', '22.5', '12,4'],
+  ];
+  const BAD0 = ['1.1', '3.1', '1.3', '2.2', '3.3', 'row4', '5.3', '6.4'];
+  const STEPS = [
+    { name: 'Standardize names', msg: 'Two spellings of San José now match the standard name.', fix: [[1, 1, 'San José'], [3, 1, 'San José']], clear: ['1.1', '3.1'] },
+    { name: 'Unify formats', msg: 'The date and the decimal comma now follow one format. Row 5 now matches row 3 exactly.', fix: [[2, 2, '2024-03-02'], [6, 4, '12.4']], clear: ['2.2', '6.4'] },
+    { name: 'Convert units', msg: '75.2 °F becomes 24.0 °C.', fix: [[3, 3, '24.0']], clear: ['3.3'] },
+    { name: 'Remove duplicates', msg: 'Row 5 repeats row 3, so one copy is removed.', fix: [], clear: ['row4'], drop: 4 },
+    { name: 'Check ranges', msg: '210 °C is impossible here, so it becomes a missing value.', fix: [[5, 3, '']], clear: [] },
+    { name: 'Fill missing', msg: 'Both gaps get the median of the known temperatures, 24.1 °C.', fix: [[1, 3, '24.1'], [5, 3, '24.1']], clear: ['1.3', '5.3'] },
+  ];
+  const body = document.getElementById('pipe-body'), chips = document.getElementById('pipe-steps');
+  const chipEls = STEPS.map((s, i) => { const d = document.createElement('div'); d.textContent = `${i + 1}. ${s.name}`; chips.appendChild(d); return d; });
+  const cells = START.map((row) => {
+    const tr = document.createElement('tr');
+    const tds = row.map((v, j) => { const td = document.createElement('td'); if (j === 0) td.className = 'id'; if (j >= 3) td.classList.add('num'); tr.appendChild(td); return td; });
+    body.appendChild(tr);
+    return { tr, tds };
+  });
+  let data, bad, step, gone;
+  function paint(fixed = new Set()) {
+    cells.forEach(({ tr, tds }, i) => {
+      tr.classList.toggle('gone', gone.has(i));
+      tds.forEach((td, j) => {
+        td.textContent = data[i][j] === '' ? ' ' : data[i][j];
+        td.classList.toggle('bad', bad.has(`${i}.${j}`) || (j > 0 && bad.has('row' + i)));
+        td.classList.toggle('fixed', fixed.has(`${i}.${j}`));
+      });
+    });
+    chipEls.forEach((c, i) => { c.classList.toggle('done', i < step); c.classList.toggle('now', i === step - 1); });
+    document.getElementById('pipe-step').textContent = `${step} / ${STEPS.length}`;
+    document.getElementById('pipe-left').textContent = bad.size;
+    document.getElementById('pipe-rows').textContent = START.length - gone.size;
+  }
+  function reset() {
+    data = START.map((r) => r.slice()); bad = new Set(BAD0); step = 0; gone = new Set();
+    document.getElementById('pipe-msg').textContent = 'Orange cells have a problem. Each click applies one cleaning step.';
+    paint();
+  }
+  document.getElementById('pipe-next').addEventListener('click', () => {
+    if (step >= STEPS.length) return;
+    const s = STEPS[step++], fixed = new Set();
+    s.fix.forEach(([i, j, v]) => { data[i][j] = v; fixed.add(`${i}.${j}`); });
+    s.clear.forEach((k) => bad.delete(k));
+    if (s.drop !== undefined) gone.add(s.drop);
+    document.getElementById('pipe-msg').textContent = s.msg;
+    paint(fixed);
+  });
+  document.getElementById('pipe-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+drawGigo(); drawMissingOptions(); drawDuplicates(); drawMapping();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q-learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488;--c-f:#db2777}
+.dark{--c-e:#2dd4bf;--c-f:#f472b6}
+.bt:disabled{opacity:.45;cursor:default}
+svg .tk{font-size:24px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 21</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Q-learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Learn the value of every action from experience, without a model of the world</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 21 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Learning without a model</li>
+<li class="an-up" style="--d:.15s">The Q-learning update</li>
+<li class="an-up" style="--d:.25s">The algorithm on a grid</li>
+<li class="an-up" style="--d:.35s">Exploration and settings</li>
+<li class="an-up" style="--d:.45s">SARSA, convergence and limits</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:36%"><col style="width:64%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">s, \ a, \ r, \ s'</span></td><td>State, action, reward and next state of one step</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">S_t, \ A_t, \ R_{t+1}</span></td><td>The same quantities at time step <span class="tex">t</span></td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">\gamma</span></td><td>Discount factor, between 0 and 1</td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">\pi(s), \ \pi^*(s)</span></td><td>A policy and the optimal policy</td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">Q(s, a)</span></td><td>Our table of estimates, one number per pair</td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">Q^*(s, a)</span></td><td>The optimal action values we want to learn</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">\alpha</span></td><td>Learning rate (step size), between 0 and 1</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\varepsilon</span></td><td>Exploration rate: chance of a random action</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>A prime marks the next step: <span class="tex">s'</span> comes right after <span class="tex">s</span>.</p><p>Uppercase <span class="tex">S_t</span> is the state at time <span class="tex">t</span> of one run; lowercase <span class="tex">s</span> is any state.</p><p>An <strong>episode</strong> runs from a start state to a terminal state.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Learning without a model</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">We do not know how the world works. We can only act and watch what happens.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Recap">
+<div class="hdr" data-s="Without a model"></div>
+<h2>Where we left off</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">In Topic 20, with <span class="tex">P</span> and <span class="tex">R</span> known, value iteration solves the Bellman optimality equation for <span class="tex">Q^*</span>:</p>
+<div class="eq"><div class="m tex-d">Q^*(s, a) = \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma \max_{a'} Q^*(s', a') \big]</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="r1" style="margin:0">With <span class="tex">Q^*</span> in hand, acting well is easy: in each state, take the action with the largest value.</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">\pi^*(s) = \underset{a}{\arg\max} \ Q^*(s, a)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="r2" style="margin:0">This topic learns <span class="tex">Q^*</span> when <span class="tex">P</span> and <span class="tex">R</span> are unknown.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example: equation (1)</div><p>Moving right always reaches <span class="tex">s'</span>, with <span class="tex">r = 0</span>, <span class="tex">\gamma = 0.9</span> and <span class="tex">\max_{a'} Q^*(s', a') = 0.79</span>:</p><p><span class="tex">Q^*(s, \rightarrow) = 0 + 0.9 \cdot 0.79 \approx 0.71</span></p></aside>
+<aside class="am frag up" data-step="r1"><div class="t">Example: equation (2)</div><p><span class="tex">Q^*(s, \cdot)</span> for <span class="tex">\uparrow \rightarrow \downarrow \leftarrow</span>: 0.66, 0.71, 0.55, 0.60</p><p><span class="tex">\Rightarrow \ \pi^*(s) = \ \rightarrow</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Only experience">
+<div class="hdr" data-s="Without a model"></div>
+<h2>No model, only experience</h2>
+<div class="fr">
+<div class="figbox"><svg id="exp-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A robot, a game or a thermostat rarely comes with its transition probabilities written down.</p>
+<p class="small frag up" data-step="ex" style="margin:0">What the agent can do is try an action and record one <strong>experience tuple</strong> <span class="tex">(s, a, r, s')</span>. Q-learning builds <span class="tex">Q^*</span> from these tuples alone.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) With a model, value iteration computes <span class="tex">Q^*</span>. (b) Without one, the agent learns from a stream of steps.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The Q-table">
+<div class="hdr" data-s="Without a model"></div>
+<h2>The Q-table</h2>
+<div class="fr">
+<div class="figbox"><svg id="tab-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Q-learning stores one number for every state and action: rows are states, columns are actions.</p>
+<p class="small frag up" data-step="tb" style="margin:0">It starts with every entry at 0. Learning fills it in. The greedy action is the largest entry of the row.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>A world with five states and a goal G, <span class="tex">\gamma = 0.9</span>. (a) The table <span class="tex">Q^*</span>. (b) The same numbers drawn as four triangles per cell; arrows show the greedy action.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Small steps">
+<div class="hdr" data-s="Without a model"></div>
+<h2>Learning in small steps</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">To average numbers that arrive one at a time, keep the mean and move it toward each new number <span class="tex">x_n</span>:</p>
+<div class="eq"><div class="m tex-d">\bar{x}_n = \bar{x}_{n-1} + \frac{1}{n} \big( x_n - \bar{x}_{n-1} \big)</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="m1" style="margin:0">Replace <span class="tex">1/n</span> by a fixed step size <span class="tex">\alpha</span>, and the new number by a <strong>target</strong>:</p>
+<div class="eq frag up" data-step="m1"><div class="m tex-d">\text{estimate} \leftarrow \text{estimate} + \alpha \, \big( \text{target} - \text{estimate} \big)</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="m2" style="margin:0">Learning from such targets, step by step, is called <strong>temporal-difference</strong> (TD) learning.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example: equation (3)</div><p>Numbers 4, 8, 3:</p><p><span class="tex">\bar{x}_2 = 4 + \tfrac{1}{2}(8 - 4) = 6</span></p><p><span class="tex">\bar{x}_3 = 6 + \tfrac{1}{3}(3 - 6) = 5</span></p><p>Same as <span class="tex">(4 + 8 + 3)/3 = 5</span>.</p></aside>
+<aside class="am frag up" data-step="m1"><div class="t">Example: equation (4)</div><p>With <span class="tex">\alpha = 0.5</span>: <span class="tex">6 + 0.5(3 - 6) = 4.5</span>. Recent numbers count more.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The Q-learning update</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">One step of experience changes one entry of the table.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Update formulas">
+<div class="hdr" data-s="The update"></div>
+<h2>Target, error, update</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0"><strong>Target</strong>: the reward we got, plus the discounted value of the best action in the next state.</p>
+<div class="eq"><div class="m tex-d">y = r + \gamma \max_{a'} Q(s', a')</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="t2" style="margin:0"><strong>TD error</strong>: how much the target differs from the current estimate.</p>
+<div class="eq frag up" data-step="t2"><div class="m tex-d">\delta = r + \gamma \max_{a'} Q(s', a') - Q(s, a)</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="t3" style="margin:0"><strong>Update</strong>: move the entry a fraction <span class="tex">\alpha</span> of the way to the target.</p>
+<div class="eq frag up" data-step="t3"><div class="m tex-d">Q(s, a) \leftarrow Q(s, a) + \alpha \, \delta</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:20px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">Q(s, a) = 0.5</span>, <span class="tex">r = 0</span>, <span class="tex">\gamma = 0.9</span>, <span class="tex">\max_{a'} Q(s', a') = 0.8</span>, <span class="tex">\alpha = 0.1</span></p>
+<p><span class="tex">y = 0 + 0.9 \cdot 0.8 = 0.72</span></p>
+<p class="frag up" data-step="t2"><span class="tex">\delta = 0.72 - 0.5 = 0.22</span></p>
+<p class="frag up" data-step="t3"><span class="tex">Q(s, a) \leftarrow 0.5 + 0.1 \cdot 0.22 = 0.522</span></p></aside>
+<aside class="am frag up" data-step="t3"><div class="t">Terminal states</div><p>If <span class="tex">s'</span> ends the episode, its value is 0 and the target is just <span class="tex">r</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Update calculator" data-demo="calc">
+<div class="hdr" data-s="The update"></div>
+<h2>One update, step by step</h2>
+<div class="fr">
+<div class="figbox"><svg id="calc-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Before the update, <span class="tex">Q(s, a) = 0.5</span>.</p>
+<div class="ctl"><label><span>Learning rate <span class="tex">\alpha</span></span><b id="calc-al-val">0.10</b></label><input type="range" id="calc-al" min="0" max="1" step="0.05" value="0.1"></div>
+<div class="ctl"><label><span>Reward <span class="tex">r</span></span><b id="calc-r-val">0.0</b></label><input type="range" id="calc-r" min="-1" max="1" step="0.1" value="0"></div>
+<div class="ctl"><label><span>Discount <span class="tex">\gamma</span></span><b id="calc-g-val">0.90</b></label><input type="range" id="calc-g" min="0" max="1" step="0.05" value="0.9"></div>
+<div class="ctl"><label><span><span class="tex">\max_{a'} Q(s', a')</span></span><b id="calc-m-val">0.80</b></label><input type="range" id="calc-m" min="-1" max="1" step="0.05" value="0.8"></div>
+<div class="ro"><span>TD error <span class="tex">\delta</span></span><b id="calc-d" class="bb">0</b></div>
+<div class="ro"><span>New <span class="tex">Q(s, a)</span></span><b id="calc-q" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>One step, and its old value, target and new value.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The algorithm">
+<div class="hdr" data-s="The update"></div>
+<h2>The algorithm</h2>
+<div class="fr">
+<div class="figbox"><svg id="alg-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Q-learning repeats the same small loop for many episodes. Every step uses one tuple <span class="tex">(s, a, r, s')</span> and changes one entry.</p>
+<p class="small frag up" data-step="al" style="margin:0">The agent never needs <span class="tex">P</span> or <span class="tex">R</span>. The environment answers each action, and the table slowly absorbs the answers.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Q-learning as a loop over episodes (outer) and steps (inner).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Grid demo" data-demo="grid">
+<div class="hdr" data-s="The update"></div>
+<h2>Q-learning on a grid</h2>
+<div class="fr">
+<div class="figbox"><svg id="grid-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Each move costs 0.04; the goal pays +1 and a pit −1.</p>
+<p class="small" style="margin:0"><span class="tex">\alpha = 0.5, \ \gamma = 0.9, \ \varepsilon = 0.1</span></p>
+<div class="btns"><button class="bt" id="gd-step">▶ Step</button><button class="bt" id="gd-ep">▶ Episode</button></div>
+<div class="btns"><button class="bt chip" id="gd-100">Run 100 episodes</button><button class="bt chip" id="gd-reset">Reset</button></div>
+<div class="ro"><span>Episodes finished</span><b id="gd-n">0</b></div>
+<div class="ro"><span>Steps in this episode</span><b id="gd-t" class="a">0</b></div>
+<div class="ro"><span>Last TD error <span class="tex">\delta</span></span><b id="gd-d" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Triangles show the four values of a cell: blue positive, orange negative. Arrows: greedy action.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Exploration and settings</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">How to try new actions, how to set the knobs, and where tables stop working.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Greedy gets stuck">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Why pure greedy gets stuck</h2>
+<div class="fr">
+<div class="figbox"><svg id="stuck-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A greedy agent only takes the action that looks best now. Once the left path pays something, the right action keeps its starting value 0 and is never tried.</p>
+<p class="small frag up" data-step="sk" style="margin:0">A few random actions are enough to discover the +10 on the right. Its value then flows back and the greedy choice changes.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>A corridor with <span class="tex">\gamma = 0.9</span> and rewards only at the two ends. Numbers are <span class="tex">Q(s, \leftarrow)</span> and <span class="tex">Q(s, \rightarrow)</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Epsilon-greedy">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Exploring with ε-greedy</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">With probability <span class="tex">\varepsilon</span> pick a random action; otherwise pick the greedy one. With <span class="tex">|\mathcal{A}|</span> actions:</p>
+<div class="eq"><div class="m tex-d">\pi(a \mid s) = \begin{cases} 1 - \varepsilon + \dfrac{\varepsilon}{|\mathcal{A}|} & \text{if } a = \arg\max_{a'} Q(s, a') \\[8pt] \dfrac{\varepsilon}{|\mathcal{A}|} & \text{otherwise} \end{cases}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="e1" style="margin:0">The greedy action also wins some random draws, hence the extra <span class="tex">\varepsilon / |\mathcal{A}|</span>.</p>
+<p class="small frag up" data-step="e2" style="margin:12px 0 0"><strong>Decaying</strong> <span class="tex">\varepsilon</span>: explore a lot at first, when the table knows little, and less later.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Four actions, <span class="tex">\varepsilon = 0.2</span>:</p><p>greedy action: <span class="tex">1 - 0.2 + 0.05 = 0.85</span></p><p>each other action: <span class="tex">0.2 / 4 = 0.05</span></p></aside>
+<aside class="am frag up" data-step="e2"><div class="t">Example: decay</div><p>Start at <span class="tex">\varepsilon = 1</span> and multiply by 0.99 after each episode: 0.37 after 100 episodes, 0.05 after 300.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Settings" data-demo="curves">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Choosing α, γ and ε</h2>
+<div class="fr">
+<div class="figbox"><svg id="cur-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:10px">
+<p class="small" style="margin:0">Blue: your settings. Orange: a fixed reference. Grid of Figure 5.</p>
+<div class="ctl"><label><span>Learning rate <span class="tex">\alpha</span></span><b id="cur-al-val">0.05</b></label><input type="range" id="cur-al" min="0.01" max="1" step="0.01" value="0.05"></div>
+<div class="ctl"><label><span>Discount <span class="tex">\gamma</span></span><b id="cur-g-val">0.90</b></label><input type="range" id="cur-g" min="0" max="1" step="0.05" value="0.9"></div>
+<div class="ctl"><label><span>Exploration <span class="tex">\varepsilon</span></span><b id="cur-e-val">0.10</b></label><input type="range" id="cur-e" min="0" max="0.5" step="0.01" value="0.1"></div>
+<div class="ro"><span>Last 100 episodes, yours</span><b id="cur-ya" class="a">0</b></div>
+<div class="ro"><span>Last 100, reference</span><b id="cur-yb" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Reward per episode, average of 40 runs. Reference: <span class="tex">\alpha = 0.5, \ \gamma = 0.9, \ \varepsilon = 0.1</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="SARSA">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Q-learning and SARSA</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column;min-height:0">
+<p class="small" style="margin:0">Q-learning is <strong>off-policy</strong>: it acts <span class="tex">\varepsilon</span>-greedily but learns the greedy policy. <strong>SARSA</strong> is <strong>on-policy</strong>: its target uses the action <span class="tex">a'</span> it will really take next.</p>
+<div class="eq"><div class="m tex-d">y_{\text{SARSA}} = r + \gamma \, Q(s', a') \qquad \text{vs} \qquad y_{\text{Q}} = r + \gamma \max_{a'} Q(s', a')</div><div class="n">(9)</div></div>
+<div class="figbox frag" data-step="sa" style="flex:none;height:330px;margin-top:8px"><svg id="cliff-svg" viewBox="0 0 1160 330"></svg></div>
+<p class="cap frag" data-step="sa" style="margin-top:12px"><b>Figure 8:</b>Cliff walking. Each move costs 1; falling costs 100. Q-learning learns the shortest path along the edge and falls now and then while exploring. SARSA counts its own random moves and learns a safer path.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">r = 0</span>, <span class="tex">\gamma = 0.9</span>. In <span class="tex">s'</span> the best action has <span class="tex">Q = 0.8</span>, but the agent explores and picks <span class="tex">a'</span> with <span class="tex">Q(s', a') = 0.3</span>.</p><p>SARSA: <span class="tex">0 + 0.9 \cdot 0.3 = 0.27</span></p><p>Q-learning: <span class="tex">0 + 0.9 \cdot 0.8 = 0.72</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Convergence">
+<div class="hdr" data-s="Exploration"></div>
+<h2>When it converges</h2>
+<div class="fr">
+<div class="figbox"><svg id="conv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">In a finite problem, Q-learning reaches <span class="tex">Q^*</span> if two conditions hold:</p>
+<p class="small" style="margin:0">1. Every pair <span class="tex">(s, a)</span> keeps being tried, again and again.</p>
+<p class="small" style="margin:0">2. The step size <span class="tex">\alpha</span> shrinks over time, but slowly, for example <span class="tex">1/n</span>.</p>
+<p class="small frag up" data-step="cv" style="margin:0">A constant <span class="tex">\alpha</span> keeps reacting to noise; in practice a small constant is usually good enough.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>One entry learned from random rewards, 0 or 1 with equal chance. Its true value is 0.5.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Tables do not scale">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Tables do not scale</h2>
+<div class="fr">
+<div class="figbox"><svg id="big-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A table needs one entry per state and action, and every entry must be visited many times.</p>
+<p class="small frag up" data-step="bg" style="margin:0">For large or continuous problems we replace the table by a function with weights that maps a state to its action values. A neural network used this way is a <strong>deep Q-network</strong> (chapter 6).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>(a) Number of states, log scale. (b) A function that generalizes from visited states to similar ones.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Exploration"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Q-learning at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Learns from experience; no model of <span class="tex">P</span> and <span class="tex">R</span></td><td>Needs many episodes, even on small problems</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Simple update: one entry per step</td><td>The table grows with every state and action</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Off-policy: learns the best policy while exploring</td><td>Results depend on <span class="tex">\alpha</span>, <span class="tex">\gamma</span>, <span class="tex">\varepsilon</span> and the rewards</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Reaches <span class="tex">Q^*</span> in finite problems under mild conditions</td><td>Continuous states need a function, not a table</td></tr>
+<tr class="an-up" style="--d:.45s"><td>The policy is read directly from the table</td><td>The max over noisy estimates tends to overestimate</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>Small problems with a few discrete states and actions, a simulator to practice in, and no model of the environment.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Q-learning learns <span class="tex">Q^*</span> from tuples <span class="tex">(s, a, r, s')</span> without knowing <span class="tex">P</span> or <span class="tex">R</span>.</li>
+<li class="an-up" style="--d:.15s">Each step moves one entry toward <span class="tex">r + \gamma \max_{a'} Q(s', a')</span> by a fraction <span class="tex">\alpha</span> of the TD error.</li>
+<li class="an-up" style="--d:.25s"><span class="tex">\varepsilon</span>-greedy mixes random actions with greedy ones so that better paths can be found.</li>
+<li class="an-up" style="--d:.35s">Q-learning is off-policy; SARSA learns the policy it follows and plays safer.</li>
+<li class="an-up" style="--d:.45s">Tables only fit small problems; large ones replace the table by a function.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The thesis that introduced Q-learning, its convergence proof, the textbook chapter on TD learning, and deep Q-networks.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Watkins, C. J. C. H. (1989). <em>Learning from delayed rewards</em> (PhD thesis). King's College, University of Cambridge.</li>
+<li style="margin:.4em 0">Watkins, C. J. C. H., &amp; Dayan, P. (1992). Q-learning. <em>Machine Learning</em>, 8(3), 279–292.</li>
+<li style="margin:.4em 0">Rummery, G. A., &amp; Niranjan, M. (1994). <em>On-line Q-learning using connectionist systems</em> (Technical report CUED/F-INFENG/TR 166). Cambridge University Engineering Department.</li>
+<li style="margin:.4em 0">Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.), Chapter 6. MIT Press.</li>
+<li style="margin:.4em 0">Mnih, V., Kavukcuoglu, K., Silver, D., et al. (2015). Human-level control through deep reinforcement learning. <em>Nature</em>, 518(7540), 529–533.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 22: deep learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { el, rng, clamp, fmt, frame, legend } = window.Deck;
+
+/* ───────── shared helpers and the grid world ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const ARROWS = ['↑', '→', '↓', '←'];
+const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const sgn = (v, d = 2) => (v < 0 ? '−' : '') + fmt(Math.abs(v), d);
+/* 5 × 5 grid: start bottom-left, goal top-right, three pits; each move costs 0.04 */
+const WORLD = { cols: 5, rows: 5, start: 20, goal: 4, pits: new Set([6, 8, 17]), cost: -0.04, cap: 100 };
+function move(w, s, a) {
+  const x = s % w.cols, y = Math.floor(s / w.cols);
+  const s2 = clamp(y + DY[a], 0, w.rows - 1) * w.cols + clamp(x + DX[a], 0, w.cols - 1);
+  if (s2 === w.goal) return [s2, 1, true];
+  if (w.pits.has(s2)) return [s2, -1, true];
+  return [s2, w.cost, false];
+}
+const maxQ = (Q, s) => Math.max(Q[4 * s], Q[4 * s + 1], Q[4 * s + 2], Q[4 * s + 3]);
+function greedy(Q, s, r) {
+  const m = maxQ(Q, s), best = [0, 1, 2, 3].filter((a) => Q[4 * s + a] === m);
+  return best[Math.floor(r() * best.length)];
+}
+const egreedy = (Q, s, eps, r) => (r() < eps ? Math.floor(r() * 4) : greedy(Q, s, r));
+/* one Q-learning step; returns what happened */
+function qstep(w, Q, s, p, r) {
+  const a = egreedy(Q, s, p.eps, r);
+  const [s2, rew, done] = move(w, s, a);
+  const old = Q[4 * s + a];
+  const delta = rew + (done ? 0 : p.gamma * maxQ(Q, s2)) - old;
+  Q[4 * s + a] = old + p.alpha * delta;
+  return { s, a, s2, rew, done, delta, old, nw: Q[4 * s + a] };
+}
+/* blue for positive values, orange for negative ones */
+function qStyle(v, scale = 1) {
+  if (Math.abs(v) < 1e-9) return 'fill:var(--myst-color-bg)';
+  const op = 0.15 + 0.75 * Math.sqrt(Math.min(1, Math.abs(v) / scale));
+  return `fill:var(${v > 0 ? '--c-a' : '--c-b'});fill-opacity:${op.toFixed(3)}`;
+}
+function tri(x0, y0, C, a) {
+  const cx = x0 + C / 2, cy = y0 + C / 2;
+  const P = [[[x0, y0], [x0 + C, y0]], [[x0 + C, y0], [x0 + C, y0 + C]], [[x0 + C, y0 + C], [x0, y0 + C]], [[x0, y0 + C], [x0, y0]]][a];
+  return `${P[0][0]},${P[0][1]} ${P[1][0]},${P[1][1]} ${cx},${cy}`;
+}
+function arrow(g, cx, cy, a, len, cls = 'wire', marker = 'ah') {
+  return el('path', { class: cls, d: `M${cx - DX[a] * len * 0.55} ${cy - DY[a] * len * 0.55}L${cx + DX[a] * len} ${cy + DY[a] * len}`, 'marker-end': `url(#${marker})`, style: 'stroke-width:4' }, g);
+}
+function box(g, x, y, w, h, lines, cls = 'box', size = 'tx') {
+  el('rect', { class: cls, x, y, width: w, height: h, rx: 10 }, g);
+  const n = lines.length, lh = size === 'tx' ? 36 : 32;
+  lines.forEach((t, i) => el('text', { class: size, x: x + w / 2, y: y + h / 2 + (i - (n - 1) / 2) * lh + 9, 'text-anchor': 'middle', text: t }, g));
+}
+
+/* ───────── static figures ───────── */
+function drawExperience() {
+  const svg = $('exp-svg');
+  const a = el('g', { class: 'an-fade' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 28, text: '(a) Topic 20: the model is known' }, a);
+  box(a, 0, 56, 330, 120, ['P(s′ | s, a)', 'R(s, a, s′)']);
+  box(a, 430, 76, 300, 80, ['value iteration']);
+  box(a, 830, 76, 330, 80, ['Q*(s, a)'], 'box-a');
+  el('path', { class: 'wire', d: 'M340 116H420', 'marker-end': 'url(#ah)' }, a);
+  el('path', { class: 'wire', d: 'M740 116H820', 'marker-end': 'url(#ah)' }, a);
+
+  const b = el('g', { class: 'an-fade', style: '--d:.5s' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 268, text: '(b) This topic: only experience' }, b);
+  box(b, 0, 300, 300, 100, ['agent'], 'box-a');
+  box(b, 0, 560, 300, 120, ['environment', 'P and R hidden']);
+  el('path', { class: 'wire', d: 'M220 410V550', 'marker-end': 'url(#ah)' }, b);
+  el('path', { class: 'wire', d: 'M80 550V410', 'marker-end': 'url(#ah)' }, b);
+  el('text', { class: 'txs', x: 236, y: 490, text: 'a' }, b);
+  el('text', { class: 'txs', x: 64, y: 490, 'text-anchor': 'end', text: 'r, s′' }, b);
+
+  const rows = [['s', 'a', 'r', 's′'], ['A', '→', '−0.04', 'B'], ['B', '↑', '−0.04', 'B'], ['B', '→', '−0.04', 'C'], ['C', '→', '+1', 'goal']];
+  const XS = [470, 600, 730, 890];
+  rows.forEach((row, i) => {
+    const g = el('g', i ? { class: 'frag', 'data-step': 'ex' } : {}, svg);
+    if (!i) el('text', { class: 'ttl', x: 420, y: 330, text: 'experience tuples, one per step' }, g);
+    const y = 400 + i * 62;
+    el('text', { class: 'tx', x: 420, y, text: '(' }, g);
+    row.forEach((t, j) => el('text', { class: i ? 'tx' : 'tx', x: XS[j], y, 'text-anchor': 'middle', style: i ? '' : 'font-weight:700', text: t + (j < 3 ? ',' : '') }, g));
+    el('text', { class: 'tx', x: 970, y, text: ')' }, g);
+  });
+  const g = el('g', { class: 'frag', 'data-step': 'ex' }, svg);
+  el('path', { class: 'wire-a', d: 'M1060 560V180', 'marker-end': 'url(#ah-a)' }, g);
+  el('text', { class: 'txs', x: 1076, y: 400, style: 'fill:var(--c-a)', text: 'learn' }, g);
+  el('text', { class: 'txs', x: 1076, y: 432, style: 'fill:var(--c-a)', text: 'directly' }, g);
+}
+
+function drawTable() {
+  const svg = $('tab-svg');
+  const names = ['A', 'B', 'C', 'D', 'E'];
+  const Qs = [[0.81, 0.90, 0.73, 0.81], [0.90, 1.00, 0.81, 0.81], [0.81, 0.81, 0.73, 0.73], [0.90, 0.90, 0.81, 0.73], [1.00, 0.90, 0.90, 0.81]];
+  const cells = [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1]];
+  /* (a) the table */
+  const X0 = 0, Y0 = 90, CW = 116, SW = 110, RH = 88;
+  el('text', { class: 'ttl', x: 0, y: 40, text: '(a) the table: states × actions' }, svg);
+  const head = el('g', { class: 'an-fade' }, svg);
+  el('text', { class: 'tx', x: X0 + SW / 2, y: Y0 + 54, 'text-anchor': 'middle', style: 'font-weight:700', text: 'state' }, head);
+  ARROWS.forEach((t, j) => el('text', { class: 'tx', x: X0 + SW + CW * j + CW / 2, y: Y0 + 56, 'text-anchor': 'middle', style: 'font-weight:700', text: t }, head));
+  el('line', { class: 'ax', x1: X0, x2: X0 + SW + 4 * CW, y1: Y0 + RH, y2: Y0 + RH }, head);
+  Qs.forEach((row, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + i * 0.1}s` }, svg);
+    const y = Y0 + RH * (i + 1);
+    el('text', { class: 'tx', x: X0 + SW / 2, y: y + 56, 'text-anchor': 'middle', text: names[i] }, g);
+    const m = Math.max(...row);
+    row.forEach((v, j) => {
+      if (v === m) el('rect', { x: X0 + SW + CW * j + 8, y: y + 14, width: CW - 16, height: RH - 28, rx: 8, style: 'fill:var(--myst-color-accent-surface);stroke:var(--c-a);stroke-width:2.5' }, g);
+      el('text', { class: 'tx', x: X0 + SW + CW * j + CW / 2, y: y + 56, 'text-anchor': 'middle', text: fmt(v, 2) }, g);
+    });
+    el('line', { class: 'gl', x1: X0, x2: X0 + SW + 4 * CW, y1: y + RH, y2: y + RH }, g);
+  });
+  /* (b) the same numbers on the grid */
+  const GX = 740, GY = 130, C = 140;
+  el('text', { class: 'ttl', x: GX, y: 40, text: '(b) the same table on the grid' }, svg);
+  const gg = el('g', { class: 'frag', 'data-step': 'tb' }, svg);
+  cells.forEach(([cx, cy], i) => {
+    const x0 = GX + cx * C, y0 = GY + cy * C;
+    const m = Math.max(...Qs[i]);
+    [0, 1, 2, 3].forEach((a) => el('polygon', { points: tri(x0, y0, C, a), style: `fill:var(--c-a);fill-opacity:${(0.1 + 2.6 * (Qs[i][a] - 0.7)).toFixed(2)};stroke:var(--myst-color-border);stroke-width:1.5` }, gg));
+    [0, 1, 2, 3].filter((a) => Qs[i][a] === m).forEach((a) => el('path', { class: 'wire', d: `M${x0 + C / 2} ${y0 + C / 2}L${x0 + C / 2 + DX[a] * 44} ${y0 + C / 2 + DY[a] * 44}`, 'marker-end': 'url(#ah)', style: 'stroke-width:4' }, gg));
+    el('text', { class: 'tx', x: x0 + 14, y: y0 + 36, style: 'font-weight:700', text: names[i] }, gg);
+  });
+  el('rect', { x: GX + 2 * C, y: GY, width: C, height: C, style: 'fill:var(--c-c);fill-opacity:.3;stroke:var(--c-c);stroke-width:3' }, gg);
+  el('text', { class: 'tx', x: GX + 2.5 * C, y: GY + C / 2 + 10, 'text-anchor': 'middle', style: 'font-weight:700', text: 'G' }, gg);
+  el('rect', { x: GX, y: GY, width: 3 * C, height: 2 * C, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:3' }, gg);
+  el('text', { class: 'txs', x: GX, y: GY + 2 * C + 50, text: 'darker blue = larger value' }, gg);
+  el('text', { class: 'txs', x: GX, y: GY + 2 * C + 84, text: 'entering G pays +1' }, gg);
+}
+
+function drawAlgorithm() {
+  const svg = $('alg-svg');
+  const X = 230, W = 640;
+  const steps = [
+    [10, ['set Q(s, a) = 0 for every pair']],
+    [120, ['new episode: s ← start state']],
+    [230, ['choose a in s with ε-greedy']],
+    [340, ['take a, observe r and s′']],
+    [450, ['Q(s, a) ← Q(s, a) + α δ']],
+  ];
+  steps.forEach(([y, lines], i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${i * 0.25}s` }, svg);
+    box(g, X, y, W, 76, lines, i === 4 ? 'box-a' : 'box');
+    if (i) el('path', { class: 'wire', d: `M${X + W / 2} ${steps[i - 1][0] + 80}V${y - 4}`, 'marker-end': 'url(#ah)' }, svg);
+  });
+  /* decision diamond */
+  const dg = el('g', { class: 'an-up', style: '--d:1.25s' }, svg);
+  const cx = X + W / 2, cy = 615;
+  el('path', { class: 'box', d: `M${cx} ${cy - 55}L${cx + 190} ${cy}L${cx} ${cy + 55}L${cx - 190} ${cy}Z` }, dg);
+  el('text', { class: 'tx', x: cx, y: cy + 10, 'text-anchor': 'middle', text: 's′ terminal?' }, dg);
+  el('path', { class: 'wire', d: `M${cx} 530V${cy - 59}`, 'marker-end': 'url(#ah)' }, svg);
+  /* inner loop: no */
+  const inner = el('g', { class: 'an-fade', style: '--d:1.6s' }, svg);
+  el('path', { class: 'wire-a', d: `M${cx + 190} ${cy}H${X + W + 110}V268H${X + W + 8}`, 'marker-end': 'url(#ah-a)' }, inner);
+  el('text', { class: 'txs', x: X + W + 124, y: 440, style: 'fill:var(--c-a)', text: 'no:' }, inner);
+  el('text', { class: 'txs', x: X + W + 124, y: 474, style: 'fill:var(--c-a)', text: 's ← s′' }, inner);
+  /* outer loop: yes */
+  const outer = el('g', { class: 'an-fade', style: '--d:2s' }, svg);
+  el('path', { class: 'wire', d: `M${cx - 190} ${cy}H${X - 110}V158H${X - 8}`, 'marker-end': 'url(#ah)' }, outer);
+  el('text', { class: 'txs', x: X - 124, y: 400, 'text-anchor': 'end', text: 'yes:' }, outer);
+  el('text', { class: 'txs', x: X - 124, y: 434, 'text-anchor': 'end', text: 'next' }, outer);
+  el('text', { class: 'txs', x: X - 124, y: 468, 'text-anchor': 'end', text: 'episode' }, outer);
+}
+
+function drawStuck() {
+  const svg = $('stuck-svg');
+  const N = 7, C = 150, X0 = 55;
+  function corridor(g, y0, vals, title) {
+    el('text', { class: 'ttl', x: X0, y: y0 - 90, text: title }, g);
+    for (let i = 0; i < N; i++) {
+      const x = X0 + i * C, end = i === 0 || i === N - 1;
+      el('rect', { x, y: y0, width: C, height: C, style: end ? 'fill:var(--c-c);fill-opacity:.25;stroke:var(--c-c);stroke-width:3' : 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+      if (end) el('text', { class: 'tx', x: x + C / 2, y: y0 + C / 2 + 12, 'text-anchor': 'middle', style: 'font-weight:700;font-size:36px', text: i ? '+10' : '+1' }, g);
+      else {
+        el('text', { class: 'txs', x: x + C / 2, y: y0 + 64, 'text-anchor': 'middle', text: '← ' + vals[i][0] }, g);
+        el('text', { class: 'txs', x: x + C / 2, y: y0 + 108, 'text-anchor': 'middle', text: '→ ' + vals[i][1] }, g);
+      }
+    }
+    el('text', { class: 'txs', x: X0 + 2.5 * C, y: y0 + C + 36, 'text-anchor': 'middle', style: 'font-weight:700', text: 'start' }, g);
+  }
+  const a = el('g', { class: 'an-fade' }, svg);
+  const vA = [null, ['1.0', '0'], ['0.9', '0'], ['0', '0'], ['0', '0'], ['0', '0']];
+  corridor(a, 110, vA, '(a) greedy: after a few episodes');
+  el('path', { class: 'wire-a', d: `M${X0 + 2.5 * C} 104C${X0 + 2.5 * C} 60 ${X0 + 0.5 * C} 60 ${X0 + 0.5 * C} 104`, 'marker-end': 'url(#ah-a)' }, a);
+  el('text', { class: 'txs', x: X0 + 2.5 * C + 30, y: 84, style: 'fill:var(--c-a)', text: 'always left, since 0.9 > 0' }, a);
+  const b = el('g', { class: 'frag', 'data-step': 'sk' }, svg);
+  const vB = [null, ['1.0', '6.56'], ['5.90', '7.29'], ['6.56', '8.1'], ['7.29', '9.0'], ['8.1', '10']];
+  corridor(b, 480, vB, '(b) with exploration: after many episodes');
+  el('path', { d: `M${X0 + 2.5 * C} 474C${X0 + 2.5 * C} 444 ${X0 + 6.5 * C} 444 ${X0 + 6.5 * C} 474`, style: 'fill:none;stroke:var(--c-b);stroke-width:3;stroke-dasharray:10 8', 'marker-end': 'url(#ah)' }, b);
+  el('text', { class: 'txs', x: X0 + 4.5 * C, y: 436, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'random steps find +10: now 7.29 > 5.90' }, b);
+}
+
+function drawCliff() {
+  const svg = $('cliff-svg');
+  const C = 66, X0 = 10, Y0 = 20, NC = 10, NR = 4;
+  for (let i = 0; i < NC; i++) for (let j = 0; j < NR; j++) {
+    const cliff = j === NR - 1 && i > 0 && i < NC - 1;
+    el('rect', { x: X0 + i * C, y: Y0 + j * C, width: C, height: C, style: cliff ? 'fill:var(--myst-color-text-tertiary);fill-opacity:.55;stroke:var(--myst-color-bg);stroke-width:1' : 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border);stroke-width:1.5' }, svg);
+  }
+  el('text', { class: 'tx', x: X0 + 5 * C, y: Y0 + 3.5 * C + 10, 'text-anchor': 'middle', style: 'fill:var(--myst-color-bg);font-weight:700', text: 'cliff' }, svg);
+  el('text', { class: 'tx', x: X0 + 0.5 * C, y: Y0 + 3.5 * C + 10, 'text-anchor': 'middle', style: 'font-weight:700', text: 'S' }, svg);
+  el('text', { class: 'tx', x: X0 + 9.5 * C, y: Y0 + 3.5 * C + 10, 'text-anchor': 'middle', style: 'font-weight:700', text: 'G' }, svg);
+  const px = (i) => X0 + (i + 0.5) * C, py = (j) => Y0 + (j + 0.5) * C;
+  el('path', { class: 'curve-a', d: `M${px(0)} ${py(3) - 22}V${py(2)}H${px(9)}V${py(3) - 24}`, 'marker-end': 'url(#ah-a)' }, svg);
+  el('path', { class: 'curve-b', d: `M${px(0) - 14} ${py(3) - 22}V${py(0)}H${px(9) + 14}V${py(3) - 24}`, 'marker-end': 'url(#ah)' }, svg);
+  legend(svg, 720, 90, [['line', 'curve-a', 'Q-learning: shortest'], ['line', 'curve-b', 'SARSA: safer']]);
+  el('text', { class: 'txs', x: 720, y: 220, text: 'S: start, G: goal' }, svg);
+}
+
+function drawConvergence() {
+  const svg = $('conv-svg'), r = rng(77), N = 200;
+  const F = frame(svg, { W: 1160, H: 700, l: 100, t: 30, x: [0, N], y: [0, 1], xt: [0, 50, 100, 150, 200], yt: [0, 0.25, 0.5, 0.75, 1], fy: (v) => fmt(v, 2), xl: 'number of updates of this entry', yl: 'estimate Q(s, a)' });
+  let qc = 0, qm = 0;
+  const pc = [[0, 0]], pm = [[0, 0]];
+  for (let n = 1; n <= N; n++) {
+    const rew = r() < 0.5 ? 1 : 0;
+    qc += 0.3 * (rew - qc); qm += (rew - qm) / n;
+    pc.push([n, qc]); pm.push([n, qm]);
+  }
+  const path = (P) => P.map(([x, y], i) => (i ? 'L' : 'M') + F.sx(x).toFixed(1) + ' ' + F.sy(y).toFixed(1)).join('');
+  el('line', { class: 'curve-t', x1: F.sx(0), x2: F.sx(N), y1: F.sy(0.5), y2: F.sy(0.5) }, F.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: 'stroke-width:3', d: path(pc) }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, style: '--d:.6s', d: path(pm) }, F.plot);
+  const lg = el('g', { class: 'bgf' }, svg);
+  el('rect', { x: F.sx(95), y: F.sy(0.99), width: 470, height: 124, rx: 8, style: 'fill:var(--myst-color-bg);opacity:.9' }, lg);
+  legend(svg, F.sx(100), F.sy(0.99) + 28, [['line', 'curve-b', 'constant α = 0.3'], ['line', 'curve-a', 'α = 1/n (running mean)'], ['line', 'curve-t', 'true value 0.5']]);
+}
+
+function drawBig() {
+  const svg = $('big-svg');
+  el('text', { class: 'ttl', x: 0, y: 26, text: '(a) number of states' }, svg);
+  const BX = 330, SC = 34; /* pixels per power of ten */
+  const rows = [['4 × 3 grid', Math.log10(11), '11'], ['5 × 5 grid', Math.log10(25), '25'], ['100 × 100 maze', 4, '10 000'], ['backgammon', 20, 'about 10²⁰'], ['robot joint angles', null, 'infinite']];
+  [0, 5, 10, 15, 20].forEach((p) => {
+    el('line', { class: 'gl', x1: BX + p * SC, x2: BX + p * SC, y1: 44, y2: 306 }, svg);
+    el('text', { class: 'tk', x: BX + p * SC, y: 336, 'text-anchor': 'middle', text: p ? '10' + ['⁵', '¹⁰', '¹⁵', '²⁰'][p / 5 - 1] : '1' }, svg);
+  });
+  rows.forEach(([lab, v, txt], i) => {
+    const y = 52 + i * 50, g = el('g', { class: 'an-fade', style: `--d:${0.15 * i}s` }, svg);
+    el('text', { class: 'txs', x: BX - 16, y: y + 28, 'text-anchor': 'end', text: lab }, g);
+    if (v === null) {
+      el('path', { class: 'wire-a', d: `M${BX} ${y + 20}H${BX + 23 * SC}`, 'marker-end': 'url(#ah-a)', style: 'stroke-dasharray:10 8;stroke-width:6' }, g);
+      el('text', { class: 'txs', x: BX + 23 * SC + 24, y: y + 28, text: txt }, g);
+    } else {
+      el('rect', { x: BX, y: y + 6, width: Math.max(6, v * SC), height: 30, rx: 4, class: 'fa' }, g);
+      el('text', { class: 'txs', x: BX + Math.max(6, v * SC) + 14, y: y + 30, text: txt }, g);
+    }
+  });
+  /* (b) a function replaces the table */
+  const g = el('g', { class: 'frag', 'data-step': 'bg' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 406, text: '(b) a function with weights replaces the table' }, g);
+  box(g, 0, 470, 260, 160, ['state s', 'as numbers'], 'box', 'txs');
+  const L1 = [480, 540, 600, 660].map((y) => [420, y - 10]), L2 = [500, 570, 640].map((y) => [570, y - 10]);
+  const outs = ['Q(s, ↑)', 'Q(s, →)', 'Q(s, ↓)', 'Q(s, ←)'];
+  const L3 = outs.map((_, i) => [800, 460 + i * 58]);
+  L1.forEach(([x, y]) => el('path', { class: 'wire', d: `M262 550L${x - 18} ${y}`, style: 'stroke-width:1.5' }, g));
+  L1.forEach(([x1, y1]) => L2.forEach(([x2, y2]) => el('line', { class: 'gl', x1, y1, x2, y2 }, g)));
+  L2.forEach(([x1, y1]) => L3.forEach(([x2, y2]) => el('line', { class: 'gl', x1, y1, x2: x2 - 4, y2 }, g)));
+  [...L1, ...L2].forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 18, class: 'box' }, g));
+  L3.forEach(([x, y], i) => {
+    el('rect', { x, y: y - 24, width: 170, height: 48, rx: 8, class: 'box-a' }, g);
+    el('text', { class: 'txs', x: x + 85, y: y + 8, 'text-anchor': 'middle', text: outs[i] }, g);
+  });
+  el('text', { class: 'txs', x: 495, y: 700, 'text-anchor': 'middle', text: 'weights learned from experience' }, g);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.calc = (() => {
+  const svg = $('calc-svg'), Q0 = 0.5;
+  const ids = ['al', 'r', 'g', 'm'];
+  const inp = Object.fromEntries(ids.map((k) => [k, $('calc-' + k)]));
+  /* top: backup diagram */
+  const S = [130, 150], S2 = [640, 150];
+  el('circle', { cx: S[0], cy: S[1], r: 56, class: 'box-a' }, svg);
+  el('text', { class: 'tx', x: S[0], y: S[1] + 10, 'text-anchor': 'middle', style: 'font-size:34px', text: 's' }, svg);
+  const tQ = el('text', { class: 'tx', x: S[0], y: S[1] + 100, 'text-anchor': 'middle' }, svg);
+  el('path', { class: 'wire', d: `M${S[0] + 62} ${S[1]}H${S2[0] - 66}`, 'marker-end': 'url(#ah)' }, svg);
+  const tR = el('text', { class: 'tx', x: (S[0] + S2[0]) / 2, y: S[1] - 22, 'text-anchor': 'middle' }, svg);
+  el('circle', { cx: S2[0], cy: S2[1], r: 56, class: 'box' }, svg);
+  el('text', { class: 'tx', x: S2[0], y: S2[1] + 10, 'text-anchor': 'middle', style: 'font-size:34px', text: 's′' }, svg);
+  const OFF = [0, -0.25, -0.45, -0.7], YS = [45, 115, 185, 255];
+  const opt = YS.map((y, i) => {
+    el('line', { class: 'wire', x1: S2[0] + 56, y1: S2[1] + (y - S2[1]) * 0.2, x2: 840, y2: y }, svg);
+    const c = el('circle', { cx: 852, cy: y, r: 12 }, svg);
+    const t = el('text', { class: 'txs', x: 878, y: y + 8 }, svg);
+    return { c, t, off: OFF[i] };
+  });
+  el('text', { class: 'ttl', x: 1010, y: 30, text: 'Q(s′, ·)' }, svg);
+  const tT = el('text', { class: 'tx', x: 0, y: 360 }, svg);
+  /* bottom: number line from −2 to 2 */
+  const NX = (v) => 70 + (v + 2) * 255, NY = 540;
+  el('line', { class: 'ax', x1: NX(-2), x2: NX(2), y1: NY, y2: NY }, svg);
+  [-2, -1, 0, 1, 2].forEach((v) => {
+    el('line', { class: 'ax', x1: NX(v), x2: NX(v), y1: NY - 10, y2: NY + 10 }, svg);
+    el('text', { class: 'tk', x: NX(v), y: NY + 44, 'text-anchor': 'middle', text: v < 0 ? '−' + -v : String(v) }, svg);
+  });
+  const gap = el('path', { class: 'wire', style: 'stroke-dasharray:8 6' }, svg);
+  const tD = el('text', { class: 'txs', 'text-anchor': 'middle' }, svg);
+  const step = el('path', { class: 'wire-a', 'marker-end': 'url(#ah-a)', style: 'stroke-width:5' }, svg);
+  const mOld = el('circle', { r: 20, style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:4' }, svg);
+  const mTar = el('path', { d: 'M0 -16L16 0L0 16L-16 0Z', class: 'fb', style: 'stroke:var(--myst-color-bg);stroke-width:2' }, svg);
+  const mNew = el('circle', { r: 11, class: 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:2' }, svg);
+  const lOld = el('text', { class: 'txs', y: NY - 34 }, svg);
+  const lTar = el('text', { class: 'txs', y: NY - 34, style: 'fill:var(--c-b)' }, svg);
+  const lNew = el('text', { class: 'txs', y: NY + 92, style: 'fill:var(--c-a)' }, svg);
+  function draw() {
+    const al = +inp.al.value, r = +inp.r.value, g = +inp.g.value, m = +inp.m.value;
+    const y = r + g * m, d = y - Q0, q = Q0 + al * d;
+    $('calc-al-val').textContent = fmt(al, 2); $('calc-r-val').textContent = sgn(r, 1);
+    $('calc-g-val').textContent = fmt(g, 2); $('calc-m-val').textContent = sgn(m, 2);
+    $('calc-d').textContent = sgn(d, 3); $('calc-q').textContent = sgn(q, 3);
+    tQ.textContent = `Q(s, a) = ${fmt(Q0, 2)}`;
+    tR.textContent = `a, then r = ${sgn(r, 1)}`;
+    opt.forEach((o, i) => {
+      const v = Math.max(-1, m + o.off);
+      o.c.setAttribute('class', i ? '' : 'fb');
+      if (i) o.c.setAttribute('style', 'fill:var(--myst-color-text-tertiary)');
+      o.t.textContent = sgn(i ? Math.min(v, m) : m, 2) + (i ? '' : '  max');
+      o.t.style.fontWeight = i ? '400' : '700';
+    });
+    tT.textContent = `target = r + γ · max = ${sgn(r, 1)} + ${fmt(g, 2)} · ${sgn(m, 2)} = ${sgn(y, 3)}`;
+    const xo = NX(Q0), xt = NX(clamp(y, -2, 2)), xn = NX(q);
+    mOld.setAttribute('cx', xo); mOld.setAttribute('cy', NY);
+    mTar.setAttribute('transform', `translate(${xt} ${NY})`);
+    mNew.setAttribute('cx', xn); mNew.setAttribute('cy', NY);
+    gap.setAttribute('d', `M${xo} ${NY - 70}H${xt}M${xo} ${NY - 80}V${NY - 60}M${xt} ${NY - 80}V${NY - 60}`);
+    tD.setAttribute('x', (xo + xt) / 2); tD.setAttribute('y', NY - 86); tD.textContent = `δ = ${sgn(d, 3)}`;
+    step.setAttribute('d', Math.abs(xn - xo) > 14 ? `M${xo} ${NY + 50}H${xn}` : '');
+    const right = y >= Q0;
+    lOld.setAttribute('x', xo + (right ? -14 : 14)); lOld.setAttribute('text-anchor', right ? 'end' : 'start'); lOld.textContent = `old ${fmt(Q0, 2)}`;
+    lTar.setAttribute('x', xt + (right ? 14 : -14)); lTar.setAttribute('text-anchor', right ? 'start' : 'end'); lTar.textContent = `target ${sgn(y, 2)}`;
+    lNew.setAttribute('x', xn); lNew.setAttribute('text-anchor', 'middle'); lNew.textContent = `new ${sgn(q, 3)}`;
+  }
+  ids.forEach((k) => inp[k].addEventListener('input', draw));
+  draw();
+  return {};
+})();
+
+DEMOS.grid = (() => {
+  const svg = $('grid-svg'), W = WORLD, P = { alpha: 0.5, gamma: 0.9, eps: 0.1 };
+  const GX = 20, GY = 64, C = 124;
+  const msg = el('text', { class: 'txs', x: GX, y: 34 }, svg);
+  const tris = [], arrs = el('g', {}, svg);
+  for (let s = 0; s < 25; s++) {
+    const x0 = GX + (s % 5) * C, y0 = GY + Math.floor(s / 5) * C;
+    if (s === W.goal || W.pits.has(s)) {
+      const goal = s === W.goal;
+      el('rect', { x: x0, y: y0, width: C, height: C, style: goal ? 'fill:var(--c-c);fill-opacity:.3;stroke:var(--c-c);stroke-width:3' : 'fill:var(--myst-color-text-tertiary);fill-opacity:.55;stroke:var(--myst-color-bg);stroke-width:2' }, svg);
+      el('text', { class: 'tx', x: x0 + C / 2, y: y0 + C / 2 + 10, 'text-anchor': 'middle', style: `font-weight:700;${goal ? '' : 'fill:var(--myst-color-bg)'}`, text: goal ? '+1' : '−1' }, svg);
+      tris.push(null);
+    } else {
+      tris.push([0, 1, 2, 3].map((a) => el('polygon', { points: tri(x0, y0, C, a), style: 'fill:var(--myst-color-bg)', 'stroke-linejoin': 'round' }, svg)));
+    }
+  }
+  for (let i = 0; i <= 5; i++) {
+    el('line', { class: 'gl', x1: GX, x2: GX + 5 * C, y1: GY + i * C, y2: GY + i * C, style: 'stroke-width:2' }, svg);
+    el('line', { class: 'gl', y1: GY, y2: GY + 5 * C, x1: GX + i * C, x2: GX + i * C, style: 'stroke-width:2' }, svg);
+  }
+  svg.appendChild(arrs);
+  el('text', { class: 'txs', x: GX + 8, y: GY + 4 * C + C - 10, style: 'font-weight:700', text: 'S' }, svg);
+  const hl = el('polygon', { style: 'fill:none;stroke:var(--myst-color-text);stroke-width:4;stroke-linejoin:round' }, svg);
+  const agent = el('circle', { r: 22, class: 'fd', style: 'stroke:var(--myst-color-bg);stroke-width:3' }, svg);
+  const sub = el('svg', { id: 'grid-curve', x: 680, y: 40, width: 480, height: 660, viewBox: '0 0 480 660', overflow: 'visible' }, svg);
+  let Q, r, s, t, hist, ended;
+  const cellXY = (st) => [GX + (st % 5) * C + C / 2, GY + Math.floor(st / 5) * C + C / 2];
+  function paint() {
+    for (let k = 0; k < 25; k++) if (tris[k]) tris[k].forEach((p, a) => p.setAttribute('style', qStyle(Q[4 * k + a], 1) + ';stroke:var(--myst-color-border);stroke-width:1'));
+    clear(arrs);
+    for (let k = 0; k < 25; k++) {
+      if (!tris[k]) continue;
+      const q = [0, 1, 2, 3].map((a) => Q[4 * k + a]), m = Math.max(...q);
+      if (q.every((v) => v === m)) continue;
+      const [cx, cy] = cellXY(k);
+      el('path', { d: `M${cx - DX[q.indexOf(m)] * 20} ${cy - DY[q.indexOf(m)] * 20}L${cx + DX[q.indexOf(m)] * 34} ${cy + DY[q.indexOf(m)] * 34}`, 'marker-end': 'url(#ah)', style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:4' }, arrs);
+    }
+    const [ax, ay] = cellXY(s);
+    agent.setAttribute('cx', ax); agent.setAttribute('cy', ay);
+    $('gd-n').textContent = hist.length; $('gd-t').textContent = t;
+    drawCurve();
+  }
+  function drawCurve() {
+    clear(sub);
+    const n = Math.max(20, hist.length), step = n <= 40 ? 10 : n <= 100 ? 25 : n <= 200 ? 50 : 100;
+    const xt = []; for (let v = 0; v <= n; v += step) xt.push(v);
+    const F = frame(sub, { W: 480, H: 660, l: 90, t: 30, r: 16, x: [0, n], y: [0, 100], xt, yt: [0, 25, 50, 75, 100], xl: 'episode', yl: 'steps per episode' });
+    el('line', { class: 'curve-t', x1: F.sx(0), x2: F.sx(n), y1: F.sy(8), y2: F.sy(8) }, F.plot);
+    el('text', { class: 'txs', x: F.sx(n) - 6, y: F.T + 34, 'text-anchor': 'end', text: 'dashed: shortest, 8' }, sub);
+    if (hist.length) el('path', { class: 'curve-a', style: 'stroke-width:3', d: hist.map((v, i) => (i ? 'L' : 'M') + F.sx(i + 1).toFixed(1) + ' ' + F.sy(v).toFixed(1)).join('') }, F.plot);
+    if (hist.length === 1) el('circle', { class: 'fa', cx: F.sx(1), cy: F.sy(hist[0]), r: 6 }, F.plot);
+  }
+  function one(show) {
+    if (ended) { s = W.start; t = 0; ended = false; if (show) { msg.textContent = `Episode ${hist.length + 1} starts`; hl.setAttribute('points', ''); } return; }
+    const o = qstep(W, Q, s, P, r);
+    s = o.s2; t++;
+    if (show) {
+      const x0 = GX + (o.s % 5) * C, y0 = GY + Math.floor(o.s / 5) * C;
+      hl.setAttribute('points', tri(x0, y0, C, o.a));
+      msg.textContent = `move ${ARROWS[o.a]}, r = ${sgn(o.rew, 2)}, Q(s, ${ARROWS[o.a]}): ${sgn(o.old, 3)} → ${sgn(o.nw, 3)}`;
+      $('gd-d').textContent = sgn(o.delta, 3);
+    }
+    if (o.done || t >= W.cap) {
+      hist.push(t); ended = true;
+      if (show) msg.textContent += o.done ? (o.rew > 0 ? '   goal!' : '   pit!') : '   time limit';
+    }
+  }
+  function reset() {
+    Q = new Float64Array(100); r = rng(2024); s = W.start; t = 0; hist = []; ended = false;
+    msg.textContent = 'All Q-values start at 0. Press Step.';
+    hl.setAttribute('points', ''); $('gd-d').textContent = '0';
+    paint();
+  }
+  $('gd-step').addEventListener('click', () => { one(true); paint(); });
+  $('gd-ep').addEventListener('click', () => {
+    if (ended) one(false);
+    let guard = 0;
+    while (!ended && guard++ < 1000) one(false);
+    msg.textContent = `Episode ${hist.length} took ${hist[hist.length - 1]} steps`;
+    hl.setAttribute('points', ''); paint();
+  });
+  $('gd-100').addEventListener('click', () => {
+    const target = hist.length + 100;
+    if (ended) one(false);
+    let guard = 0;
+    while (hist.length < target && guard++ < 20000) { one(false); if (ended && hist.length < target) one(false); }
+    msg.textContent = `${hist.length} episodes; the last took ${hist[hist.length - 1]} steps`;
+    hl.setAttribute('points', ''); paint();
+  });
+  $('gd-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.curves = (() => {
+  const svg = $('cur-svg'), E = 200, RUNS = 40, REF = { alpha: 0.5, gamma: 0.9, eps: 0.1 };
+  function curve(p) {
+    const out = new Array(E).fill(0);
+    for (let k = 0; k < RUNS; k++) {
+      const r = rng(3000 + k), Q = new Float64Array(100);
+      for (let e = 0; e < E; e++) {
+        let s = WORLD.start, G = 0;
+        for (let t = 0; t < WORLD.cap; t++) {
+          const o = qstep(WORLD, Q, s, p, r);
+          G += o.rew; s = o.s2;
+          if (o.done) break;
+        }
+        out[e] += G / RUNS;
+      }
+    }
+    return out;
+  }
+  const smooth = (a, w = 10) => a.map((_, i) => { const j = Math.max(0, i - w + 1); return a.slice(j, i + 1).reduce((x, y) => x + y, 0) / (i + 1 - j); });
+  const tail = (a) => a.slice(E - 100).reduce((x, y) => x + y, 0) / 100;
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [0, E], y: [-3, 1], xt: [0, 50, 100, 150, 200], yt: [-3, -2, -1, 0, 1], fy: (v) => (v < 0 ? '−' + -v : String(v)), xl: 'episode', yl: 'reward per episode' });
+  el('line', { class: 'curve-t', x1: F.sx(0), x2: F.sx(E), y1: F.sy(0.72), y2: F.sy(0.72) }, F.plot);
+  el('text', { class: 'txs', x: F.sx(E) - 8, y: F.sy(0.72) - 14, 'text-anchor': 'end', text: 'best possible: 0.72' }, svg);
+  const path = (a) => smooth(a).map((v, i) => (i ? 'L' : 'M') + F.sx(i + 1).toFixed(1) + ' ' + F.sy(clamp(v, -3.2, 1.2)).toFixed(1)).join('');
+  const ref = curve(REF);
+  el('path', { class: 'curve-b', d: path(ref) }, F.plot);
+  const mine = el('path', { class: 'curve-a' }, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.sx(96), y: F.sy(-1.75), width: 420, height: 90, rx: 8, style: 'fill:var(--myst-color-bg);opacity:.9' }, lg);
+  legend(lg, F.sx(100), F.sy(-1.75) + 26, [['line', 'curve-a', 'your settings'], ['line', 'curve-b', 'reference']]);
+  $('cur-yb').textContent = sgn(tail(ref), 2);
+  const ids = ['al', 'g', 'e'];
+  function draw() {
+    const p = { alpha: +$('cur-al').value, gamma: +$('cur-g').value, eps: +$('cur-e').value };
+    $('cur-al-val').textContent = fmt(p.alpha, 2); $('cur-g-val').textContent = fmt(p.gamma, 2); $('cur-e-val').textContent = fmt(p.eps, 2);
+    const c = curve(p);
+    mine.setAttribute('d', path(c));
+    $('cur-ya').textContent = sgn(tail(c), 2);
+  }
+  ids.forEach((k) => $('cur-' + k).addEventListener('input', draw));
+  draw();
+  return {};
+})();
+
+drawExperience(); drawTable(); drawAlgorithm(); drawStuck(); drawCliff(); drawConvergence(); drawBig();
+})();
+</script>
+</body>
+</html>

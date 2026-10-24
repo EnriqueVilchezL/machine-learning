@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cross-validation</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 6</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Cross-validation</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">How to get a trustworthy score from limited data, and how to use it to choose a model</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 6 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why one split is not enough</li>
+<li class="an-up" style="--d:.15s">k-fold cross-validation</li>
+<li class="an-up" style="--d:.25s">Choosing k and stratified folds</li>
+<li class="an-up" style="--d:.35s">Choosing a setting with cross-validation</li>
+<li class="an-up" style="--d:.45s">The full recipe and special cases</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: a class or a number</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">k</span></td><td>Number of folds</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">F_1, \dots, F_k</span></td><td>The folds: parts of <span class="tex">\mathcal{D}</span> with no example in common</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\hat{f}_{-m}</span></td><td>Model trained on every fold except fold <span class="tex">m</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">L(y, \hat{y})</span></td><td>Loss: the cost of predicting <span class="tex">\hat{y}</span> when the truth is <span class="tex">y</span></td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">s_m</span></td><td>Score of <span class="tex">\hat{f}_{-m}</span> on fold <span class="tex">m</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">m</span> picks a fold.</p><p>A hat marks a learned model; <span class="tex">-m</span> reads as "without fold <span class="tex">m</span>".</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">One split is not enough</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A single test set can be lucky or unlucky.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Lucky and unlucky splits" data-demo="lucky">
+<div class="hdr" data-s="One split"></div>
+<h2>Lucky and unlucky splits</h2>
+<div class="fr">
+<div class="figbox"><svg id="lucky-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Same data, same model. Only the random choice of the 12 test examples changes.</p>
+<div class="btns"><button class="bt" id="lucky-one">New split</button><button class="bt chip" id="lucky-many">20 more</button><button class="bt chip" id="lucky-reset">Reset</button></div>
+<div class="ro"><span>This split</span><b id="lucky-acc" class="bb">0%</b></div>
+<div class="ro"><span>Splits so far</span><b id="lucky-n">0</b></div>
+<div class="ro"><span>Lowest to highest</span><b id="lucky-range" class="a" style="font-size:28px">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>60 examples, 80/20 split, nearest-centroid classifier. Hollow points are the test set; each split adds one dot on the right.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">k-fold cross-validation</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Every example gets a turn in the test set.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The k-fold idea" data-demo="kfold">
+<div class="hdr" data-s="k-fold"></div>
+<h2>The k-fold idea</h2>
+<div class="fr">
+<div class="figbox"><svg id="kf-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Cut the data into <span class="tex">k</span> folds. Each round, one fold is the test set and the rest train the model.</p>
+<div class="ctl"><label><span>Number of folds <span class="tex">k</span></span><b id="kf-k-val">5</b></label><input type="range" id="kf-k" min="3" max="10" step="1" value="5"></div>
+<div class="btns"><button class="bt" id="kf-next">Next fold</button><button class="bt chip" id="kf-reset">Reset</button></div>
+<div class="ro"><span>Round</span><b id="kf-round">0 of 5</b></div>
+<div class="ro"><span>Train / test size</span><b id="kf-size">—</b></div>
+<div class="ro"><span>Average so far</span><b id="kf-avg" class="bb">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>The 60 examples of Figure 1. Each row is one round, with its score on the right.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Fold formulas">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Folds in symbols</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Split <span class="tex">\mathcal{D}</span> into <span class="tex">k</span> folds of about the same size, with no example in two folds:</p>
+<div class="eq"><div class="m tex-d">\mathcal{D} = F_1 \cup F_2 \cup \cdots \cup F_k, \qquad |F_m| \approx \frac{n}{k}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="f1" style="margin:16px 0 0">In round <span class="tex">m</span>, train <span class="tex">\hat{f}_{-m}</span> on all other folds and score it on <span class="tex">F_m</span>, for example with the average loss:</p>
+<div class="eq frag up" data-step="f1"><div class="m tex-d">s_m = \frac{1}{|F_m|} \sum_{i \in F_m} L\big(y_i, \hat{f}_{-m}(\mathbf{x}_i)\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="f2" style="margin:16px 0 0">Each example sits in exactly one fold, so it is tested exactly once.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 2 with <span class="tex">n = 60</span> and <span class="tex">k = 5</span>:</p><p><span class="tex">|F_m| = 60/5 = 12</span>, and each model trains on 48 examples.</p><p>10 of 12 right:</p><p>accuracy <span class="tex">\tfrac{10}{12} \approx 0.83</span></p><p>0-1 loss <span class="tex">\tfrac{2}{12} \approx 0.17</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Average and spread">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Average and spread</h2>
+<div class="fr">
+<div class="figbox"><svg id="fold-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Report two numbers: the average score, and how much it moves from fold to fold.</p>
+<div class="small" style="text-align:center"><span class="tex">\text{average} = \dfrac{s_1 + s_2 + \cdots + s_k}{k}</span></div>
+<div class="ro"><span>Average</span><b id="fold-mean" class="bb">—</b></div>
+<div class="ro"><span>Standard deviation</span><b id="fold-std">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>10-fold scores on the data of Figure 1. The band is one standard deviation around the average.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="CV estimate">
+<div class="hdr" data-s="k-fold"></div>
+<h2>The cross-validation estimate</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The cross-validation estimate is the average of the <span class="tex">k</span> fold scores:</p>
+<div class="eq"><div class="m tex-d">\text{CV}_{(k)} = \frac{1}{k} \sum_{m=1}^{k} s_m</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="a1" style="margin:16px 0 0">The standard deviation measures the typical distance of a fold score from that average:</p>
+<div class="eq frag up" data-step="a1"><div class="m tex-d">\text{SD} = \sqrt{\frac{1}{k} \sum_{m=1}^{k} \big(s_m - \text{CV}_{(k)}\big)^2}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="a2" style="margin:16px 0 0">A large SD means the score depends a lot on which examples land in the test fold.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Five fold accuracies: 80, 85, 75, 90 and 80%.</p><p><span class="tex">\text{CV}_{(5)} = \tfrac{410}{5} = 82\%</span></p><p>Squared gaps: 4, 9, 49, 64, 4. Their mean is <span class="tex">130/5 = 26</span>.</p><p><span class="tex">\text{SD} = \sqrt{26} \approx 5.1</span> points</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing k">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Choosing k</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Three common choices for a data set of 1000 examples.</p>
+<table class="tb">
+<colgroup><col style="width:21%"><col style="width:15%"><col style="width:15%"><col style="width:13%"><col style="width:36%"></colgroup>
+<thead><tr><th></th><th>Models</th><th>Train size</th><th>Cost</th><th>Comment</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>k = 5</strong></td><td>5</td><td>800</td><td>Low</td><td>A good default</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>k = 10</strong></td><td>10</td><td>900</td><td>Medium</td><td>The other usual default</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Leave-one-out</strong></td><td>1000</td><td>999</td><td>High</td><td>Each test set is one example; scores jump a lot</td></tr>
+</tbody>
+</table>
+<aside class="adm k-tip sm frag up" style="margin-top:32px"><div class="h"><i data-i="hint"></i><span>Rule of thumb</span></div><div class="b"><p>Use 5 or 10 folds. Use leave-one-out only when the data set is very small and the model is cheap to train.</p></div></aside>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">More folds</div><p>Each model sees more data, so its score is closer to the final model. Training takes longer.</p></aside>
+<aside class="am"><div class="t">Fewer folds</div><p>Faster, but each model trains on less data and may look a bit worse than it is.</p></aside>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Leave-one-out formula">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Training size and leave-one-out</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Each round leaves one fold out, so every model trains on:</p>
+<div class="eq"><div class="m tex-d">n_{\text{train}} = n - \frac{n}{k} = \frac{k - 1}{k}\, n</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="l1" style="margin:16px 0 0">Leave-one-out is the case <span class="tex">k = n</span>: each fold is one example and <span class="tex">n</span> models are trained.</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">\text{CV}_{(n)} = \frac{1}{n} \sum_{i=1}^{n} L\big(y_i, \hat{f}_{-i}(\mathbf{x}_i)\big)</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="l2" style="margin:16px 0 0">Here <span class="tex">\hat{f}_{-i}</span> is trained on every example except example <span class="tex">i</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>With <span class="tex">n = 1000</span>, as in Table 2:</p><p><span class="tex">k = 5 \;\Rightarrow\; \tfrac{4}{5} \times 1000 = 800</span></p><p><span class="tex">k = 10 \;\Rightarrow\; \tfrac{9}{10} \times 1000 = 900</span></p><p><span class="tex">k = n \;\Rightarrow\; 1000 - 1 = 999</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Stratified folds">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Stratified folds</h2>
+<div class="fr">
+<div class="figbox"><svg id="strat-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">With a rare class, random folds can get none of it, or too much.</p>
+<p class="small frag up" style="margin:0"><strong>Stratified k-fold</strong> gives every fold the same class proportions as the whole data set.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>20 examples, 4 of them rare (orange), in 4 folds. (a) Random. (b) Stratified.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Stratified fold shares">
+<div class="hdr" data-s="k-fold"></div>
+<h2>Class shares in each fold</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The share of class <span class="tex">c</span> in the data is the number of its examples <span class="tex">n_c</span> over the total:</p>
+<div class="eq"><div class="m tex-d">\pi_c = \frac{n_c}{n}</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="p1" style="margin:16px 0 0">Stratified folds keep that share inside every fold of about <span class="tex">n/k</span> examples:</p>
+<div class="eq frag up" data-step="p1"><div class="m tex-d">n_{m,c} \approx \pi_c \, \frac{n}{k}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="p2" style="margin:16px 0 0"><span class="tex">n_{m,c}</span> is the number of examples of class <span class="tex">c</span> in fold <span class="tex">m</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 4: 20 examples, 4 rare, 4 folds.</p><p><span class="tex">\pi_{\text{rare}} = \tfrac{4}{20} = 0.2</span></p><p>Each fold has <span class="tex">20/4 = 5</span> examples, so it gets <span class="tex">0.2 \times 5 = 1</span> rare example.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Cross-validation in practice</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Choosing settings, keeping the test set clean, and data with structure.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Choosing a setting" data-demo="cvdeg">
+<div class="hdr" data-s="In practice"></div>
+<h2>Choosing a setting</h2>
+<div class="fr">
+<div class="figbox"><svg id="cvd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Run 5-fold cross-validation for each degree and keep the lowest average error.</p>
+<div class="ctl"><label><span>Polynomial degree</span><b id="cvd-deg-val">3</b></label><input type="range" id="cvd-deg" min="1" max="10" step="1" value="3"></div>
+<div class="ro"><span>Cross-validation error</span><b id="cvd-cv" class="bb">0</b></div>
+<div class="ro"><span>Best degree</span><b id="cvd-best">—</b></div>
+<div><span class="tag" id="cvd-diag">Good fit</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>30 noisy points from a smooth curve. Right: the average error over the 5 folds.</p>
+</div>
+</div>
+</section>
+<section class="s ats-prose" data-label="Choosing formula">
+<div class="hdr" data-s="In practice"></div>
+<h2>Picking the best setting</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">Run cross-validation once for each candidate setting <span class="tex">\theta</span>, such as the polynomial degree. Keep the setting with the lowest error:</p>
+<div class="eq"><div class="m tex-d">\hat{\theta} = \underset{\theta}{\arg\min} \ \text{CV}_{(k)}(\theta)</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="t1" style="margin:16px 0 0"><span class="tex">\arg\min</span> returns the best setting itself. The smallest error is <span class="tex">\text{CV}_{(k)}(\hat{\theta})</span>.</p>
+<p class="small frag up" data-step="t2" style="margin:16px 0 0">Then train the model with <span class="tex">\hat{\theta}</span> on all the training data, and only then open the test set.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>5-fold errors for three degrees:</p><p>degree 1: 0.42<br>degree 3: 0.11<br>degree 10: 0.25</p><p><span class="tex">\Rightarrow \ \hat{\theta} = 3</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The full recipe">
+<div class="hdr" data-s="In practice"></div>
+<h2>The full recipe</h2>
+<div class="figbox"><svg id="recipe-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 6:</b>Cross-validation chooses the setting using only the training data. The test set is opened once, at the end, to report the final score.</p>
+</section>
+
+<section class="s ats-prose" data-label="Time and groups">
+<div class="hdr" data-s="In practice"></div>
+<h2>Time and groups</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="time-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="group-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Time-ordered data: train on the past, test on what comes next</div>
+<div class="subcap">(b) Groups: all records of a patient stay on the same side</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>Random folds would let the model peek at the future in (a), or at the same patient in (b). Both make the score look better than it really is.</p>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A single train-test split can give a lucky or unlucky score.</li>
+<li class="an-up" style="--d:.15s">k-fold cross-validation tests on every example once and averages the k scores.</li>
+<li class="an-up" style="--d:.25s">Report the average and the spread; 5 or 10 folds are the usual choice.</li>
+<li class="an-up" style="--d:.35s">Use stratified folds for classes, time-ordered folds for time, and group folds for groups.</li>
+<li class="an-up" style="--d:.45s">Choose settings with cross-validation on the training data and open the test set only once.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers more cross-validation schemes and when to use each.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Section 7.10. Springer.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 5. Springer.</li>
+<li style="margin:.4em 0">Kohavi, R. (1995). A study of cross-validation and bootstrap for accuracy estimation and model selection. <em>Proceedings of the 14th International Joint Conference on Artificial Intelligence (IJCAI)</em>, 1137–1143.</li>
+<li style="margin:.4em 0">Arlot, S., &amp; Celisse, A. (2010). A survey of cross-validation procedures for model selection. <em>Statistics Surveys</em>, 4, 40–79.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Chapter 3: supervised learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared data ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
+function shuffle(n, r) {
+  const p = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  return p;
+}
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+
+/* 60 examples, two overlapping classes, scored with a nearest-centroid classifier */
+const CLS = (() => {
+  const r = rng(22), pts = [];
+  for (let i = 0; i < 60; i++) {
+    const y = i % 2;
+    pts.push({ x1: (y ? 6 : 3.8) + 1.3 * gauss(r), x2: (y ? 5.8 : 4.2) + 1.3 * gauss(r), y });
+  }
+  function acc(train, test) {
+    const c = [0, 1].map((k) => {
+      const s = train.filter((i) => pts[i].y === k);
+      return [mean(s.map((i) => pts[i].x1)), mean(s.map((i) => pts[i].x2))];
+    });
+    return test.filter((i) => {
+      const p = pts[i], d = c.map(([a, b]) => (p.x1 - a) ** 2 + (p.x2 - b) ** 2);
+      return (d[1] < d[0] ? 1 : 0) === p.y;
+    }).length / test.length;
+  }
+  function kfold(perm, k) {
+    const n = perm.length, fold = (i) => Math.floor((i * k) / n);
+    return Array.from({ length: k }, (_, j) => {
+      const test = perm.filter((_, i) => fold(i) === j), train = perm.filter((_, i) => fold(i) !== j);
+      return { train: train.length, test: test.length, acc: acc(train, test) };
+    });
+  }
+  return { pts, acc, kfold };
+})();
+
+/* ───────── static figures ───────── */
+function drawFoldScores() {
+  const svg = document.getElementById('fold-svg');
+  const sc = CLS.kfold(shuffle(60, rng(7)), 10).map((f) => f.acc);
+  const m = mean(sc), s = std(sc);
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0.4, 10.6], y: [0, 1.16], xt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], yt: [0, 0.25, 0.5, 0.75, 1], fy: pct, xl: 'fold', yl: 'accuracy' });
+  sc.forEach((v, i) => {
+    el('rect', { class: 'fa an-growy', x: F.sx(i + 1) - 30, y: F.sy(v), width: 60, height: F.sy(0) - F.sy(v), rx: 2, style: `--d:${i * 0.08}s` }, F.plot);
+    el('text', { class: 'tk an-fade', x: F.sx(i + 1), y: F.sy(v) - 12, 'text-anchor': 'middle', text: pct(v), style: `--d:${0.3 + i * 0.08}s` }, svg);
+  });
+  const g = el('g', { class: 'an-fade', style: '--d:1.3s' }, F.plot);
+  el('rect', { x: F.L, y: F.sy(m + s), width: F.W - F.R - F.L, height: F.sy(m - s) - F.sy(m + s), style: 'fill:var(--c-b);fill-opacity:.16' }, g);
+  el('line', { class: 'curve-b', x1: F.L, x2: F.W - F.R, y1: F.sy(m), y2: F.sy(m), style: 'stroke-width:4' }, g);
+  const lab = el('g', { class: 'an-fade', style: '--d:1.5s' }, svg);
+  legend(lab, F.L + 24, F.T + 26, [['line', 'curve-b', `average ${pct(m)}`]]);
+  el('rect', { x: F.L + 360, y: F.T + 12, width: 26, height: 28, style: 'fill:var(--c-b);fill-opacity:.25' }, lab);
+  el('text', { class: 'txs', x: F.L + 398, y: F.T + 34, text: `spread band, ${pct(m - s)} to ${pct(m + s)}` }, lab);
+  document.getElementById('fold-mean').textContent = pct(m);
+  document.getElementById('fold-std').textContent = fmt(s * 100, 1) + ' points';
+}
+
+function drawStratified() {
+  const svg = document.getElementById('strat-svg');
+  const RANDOM = [[0, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 0], [1, 0, 0, 1, 1]];
+  const STRAT = [[0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [1, 0, 0, 0, 0], [0, 0, 0, 0, 1]];
+  const BW = 250, GAP = 26, X0 = 20;
+  function row(folds, y0, title, step) {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : { class: 'an-fade' }, svg);
+    el('text', { class: 'ttl', x: X0, y: y0, text: title }, g);
+    folds.forEach((f, j) => {
+      const x = X0 + j * (BW + GAP), y = y0 + 24;
+      el('rect', { class: 'box', x, y, width: BW, height: 90, rx: 4 }, g);
+      f.forEach((v, i) => el('circle', { class: `pt ${v ? 'fb' : 'fa'} an-pop`, cx: x + 37 + i * 44, cy: y + 45, r: 17, style: `--d:${0.2 + j * 0.15 + i * 0.03}s` }, g));
+      const n = f.reduce((a, b) => a + b, 0);
+      el('text', { class: 'tx', x: x + BW / 2, y: y + 136, 'text-anchor': 'middle', style: n === 1 ? 'fill:var(--c-c);font-weight:600' : 'fill:var(--c-b);font-weight:600', text: `${n} of 5 orange` }, g);
+      el('text', { class: 'tk', x: x + BW / 2, y: y + 170, 'text-anchor': 'middle', text: `fold ${j + 1}` }, g);
+    });
+  }
+  row(RANDOM, 40, '(a) random folds');
+  row(STRAT, 380, '(b) stratified folds', 'strat');
+  legend(svg, X0 + 10, 660, [['dot', 'fa', 'common class (80%)']]);
+  legend(svg, X0 + 380, 660, [['dot', 'fb', 'rare class (20%)']]);
+}
+
+function drawRecipe() {
+  const svg = document.getElementById('recipe-svg');
+  const CW = 370, XS = [0, 436, 872, 1308], TOP = 20;
+  const STAGES = [
+    ['1', 'Hold out a test set', ['put 20% aside,', 'do not look at it']],
+    ['2', 'Cross-validate', ['on the training part,', 'once per setting']],
+    ['3', 'Retrain the best', ['best setting, on all', 'the training data']],
+    ['4', 'Test once', ['report this score', 'as the final result']],
+  ];
+  STAGES.forEach(([n, title, lines], s) => {
+    const x = XS[s], g = el('g', s ? { class: 'frag up', 'data-step': 's' + s } : { class: 'an-up' }, svg);
+    el('rect', { class: s === 3 ? 'box-b' : s === 0 ? 'box' : 'box-a', x, y: TOP, width: CW, height: 470, rx: 6 }, g);
+    el('text', { class: 'ttl', x: x + 20, y: TOP + 40, text: n }, g);
+    el('text', { class: 'tx', x: x + CW / 2, y: TOP + 82, 'text-anchor': 'middle', 'font-weight': 600, text: title }, g);
+    const mx = x + 30, mw = CW - 60, my = TOP + 130;
+    const bar = (yy, parts) => {
+      let xx = mx;
+      parts.forEach(([w, kind, k]) => {
+        const style = kind === 'test' ? 'fill:var(--c-b)' : kind === 'val' ? 'fill:var(--c-b);fill-opacity:.55' : kind === 'off' ? 'fill:var(--myst-color-surface-hover)' : 'fill:var(--c-a)';
+        el('rect', { x: xx + 1, y: yy, width: w * mw - 2, height: 32, rx: 3, style, class: 'an-grow', 'data-k': k || '' }, g);
+        xx += w * mw;
+      });
+    };
+    if (s === 0) {
+      bar(my + 60, [[0.8, 'train'], [0.2, 'test']]);
+      el('text', { class: 'txs', x: mx + 0.4 * mw, y: my + 40, 'text-anchor': 'middle', text: 'training' }, g);
+      el('text', { class: 'txs', x: mx + 0.9 * mw, y: my + 40, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'test' }, g);
+    } else if (s === 1) {
+      for (let r = 0; r < 5; r++) {
+        const parts = [];
+        for (let j = 0; j < 5; j++) parts.push([0.16, j === r ? 'val' : 'train']);
+        parts.push([0.2, 'off']);
+        bar(my + r * 38, parts);
+      }
+    } else if (s === 2) {
+      bar(my + 60, [[0.8, 'train'], [0.2, 'off']]);
+      el('text', { class: 'txs', x: mx + 0.4 * mw, y: my + 40, 'text-anchor': 'middle', text: 'all training data' }, g);
+    } else {
+      bar(my + 60, [[0.8, 'off'], [0.2, 'test']]);
+      el('text', { class: 'txs', x: mx + 0.9 * mw, y: my + 40, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'test' }, g);
+    }
+    lines.forEach((t, i) => el('text', { class: 'txs', x: x + CW / 2, y: TOP + 380 + i * 34, 'text-anchor': 'middle', text: t }, g));
+    if (s) {
+      el('path', { class: 'wire', d: `M${XS[s - 1] + CW + 4} ${TOP + 235}H${x - 6}`, 'marker-end': 'url(#ah)' }, g);
+    }
+  });
+  const warn = el('g', { class: 'frag', 'data-step': 's3' }, svg);
+  el('text', { class: 'txs', x: 840, y: 590, 'text-anchor': 'middle', 'font-style': 'italic', text: 'The test set is never used to choose anything: otherwise its score is too optimistic.' }, warn);
+}
+
+function drawTime() {
+  const svg = document.getElementById('time-svg');
+  const N = 6, X0 = 130, BW = 100, RH = 60, Y0 = 50;
+  for (let r = 1; r <= 5; r++) {
+    const y = Y0 + (r - 1) * (RH + 18), g = el('g', { class: 'an-up', style: `--d:${r * 0.15}s` }, svg);
+    el('text', { class: 'txs', x: X0 - 20, y: y + 40, 'text-anchor': 'end', text: `round ${r}` }, g);
+    for (let j = 0; j < N; j++) {
+      const kind = j < r ? 'fill:var(--c-a)' : j === r ? 'fill:var(--c-b)' : 'fill:var(--myst-color-surface-hover)';
+      el('rect', { x: X0 + j * (BW + 4), y, width: BW, height: RH, rx: 3, style: kind }, g);
+    }
+  }
+  const ya = Y0 + 5 * (RH + 18) + 20;
+  el('path', { class: 'wire', d: `M${X0} ${ya}H${X0 + N * (BW + 4)}`, 'marker-end': 'url(#ah)' }, svg);
+  el('text', { class: 'lb', x: X0 + N * (BW + 4) - 4, y: ya + 36, 'text-anchor': 'end', text: 'time' }, svg);
+  legend(svg, X0, ya + 82, [['dot', 'fa', 'train']]);
+  legend(svg, X0 + 170, ya + 82, [['dot', 'fb', 'test']]);
+  legend(svg, X0 + 320, ya + 82, [['dot', '', 'not used yet']]).querySelector('circle').setAttribute('style', 'fill:var(--myst-color-surface-hover);stroke:var(--myst-color-border-strong);stroke-width:2');
+}
+
+function drawGroups() {
+  const svg = document.getElementById('group-svg');
+  const P = ['A', 'B', 'C', 'D'], REC = 3, SQ = 34, X0 = 130, GW = 3 * SQ + 2 * 6 + 40, Y0 = 70, RH = 60;
+  P.forEach((p, k) => el('text', { class: 'lb', x: X0 + k * GW + (3 * SQ + 12) / 2, y: Y0 - 20, 'text-anchor': 'middle', text: `patient ${p}` }, svg));
+  for (let r = 0; r < 4; r++) {
+    const y = Y0 + r * (RH + 18), g = el('g', { class: 'an-up', style: `--d:${0.15 + r * 0.15}s` }, svg);
+    el('text', { class: 'txs', x: X0 - 20, y: y + 40, 'text-anchor': 'end', text: `round ${r + 1}` }, g);
+    P.forEach((_, k) => {
+      for (let i = 0; i < REC; i++) {
+        el('rect', { x: X0 + k * GW + i * (SQ + 6), y: y + (RH - SQ) / 2 - 6, width: SQ, height: SQ + 12, rx: 3, class: k === r ? 'fb' : 'fa' }, g);
+      }
+    });
+  }
+  const yl = Y0 + 4 * (RH + 18) + 40;
+  el('text', { class: 'txs', x: X0, y: yl, text: 'each patient has 3 records (small bars)' }, svg);
+  legend(svg, X0, yl + 70, [['dot', 'fa', 'train']]);
+  legend(svg, X0 + 170, yl + 70, [['dot', 'fb', 'test']]);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.lucky = (() => {
+  const svg = document.getElementById('lucky-svg');
+  const gL = el('g', { id: 'lucky-l' }, svg), gR = el('g', { id: 'lucky-r' }, svg);
+  const FL = frame(gL, { W: 520, H: 700, l: 70, t: 64, x: [0, 10], y: [0, 10], xt: [], yt: [], xl: 'feature 1', yl: 'feature 2' });
+  const FR = frame(gR, { W: 1160, H: 700, l: 620, t: 64, x: [0.45, 1.05], y: [0, 1], xt: [0.5, 0.6, 0.7, 0.8, 0.9, 1], fx: pct, xl: 'test accuracy' });
+  el('text', { class: 'ttl', x: 70, y: 36, text: 'current split' }, svg);
+  el('text', { class: 'ttl', x: 620, y: 36, text: 'one dot per split' }, svg);
+  const dots = CLS.pts.map((p) => el('circle', { cx: FL.sx(clamp(p.x1, 0.2, 9.8)), cy: FL.sy(clamp(p.x2, 0.2, 9.8)), r: 10 }, FL.plot));
+  const stack = el('g', {}, FR.plot);
+  const avgLine = el('line', { y1: FR.T, y2: FR.H - FR.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:10 8;display:none' }, FR.plot);
+  const avgLab = el('text', { class: 'txs', y: FR.T + 30, 'text-anchor': 'middle', text: '' }, svg);
+  legend(svg, 90, 108, [['dot', 'fa', 'class A'], ['dot', 'fb', 'class B']]);
+  const r = rng(99);
+  let accs = [];
+  function split() {
+    const perm = shuffle(60, r), test = perm.slice(0, 12), isTest = new Set(test);
+    const a = CLS.acc(perm.slice(12), test);
+    CLS.pts.forEach((p, i) => {
+      const c = p.y ? 'var(--c-b)' : 'var(--c-a)';
+      if (isTest.has(i)) { dots[i].removeAttribute('class'); dots[i].setAttribute('style', `fill:var(--myst-color-bg);stroke:${c};stroke-width:4`); }
+      else { dots[i].setAttribute('class', `pt ${p.y ? 'fb' : 'fa'}`); dots[i].setAttribute('style', 'opacity:.75'); }
+    });
+    accs.push(a);
+    return a;
+  }
+  function draw(last) {
+    clear(stack);
+    const count = {};
+    accs.forEach((a, i) => {
+      const key = a.toFixed(3), n = count[key] = (count[key] || 0) + 1;
+      const isLast = i === accs.length - 1;
+      el('circle', { cx: FR.sx(a), cy: FR.H - FR.B - 18 - (n - 1) * 30, r: 13, class: `fb${isLast ? ' an-pop' : ''}`, style: isLast ? 'stroke:var(--myst-color-text);stroke-width:3.5' : 'stroke:var(--myst-color-bg);stroke-width:2' }, stack);
+    });
+    const m = mean(accs);
+    avgLine.style.display = accs.length > 1 ? '' : 'none';
+    avgLine.setAttribute('x1', FR.sx(m)); avgLine.setAttribute('x2', FR.sx(m));
+    avgLab.setAttribute('x', FR.sx(m)); avgLab.textContent = accs.length > 1 ? `average ${pct(m)}` : '';
+    document.getElementById('lucky-acc').textContent = pct(last);
+    document.getElementById('lucky-n').textContent = accs.length;
+    document.getElementById('lucky-range').textContent = accs.length > 1 ? `${pct(Math.min(...accs))} to ${pct(Math.max(...accs))}` : '—';
+  }
+  document.getElementById('lucky-one').addEventListener('click', () => draw(split()));
+  document.getElementById('lucky-many').addEventListener('click', () => { let a; for (let i = 0; i < 20; i++) a = split(); draw(a); });
+  document.getElementById('lucky-reset').addEventListener('click', () => { accs = []; draw(split()); });
+  draw(split());
+  return {};
+})();
+
+DEMOS.kfold = (() => {
+  const svg = document.getElementById('kf-svg');
+  const perm = shuffle(60, rng(5));
+  const slider = document.getElementById('kf-k');
+  const X0 = 150, X1 = 900, GAP = 8;
+  let k = 5, done = 0, folds = CLS.kfold(perm, k);
+  function draw() {
+    clear(svg);
+    const bw = (X1 - X0 - GAP * (k - 1)) / k, rh = Math.min(72, (560 - 10 * (k - 1)) / k), Y0 = 70;
+    el('text', { class: 'ttl', x: 0, y: 40, text: 'folds' }, svg);
+    for (let j = 0; j < k; j++) el('text', { class: 'tk', x: X0 + j * (bw + GAP) + bw / 2, y: 40, 'text-anchor': 'middle', text: j + 1 }, svg);
+    el('text', { class: 'ttl', x: 1160, y: 40, 'text-anchor': 'end', text: 'score' }, svg);
+    for (let r = 0; r < k; r++) {
+      const y = Y0 + r * (rh + 10), shown = r < done, cur = r === done - 1;
+      const g = el('g', { style: shown ? '' : 'opacity:.22', class: cur ? 'an-fade' : '' }, svg);
+      el('text', { class: 'txs', x: 0, y: y + rh / 2 + 8, text: `round ${r + 1}` }, g);
+      for (let j = 0; j < k; j++) el('rect', { x: X0 + j * (bw + GAP), y, width: bw, height: rh, rx: 3, class: j === r ? 'fb' : 'fa' }, g);
+      if (cur) el('rect', { x: X0 - 8, y: y - 5, width: X1 - X0 + 16, height: rh + 10, rx: 6, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g);
+      if (shown) el('text', { class: 'tx', x: 1160, y: y + rh / 2 + 10, 'text-anchor': 'end', 'font-weight': 600, text: pct(folds[r].acc) }, g);
+    }
+    const yb = 660;
+    legend(svg, X0, yb, [['dot', 'fa', 'training folds']]);
+    legend(svg, X0 + 280, yb, [['dot', 'fb', 'test fold']]);
+    const sofar = folds.slice(0, done).map((f) => f.acc);
+    if (done === k) el('text', { class: 'tx', x: 1160, y: yb + 8, 'text-anchor': 'end', 'font-weight': 700, style: 'fill:var(--c-b)', text: `average ${pct(mean(sofar))}` }, svg);
+    document.getElementById('kf-k-val').textContent = k;
+    document.getElementById('kf-round').textContent = `${done} of ${k}`;
+    document.getElementById('kf-size').textContent = done ? `${folds[done - 1].train} / ${folds[done - 1].test}` : '—';
+    document.getElementById('kf-avg').textContent = done ? pct(mean(sofar)) : '—';
+  }
+  slider.addEventListener('input', () => { k = +slider.value; done = 0; folds = CLS.kfold(perm, k); draw(); });
+  document.getElementById('kf-next').addEventListener('click', () => { done = done >= k ? 1 : done + 1; draw(); });
+  document.getElementById('kf-reset').addEventListener('click', () => { done = 0; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.cvdeg = (() => {
+  const svg = document.getElementById('cvd-svg');
+  const f = (x) => Math.sin(2 * Math.PI * x), u = (x) => 2 * x - 1;
+  const r = rng(3);
+  const D = Array.from({ length: 30 }, () => { const x = r(); return [x, f(x) + 0.3 * gauss(r)]; });
+  const perm = shuffle(30, rng(11)), K = 5, fold = (i) => Math.floor((i * K) / 30);
+  const mse = (c, set) => mean(set.map(([x, y]) => (polyval(c, u(x)) - y) ** 2));
+  const DEG = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], cv = {}, tr = {}, fits = {};
+  DEG.forEach((d) => {
+    const errs = [];
+    for (let j = 0; j < K; j++) {
+      const te = perm.filter((_, i) => fold(i) === j).map((i) => D[i]), trn = perm.filter((_, i) => fold(i) !== j).map((i) => D[i]);
+      errs.push(mse(polyfit(trn.map((p) => u(p[0])), trn.map((p) => p[1]), d), te));
+    }
+    cv[d] = mean(errs);
+    fits[d] = polyfit(D.map((p) => u(p[0])), D.map((p) => p[1]), d);
+    tr[d] = mse(fits[d], D);
+  });
+  const best = DEG.reduce((a, b) => (cv[b] < cv[a] ? b : a));
+  const gL = el('g', { id: 'cvd-l' }, svg), gR = el('g', { id: 'cvd-r' }, svg);
+  const FL = frame(gL, { W: 560, H: 700, l: 80, t: 64, x: [0, 1], y: [-2, 2], xt: [0, 0.5, 1], yt: [-2, -1, 0, 1, 2], xl: 'x', yl: 'y' });
+  const YMAX = 0.6;
+  const FR = frame(gR, { W: 1160, H: 700, l: 700, t: 64, x: [0.5, 10.5], y: [0, YMAX], xt: DEG, yt: [0, 0.2, 0.4, 0.6], xl: 'polynomial degree', yl: 'error' });
+  el('text', { class: 'ttl', x: 80, y: 36, text: 'fit on all 30 points' }, svg);
+  el('text', { class: 'ttl', x: 700, y: 36, text: 'error for each degree' }, svg);
+  el('path', { class: 'curve-t', d: curvePath(f, 0, 1, FL.sx, FL.sy) }, FL.plot);
+  const fitPath = el('path', { class: 'curve-a' }, FL.plot);
+  D.forEach(([x, y]) => el('circle', { class: 'pt fb', cx: FL.sx(x), cy: FL.sy(y), r: 9 }, FL.plot));
+  const yv = (v) => FR.sy(Math.min(v, YMAX));
+  const sel = el('line', { y1: FR.T, y2: FR.H - FR.B, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:8 8' }, FR.plot);
+  [[tr, 'curve-a', 'fa', 0], [cv, 'curve-b', 'fb', 0.6]].forEach(([e, cc, fc, dl]) => {
+    el('path', { class: `${cc} an-draw`, pathLength: 1, style: `--d:${dl}s`, d: DEG.map((d, i) => (i ? 'L' : 'M') + FR.sx(d) + ' ' + yv(e[d])).join('') }, FR.plot);
+    DEG.forEach((d, i) => el('circle', { class: `${fc} an-pop`, cx: FR.sx(d), cy: yv(e[d]), r: 8, style: `--d:${dl + i * 0.08}s` }, FR.plot));
+  });
+  DEG.filter((d) => cv[d] > YMAX).forEach((d) => el('text', { class: 'tk', x: FR.sx(d) - 14, y: FR.T + 26, 'text-anchor': 'end', text: fmt(cv[d], 2) + ' ↑' }, svg));
+  const bg = el('g', { class: 'an-fade', style: '--d:1.6s' }, svg);
+  el('circle', { cx: FR.sx(best), cy: yv(cv[best]), r: 17, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, bg);
+  el('text', { class: 'txs', x: FR.sx(best), y: yv(cv[best]) + 52, 'text-anchor': 'middle', text: `best: ${best}` }, bg);
+  legend(svg, FR.L + 24, FR.T + 30, [['line', 'curve-b', 'cross-validation'], ['line', 'curve-a', 'training']]);
+  legend(svg, 100, FL.T + 30, [['line', 'curve-a', 'fit'], ['line', 'curve-t', 'true curve']]);
+  document.getElementById('cvd-best').textContent = best;
+  const slider = document.getElementById('cvd-deg'), diag = document.getElementById('cvd-diag');
+  function draw() {
+    const d = +slider.value;
+    document.getElementById('cvd-deg-val').textContent = d;
+    fitPath.setAttribute('d', curvePath((x) => polyval(fits[d], u(x)), 0, 1, FL.sx, FL.sy, 400));
+    sel.setAttribute('x1', FR.sx(d)); sel.setAttribute('x2', FR.sx(d));
+    document.getElementById('cvd-cv').textContent = fmt(cv[d], 3);
+    let label = 'Good fit', col = 'var(--c-c)';
+    if (cv[d] > 1.5 * cv[best] && d < best) { label = 'Too simple'; col = 'var(--c-b)'; }
+    if (cv[d] > 1.5 * cv[best] && d > best) { label = 'Too flexible'; col = 'var(--c-d)'; }
+    diag.textContent = label; diag.style.color = col;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawFoldScores(); drawStratified(); drawRecipe(); drawTime(); drawGroups();
+})();
+</script>
+</body>
+</html>

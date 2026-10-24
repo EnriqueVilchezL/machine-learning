@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Normalization</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 4</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Normalization</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Putting features on comparable scales so that no single column dominates the model</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 4 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Why scale features</li>
+<li class="an-up" style="--d:.15s">Min-max scaling and standardization</li>
+<li class="an-up" style="--d:.25s">Outliers and skewed data</li>
+<li class="an-up" style="--d:.35s">Scaling without leakage</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Data set: <span class="tex">n</span> examples with labels <span class="tex">y_i</span></td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>: one row with <span class="tex">d</span> values</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">x_{ij}</span></td><td>Value of feature <span class="tex">j</span> for example <span class="tex">i</span></td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\min_j, \ \max_j</span></td><td>Smallest and largest value of feature <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\bar{x}_j, \ s_j</span></td><td>Mean and standard deviation of feature <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\tilde{x}_j, \ Q_1, \ Q_3</span></td><td>Median and quartiles of feature <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">x'_{ij}, \ z_{ij}</span></td><td>The value after scaling</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>Every scaler works on one feature, one column, at a time.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Why scale features</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A column measured in millions can drown out a column measured in tens.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Nearest neighbor" data-demo="knn">
+<div class="hdr" data-s="Why scale"></div>
+<h2>Big numbers win</h2>
+<div class="fr">
+<div class="figbox"><svg id="knn-svg" viewBox="0 0 1160 700" style="cursor:crosshair"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Who is most similar to the query person? k-NN answers with the straight-line distance.</p>
+<div class="btns"><button class="bt" id="knn-raw">Raw</button><button class="bt chip" id="knn-scaled">Scaled</button></div>
+<div class="ro"><span>Nearest neighbor</span><b id="knn-nn" style="font-size:26px">—</b></div>
+<div class="ro"><span>Age part of the distance</span><b id="knn-age" class="a">—</b></div>
+<div class="ro"><span>Income part</span><b id="knn-inc" class="bb">—</b></div>
+<p class="small" style="margin:0">Click the plot to move the query.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>16 people. With raw values, income decides almost alone; the shaded ellipse holds everyone as close as the neighbor.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Which models care">
+<div class="hdr" data-s="Why scale"></div>
+<h2>Which models care</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Common models and whether scaling the features changes their results.</p>
+<table class="tb">
+<colgroup><col style="width:30%"><col style="width:15%"><col style="width:55%"></colgroup>
+<thead><tr><th>Model</th><th>Scale?</th><th>Reason</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>k-NN</strong></td><td class="ans">yes</td><td>Compares points by distance</td></tr>
+<tr class="an-up" style="--d:.13s"><td><strong>k-means</strong></td><td class="ans">yes</td><td>Assigns points to the nearest centroid</td></tr>
+<tr class="an-up" style="--d:.21s"><td><strong>SVM</strong></td><td class="ans">yes</td><td>The margin is measured as a distance</td></tr>
+<tr class="an-up" style="--d:.29s"><td><strong>Neural networks</strong></td><td class="ans">yes</td><td>Training is faster and steadier with similar ranges</td></tr>
+<tr class="an-up" style="--d:.37s"><td><strong>PCA</strong></td><td class="ans">yes</td><td>Looks for the directions with the largest spread</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Decision trees</strong></td><td style="color:var(--myst-color-text-tertiary)">no</td><td>Splits one feature at a time with a threshold</td></tr>
+<tr class="an-up" style="--d:.53s"><td><strong>Random forests</strong></td><td style="color:var(--myst-color-text-tertiary)">no</td><td>They are made of decision trees</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Rule of thumb</div><p>If the model measures distances or adds features together, scale them first.</p></aside>
+<aside class="am"><div class="t">Trees</div><p>Asking "is income above 1 000 000?" gives the same split as asking "is scaled income above 0.26?".</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Two common scalers</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Min-max scaling and standardization: same idea, different reference points.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Min-max scaling">
+<div class="hdr" data-s="Scaling methods"></div>
+<h2>Min-max scaling</h2>
+<div class="two">
+<div>
+<p style="margin-top:0">Shift and stretch each feature so that its smallest value becomes 0 and its largest becomes 1.</p>
+<div class="eq an-fade" style="--d:.2s"><div class="m tex-d">x' = \frac{x - \min}{\max - \min}</div></div>
+<aside class="adm k-note sm frag up"><div class="h"><i data-i="note"></i><span>Example</span></div><div class="b"><p>Ages go from 18 to 80. A 45-year-old becomes (45 − 18) / (80 − 18) = 0.44.</p></div></aside>
+<p class="frag up small" style="margin-top:28px">The order of the people and the relative gaps between them stay the same. Only the units change.</p>
+</div>
+<div class="col">
+<div class="figbox"><svg id="mm-svg" viewBox="0 0 792 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 2:</b>Eight ages on the original line (top) and after min-max scaling (bottom). The youngest maps to 0 and the oldest to 1.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Standardization" data-demo="std">
+<div class="hdr" data-s="Scaling methods"></div>
+<h2>Standardization</h2>
+<div class="two">
+<div>
+<p style="margin-top:0">Replace each value by <strong>how many standard deviations it is from the average</strong>. The standard deviation measures the typical distance to the average.</p>
+<div class="eq"><div class="m tex-d">z = \frac{x - \text{mean}}{\text{std}}</div></div>
+<p class="small" style="margin:0 0 20px">Average age 45, standard deviation 12: a 57-year-old gets z = 1 and a 33-year-old gets z = −1.</p>
+<aside class="adm k-tip sm frag up"><div class="h"><i data-i="hint"></i><span>Result</span></div><div class="b"><p>Every feature ends with average 0 and standard deviation 1. The shape of the data does not change.</p></div></aside>
+</div>
+<div class="col" style="gap:14px">
+<div class="figbox"><svg id="std-svg" viewBox="0 0 792 470"></svg></div>
+<div class="btns"><button class="bt" id="std-0">Raw</button><button class="bt chip" id="std-1">Subtract mean</button><button class="bt chip" id="std-2">Divide by std</button></div>
+<p class="cap"><b>Figure 3:</b>300 ages. Subtracting the mean moves the center to 0; dividing by the std makes one unit equal one standard deviation.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Mean and std formulas">
+<div class="hdr" data-s="Scaling methods"></div>
+<h2>Mean and standard deviation</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The mean of feature <span class="tex">j</span> adds its <span class="tex">n</span> values and divides by <span class="tex">n</span>:</p>
+<div class="eq"><div class="m tex-d">\bar{x}_j = \frac{1}{n} \sum_{i=1}^{n} x_{ij}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="s1" style="margin:0">The standard deviation is the square root of the average squared distance to the mean:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">s_j = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_{ij} - \bar{x}_j)^2}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="s2" style="margin:0">Standardization uses both numbers:</p>
+<div class="eq frag up" data-step="s2"><div class="m tex-d">z_{ij} = \frac{x_{ij} - \bar{x}_j}{s_j}</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Ages 33, 33, 57, 57.</p><p><span class="tex">\bar{x} = \tfrac{180}{4} = 45</span></p><p>Each age is 12 from the mean: <span class="tex">s = \sqrt{\tfrac{4 \cdot 144}{4}} = 12</span></p><p><span class="tex">z = -1, -1, 1, 1</span></p></aside>
+<aside class="am"><div class="t">n or n − 1</div><p>Some books divide by <span class="tex">n - 1</span> in (2). With many examples the difference is tiny.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Compare scalers" data-demo="cmp">
+<div class="hdr" data-s="Scaling methods"></div>
+<h2>Same data, three scales</h2>
+<div class="fr">
+<div class="figbox"><svg id="cmp-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Both axes use the same unit, so the picture shows distances as a model sees them.</p>
+<div class="btns"><button class="bt" id="cmp-0">Raw</button><button class="bt chip" id="cmp-1">Min-max</button><button class="bt chip" id="cmp-2">Standardize</button></div>
+<div class="ro"><span>Age</span><b id="cmp-age" class="a" style="font-size:26px">—</b></div>
+<div class="ro"><span>Income</span><b id="cmp-inc" class="bb" style="font-size:26px">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>40 people plotted with equal units on both axes. Raw, all ages squeeze into a thin column; after scaling both features spread out.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Outliers and skewed data</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Real data has extreme values and long tails. Choose the scaler with that in mind.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Outliers" data-demo="out">
+<div class="hdr" data-s="Outliers and skew"></div>
+<h2>One extreme value</h2>
+<div class="fr">
+<div class="figbox"><svg id="out-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<div class="ctl"><label><span>Extreme income</span><b id="out-val">1 500 000</b></label><input type="range" id="out-s" min="0" max="100" step="1" value="0"></div>
+<div class="ro"><span>Typical span, min-max</span><b id="out-mm" class="a">—</b></div>
+<div class="ro"><span>Typical span, robust</span><b id="out-rb" class="bb">—</b></div>
+<p class="small" style="margin:0"><strong>Robust scaling</strong> subtracts the median and divides by the IQR, the width of the middle half of the data. Neither changes much when one value becomes extreme.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>11 typical incomes (blue) and one extreme income (orange). Move the slider and compare the blue spans.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Robust scaling formula">
+<div class="hdr" data-s="Outliers and skew"></div>
+<h2>Robust scaling</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Robust scaling uses the median instead of the mean and the IQR instead of the standard deviation:</p>
+<div class="eq"><div class="m tex-d">x'_{ij} = \frac{x_{ij} - \tilde{x}_j}{Q_3 - Q_1}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="r1" style="margin:0">Compare min-max scaling, written for feature <span class="tex">j</span>:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">x'_{ij} = \frac{x_{ij} - \min_j}{\max_j - \min_j}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="r2" style="margin:16px 0 0">One extreme value sets <span class="tex">\max_j</span> by itself and squeezes all other values toward 0 in (5). The median and the quartiles in (4) barely move.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Incomes in thousands: <span class="tex">Q_1 = 400</span>, <span class="tex">\tilde{x} = 500</span>, <span class="tex">Q_3 = 600</span>. Income 700 gives <span class="tex">\tfrac{700 - 500}{200} = 1</span>.</p><p>Min-max with range 300 to 700 maps 500 to <span class="tex">0.5</span>. One income of 4300 makes it <span class="tex">\tfrac{200}{4000} = 0.05</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Skewed data" data-demo="log">
+<div class="hdr" data-s="Outliers and skew"></div>
+<h2>Taming a long tail</h2>
+<div class="fr">
+<div class="figbox"><svg id="log-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Prices and incomes have many small values and a few huge ones. Taking the logarithm turns multiplication into steps of equal size: 10, 100 and 1000 become evenly spaced.</p>
+<div class="btns"><button class="bt" id="log-0">Before</button><button class="bt chip" id="log-1">After log</button></div>
+<div><span class="tag" id="log-tag">Long right tail</span></div>
+<p class="small" style="margin:0">Scale after the log transform, not before.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Prices of 400 synthetic houses. After the log, the mean and the median almost meet.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Log formula">
+<div class="hdr" data-s="Outliers and skew"></div>
+<h2>The log transform</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Replace each value by its base-10 logarithm:</p>
+<div class="eq"><div class="m tex-d">x'_{ij} = \log_{10}(x_{ij})</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">Multiplying a value by 10 adds 1 to its log, so a tenfold jump becomes a step of one:</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">\log_{10}(10\,x) = 1 + \log_{10}(x)</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="l2" style="margin:0">The log works only for positive values. When a feature contains zeros, add 1 first:</p>
+<div class="eq frag up" data-step="l2"><div class="m tex-d">x'_{ij} = \log_{10}(1 + x_{ij})</div><div class="n">(8)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Prices 10, 100 and 1000 become 1, 2 and 3.</p><p>The gaps 90 and 900 both become 1.</p><p>With (8), a value of 0 becomes <span class="tex">\log_{10}(1) = 0</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 4 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 4">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 4</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Scaling without leakage</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">The scaler is part of the model, so it learns only from training data.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Fit on training only">
+<div class="hdr" data-s="In practice"></div>
+<h2>Fit on training data only</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 500">
+<g class="an-fade">
+<rect class="box" x="0" y="190" width="240" height="100" rx="4"/><text class="tx" x="120" y="250" text-anchor="middle" font-weight="600">All data</text>
+<path class="wire" d="M240 225C300 225 300 120 372 120" marker-end="url(#ah)"/>
+<path class="wire" d="M240 255C300 255 300 380 372 380" marker-end="url(#ah)"/>
+<rect class="box-a" x="380" y="70" width="300" height="100" rx="4"/><text class="tx" x="530" y="130" text-anchor="middle" font-weight="600">Training data</text>
+<rect class="box-b" x="380" y="330" width="300" height="100" rx="4"/><text class="tx" x="530" y="390" text-anchor="middle" font-weight="600">Test data</text>
+</g>
+<g class="an-up" style="--d:.4s">
+<path class="wire-a" d="M680 120H812" marker-end="url(#ah-a)"/>
+<text class="txs" x="746" y="104" text-anchor="middle" style="fill:var(--c-a)">fit</text>
+<rect class="box" x="820" y="50" width="380" height="140" rx="4"/><text class="tx" x="1010" y="104" text-anchor="middle" font-weight="600">Scaler</text>
+<text class="txs" x="1010" y="142" text-anchor="middle">learns mean = 45, std = 12</text>
+<text class="txs" x="1010" y="172" text-anchor="middle">(or min and max)</text>
+</g>
+<g class="an-up" style="--d:.8s">
+<path class="wire" d="M1200 120H1372" marker-end="url(#ah)"/>
+<text class="txs" x="1286" y="104" text-anchor="middle">transform</text>
+<rect class="box-a" x="1380" y="70" width="300" height="100" rx="4"/><text class="tx" x="1530" y="130" text-anchor="middle">Scaled training</text>
+<path class="wire" d="M680 380H1372" marker-end="url(#ah)"/>
+<path class="wire" d="M1010 190V372" stroke-dasharray="8 8" marker-end="url(#ah)"/>
+<text class="txs" x="1030" y="290">same mean and std</text>
+<text class="txs" x="1286" y="364" text-anchor="middle">transform</text>
+<rect class="box-b" x="1380" y="330" width="300" height="100" rx="4"/><text class="tx" x="1530" y="390" text-anchor="middle">Scaled test</text>
+<circle r="8" class="fa"><animateMotion dur="2.4s" repeatCount="indefinite" path="M680 120H1372"/></circle>
+<circle r="8" class="fb"><animateMotion dur="2.4s" repeatCount="indefinite" path="M680 380H1372"/></circle>
+<circle r="7" class="ink3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M1010 190V372"/></circle>
+</g>
+<text class="txs an-fade" style="--d:1.2s" x="840" y="490" text-anchor="middle" font-style="italic">The test data never changes the scaler. It is treated like new data arriving after deployment.</text>
+</svg>
+</div>
+<aside class="adm k-danger sm frag up" style="margin-top:16px;max-width:1400px"><div class="h"><i data-i="danger"></i><span>Data leakage</span></div><div class="b"><p>If the scaler is fitted on all the data, the test set has already shaped the training data and the test score is too optimistic.</p></div></aside>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>The scaler learns its numbers from the training data (blue) and reuses them, unchanged, on the test data (orange).</p>
+</section>
+
+<section class="s ats-prose" data-label="Training statistics">
+<div class="hdr" data-s="In practice"></div>
+<h2>Training numbers, new data</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Let <span class="tex">T</span> be the training examples. The scaler computes its numbers over <span class="tex">T</span> only, and <span class="tex">s_j</span> the same way:</p>
+<div class="eq"><div class="m tex-d">\bar{x}_j = \frac{1}{|T|} \sum_{i \in T} x_{ij}, \qquad \min_j = \min_{i \in T} x_{ij}, \qquad \max_j = \max_{i \in T} x_{ij}</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="t1" style="margin:0">A test value <span class="tex">x_j</span> is scaled with those same numbers, never with its own:</p>
+<div class="eq frag up" data-step="t1"><div class="m tex-d">z_j = \frac{x_j - \bar{x}_j}{s_j}, \qquad x'_j = \frac{x_j - \min_j}{\max_j - \min_j}</div><div class="n">(10)</div></div>
+<p class="small frag up" data-step="t2" style="margin:16px 0 0">A test value can fall outside the training range, so a min-max result below 0 or above 1 is normal.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Training: mean 45, std 12. A test age of 69 gives <span class="tex">z = \tfrac{69 - 45}{12} = 2</span>.</p><p>Training ages 18 to 80. A test age of 85 gives <span class="tex">x' = \tfrac{85 - 18}{62} \approx 1.08</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Features with large numbers dominate distances unless we scale them.</li>
+<li class="an-up" style="--d:.15s">Min-max scaling maps each feature to the range 0 to 1.</li>
+<li class="an-up" style="--d:.25s">Standardization gives each feature average 0 and standard deviation 1.</li>
+<li class="an-up" style="--d:.35s">With outliers use robust scaling; with long tails try a log first.</li>
+<li class="an-up" style="--d:.45s">Distance-based models need scaling; tree models do not.</li>
+<li class="an-up" style="--d:.55s">Fit the scaler on the training data only, then apply it to the test data.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic compares the scalers on more examples.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Géron, A. (2022). <em>Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow</em> (3rd ed.). O'Reilly.</li>
+<li style="margin:.4em 0">Kuhn, M., &amp; Johnson, K. (2019). <em>Feature Engineering and Selection: A Practical Approach for Predictive Models</em>. CRC Press.</li>
+<li style="margin:.4em 0">Zheng, A., &amp; Casari, A. (2018). <em>Feature Engineering for Machine Learning</em>. O'Reilly.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.). Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Train-test split: how to hold out data for an honest evaluation.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+const $ = (id) => document.getElementById(id);
+
+/* ───────── helpers ───────── */
+function tween(state, ms, step) {
+  const token = (state.token = (state.token || 0) + 1);
+  if (REDUCED) { step(1); return; }
+  const t0 = performance.now();
+  const tick = (now) => {
+    if (token !== state.token) return;
+    const k = clamp((now - t0) / ms, 0, 1);
+    step(1 - (1 - k) ** 3);
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+const mix = (a, b, e) => a + (b - a) * e;
+function niceStep(range, n) {
+  const raw = range / n, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p;
+  return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
+}
+function ticks(lo, hi, n) {
+  const s = niceStep(hi - lo, n), out = [];
+  for (let v = Math.ceil(lo / s) * s; v <= hi + s * 1e-6; v += s) out.push(+v.toFixed(10));
+  return out;
+}
+function tickLabel(v) {
+  const sign = v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  if (a >= 1e5) return sign + +(a / 1e6).toFixed(2) + 'M';
+  return sign + +a.toFixed(2);
+}
+const minus = (s) => String(s).replace('-', '−');
+/* Axes whose domain can change: set(xd, yd) redraws ticks and grid */
+function dynFrame(svg, o) {
+  const W = o.W, H = o.H, L = o.l ?? 96, R = o.r ?? 24, T = o.t ?? 24, B = o.b ?? 84;
+  const st = { xd: [0, 1], yd: [0, 1] };
+  const sx = (v) => L + ((v - st.xd[0]) / (st.xd[1] - st.xd[0])) * (W - R - L);
+  const sy = (v) => H - B - ((v - st.yd[0]) / (st.yd[1] - st.yd[0])) * (H - B - T);
+  const back = el('g', {}, svg);
+  const grid = el('g', {}, back);
+  el('path', { class: 'ax', d: `M${L} ${T}V${H - B}H${W - R}` }, back);
+  const xl = el('text', { class: 'lb', x: (L + W - R) / 2, y: H - B + 72, 'text-anchor': 'middle', text: o.xl || '' }, back);
+  if (o.yl) el('text', { class: 'lb', transform: `translate(${L - (o.ylo ?? 66)} ${(T + H - B) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: o.yl }, back);
+  const id = svg.id + '-clip';
+  const cp = el('clipPath', { id }, svg);
+  el('rect', { x: L, y: T, width: W - R - L, height: H - B - T }, cp);
+  const plot = el('g', { 'clip-path': `url(#${id})` }, svg);
+  function set(xd, yd, xt, yt) {
+    st.xd = xd; st.yd = yd;
+    grid.replaceChildren();
+    (xt || ticks(xd[0], xd[1], o.nx || 6)).forEach((t) => {
+      const [v, lab] = Array.isArray(t) ? t : [t, (o.fx || tickLabel)(t)];
+      const x = sx(v);
+      if (x < L - 1 || x > W - R + 1) return;
+      el('line', { class: 'gl', x1: x, x2: x, y1: T, y2: H - B }, grid);
+      el('text', { class: 'tk', x, y: H - B + 32, 'text-anchor': 'middle', text: lab }, grid);
+    });
+    (yt || ticks(yd[0], yd[1], o.ny || 5)).forEach((v) => {
+      const y = sy(v);
+      if (y < T - 1 || y > H - B + 1) return;
+      el('line', { class: 'gl', x1: L, x2: W - R, y1: y, y2: y }, grid);
+      el('text', { class: 'tk', x: L - 12, y: y + 8, 'text-anchor': 'end', text: (o.fy || tickLabel)(v) }, grid);
+    });
+  }
+  return { sx, sy, set, plot, st, xl, L, R, T, B, W, H };
+}
+function segmented(ids, onPick) {
+  ids.forEach((id, i) => $(id).addEventListener('click', () => {
+    ids.forEach((j, k) => { $(j).className = k === i ? 'bt' : 'bt chip'; });
+    onPick(i);
+  }));
+}
+const quant = (arr, q) => {
+  const s = [...arr].sort((a, b) => a - b), p = (s.length - 1) * q, i = Math.floor(p);
+  return s[i] + (s[Math.min(i + 1, s.length - 1)] - s[i]) * (p - i);
+};
+
+/* ───────── static figures ───────── */
+function drawMinMax() {
+  const svg = $('mm-svg');
+  const ages = [18, 23, 31, 38, 45, 57, 66, 80];
+  const TY = 110, BY = 450;
+  const tx = lin(18, 80, 70, 722), bx = lin(0, 1, 236, 556);
+  el('text', { class: 'ttl', x: 40, y: 36, text: 'original: age in years' }, svg);
+  el('line', { class: 'ax', x1: 40, x2: 752, y1: TY, y2: TY }, svg);
+  [20, 30, 40, 50, 60, 70, 80].forEach((v) => {
+    el('line', { class: 'ax', x1: tx(v), x2: tx(v), y1: TY - 10, y2: TY }, svg);
+    el('text', { class: 'tk', x: tx(v), y: TY - 22, 'text-anchor': 'middle', text: v }, svg);
+  });
+  el('text', { class: 'ttl', x: 200, y: BY + 104, text: 'scaled: always between 0 and 1' }, svg);
+  el('line', { class: 'ax', x1: 206, x2: 586, y1: BY, y2: BY }, svg);
+  [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
+    el('line', { class: 'ax', x1: bx(v), x2: bx(v), y1: BY, y2: BY + 10 }, svg);
+    el('text', { class: 'tk', x: bx(v), y: BY + 40, 'text-anchor': 'middle', text: v }, svg);
+  });
+  ages.forEach((a, i) => {
+    const s = (a - 18) / 62, hi = a === 45;
+    el('path', { class: hi ? 'curve-b an-draw' : 'wire an-draw', pathLength: 1, style: `--d:${0.5 + i * 0.12}s;${hi ? 'stroke-width:3' : 'stroke-opacity:.6'}`, d: `M${tx(a)} ${TY + 14}C${tx(a)} ${TY + 170} ${bx(s)} ${BY - 170} ${bx(s)} ${BY - 14}` }, svg);
+    el('circle', { class: `pt ${hi ? 'fb' : 'fa'} an-pop`, cx: tx(a), cy: TY, r: 11, style: `--d:${i * 0.06}s` }, svg);
+    el('circle', { class: `pt ${hi ? 'fb' : 'fa'} an-pop`, cx: bx(s), cy: BY, r: 11, style: `--d:${1.3 + i * 0.12}s` }, svg);
+  });
+  const g = el('g', { class: 'an-fade', style: '--d:2.4s' }, svg);
+  el('text', { class: 'txs', x: tx(45) + 18, y: TY + 40, style: 'fill:var(--c-b)', text: '45' }, g);
+  el('text', { class: 'txs', x: bx(27 / 62) + 18, y: BY - 22, style: 'fill:var(--c-b)', text: '0.44' }, g);
+  el('text', { class: 'txs', x: 150, y: BY + 8, 'text-anchor': 'end', text: 'min → 0' }, g);
+  el('text', { class: 'txs', x: 642, y: BY + 8, text: 'max → 1' }, g);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.knn = (() => {
+  const svg = $('knn-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [14, 86], y: [0, 3.3e6], xt: [20, 30, 40, 50, 60, 70, 80], yt: [0, 1e6, 2e6, 3e6], fy: (v) => String(v / 1e6), xl: 'age (years)', yl: 'monthly income (millions of colones)' });
+  const people = [[74, 1.21e6], [33, 1.38e6], [22, 0.45e6], [25, 2.1e6], [41, 0.8e6], [47, 2.6e6], [55, 1.6e6], [61, 0.5e6],
+    [68, 2.9e6], [36, 2.4e6], [52, 1.0e6], [79, 1.9e6], [19, 0.35e6], [45, 1.75e6], [58, 2.25e6], [28, 3.0e6]];
+  const aMin = Math.min(...people.map((p) => p[0])), aMax = Math.max(...people.map((p) => p[0]));
+  const iMin = Math.min(...people.map((p) => p[1])), iMax = Math.max(...people.map((p) => p[1]));
+  const W = [[1, 1], [1 / (aMax - aMin), 1 / (iMax - iMin)]];
+  const zone = el('ellipse', { style: 'fill:var(--c-b);fill-opacity:.1;stroke:var(--c-b);stroke-width:2;stroke-dasharray:8 6' }, F.plot);
+  const link = el('line', { class: 'curve-b' }, F.plot);
+  const dots = people.map(([a, i]) => el('circle', { class: 'pt fa', cx: F.sx(a), cy: F.sy(i), r: 11 }, F.plot));
+  const ring = el('circle', { r: 20, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, F.plot);
+  const qDot = el('rect', { width: 26, height: 26, class: 'ink', style: 'stroke:var(--myst-color-bg);stroke-width:3' }, F.plot);
+  const qLab = el('text', { class: 'txs', 'text-anchor': 'end', text: 'query' }, F.plot);
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'people'], ['ring', '', 'nearest neighbor']]);
+  const q = { a: 30, i: 1.2e6 };
+  let mode = 0;
+  const cur = { x2: F.sx(30), y2: F.sy(1.2e6), rx: 0, ry: 0 };
+  const anim = {};
+  function nearest() {
+    const [wa, wi] = W[mode];
+    let best = 0, bd = Infinity;
+    people.forEach(([a, i], k) => {
+      const d = Math.hypot(wa * (a - q.a), wi * (i - q.i));
+      if (d < bd) { bd = d; best = k; }
+    });
+    return { k: best, d: bd };
+  }
+  function update() {
+    const { k, d } = nearest();
+    const [a, i] = people[k], [wa, wi] = W[mode];
+    const ca = (wa * (a - q.a)) ** 2, ci = (wi * (i - q.i)) ** 2, tot = ca + ci || 1;
+    const pct = (v) => { const p = (100 * v) / tot; return p < 0.1 ? '< 0.1%' : p > 99.9 ? '> 99.9%' : p.toFixed(0) + '%'; };
+    $('knn-nn').textContent = `${a} years, ${(i / 1e6).toFixed(2)}M`;
+    $('knn-age').textContent = pct(ca);
+    $('knn-inc').textContent = pct(ci);
+    const qx = F.sx(q.a), qy = F.sy(q.i);
+    qDot.setAttribute('x', qx - 13); qDot.setAttribute('y', qy - 13);
+    qDot.setAttribute('transform', `rotate(45 ${qx} ${qy})`);
+    qLab.setAttribute('x', qx - 22); qLab.setAttribute('y', qy + 44);
+    zone.setAttribute('cx', qx); zone.setAttribute('cy', qy);
+    const to = {
+      x2: F.sx(a), y2: F.sy(i),
+      rx: Math.min(4000, Math.abs(F.sx(q.a + d / wa) - qx)),
+      ry: Math.min(4000, Math.max(1.5, Math.abs(F.sy(q.i + d / wi) - qy))),
+    };
+    const from = { ...cur };
+    link.setAttribute('x1', qx); link.setAttribute('y1', qy);
+    tween(anim, 700, (e) => {
+      Object.keys(to).forEach((key) => { cur[key] = mix(from[key], to[key], e); });
+      link.setAttribute('x2', cur.x2); link.setAttribute('y2', cur.y2);
+      ring.setAttribute('cx', cur.x2); ring.setAttribute('cy', cur.y2);
+      zone.setAttribute('rx', cur.rx); zone.setAttribute('ry', cur.ry);
+    });
+  }
+  segmented(['knn-raw', 'knn-scaled'], (m) => { mode = m; update(); });
+  svg.addEventListener('click', (ev) => {
+    const p = toSvgPoint(svg, ev);
+    if (p.x < F.L || p.x > F.W - F.R || p.y < F.T || p.y > F.H - F.B) return;
+    q.a = Math.round(F.ix(p.x)); q.i = Math.round(F.iy(p.y) / 1e4) * 1e4;
+    cur.x2 = F.sx(q.a); cur.y2 = F.sy(q.i); cur.rx = 0; cur.ry = 0;
+    update();
+  });
+  update();
+  return {};
+})();
+
+DEMOS.std = (() => {
+  const svg = $('std-svg');
+  const r = rng(21);
+  const ages = Array.from({ length: 300 }, () => clamp(45 + 12.6 * gauss(r), 16, 89));
+  const m = mean(ages), s = Math.sqrt(mean(ages.map((a) => (a - m) ** 2)));
+  const edges = Array.from({ length: 16 }, (_, k) => 15 + 5 * k);
+  const counts = edges.slice(0, -1).map((e0, k) => ages.filter((a) => a >= e0 && a < edges[k + 1]).length);
+  const yMax = Math.ceil(Math.max(...counts) / 10) * 10 + 10;
+  const F = dynFrame(svg, { W: 792, H: 470, l: 80, t: 20, b: 84, ylo: 58, nx: 6, ny: 4, xl: 'age (years)', yl: 'people' });
+  const MODES = [
+    { sh: 0, sc: 1, xd: [10, 100], lab: 'age (years)' },
+    { sh: m, sc: 1, xd: [-45, 45], lab: 'age minus the mean (years)' },
+    { sh: m, sc: s, xd: [-6, 6], lab: 'z (standard deviations from the mean)' },
+  ];
+  const bars = counts.map(() => el('rect', { class: 'fa', style: 'fill-opacity:.8;stroke:var(--myst-color-bg);stroke-width:1.5' }, F.plot));
+  const mLine = el('line', { style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6' }, F.plot);
+  const mLab = el('text', { class: 'txs', 'text-anchor': 'middle' }, F.plot);
+  const sLine = el('path', { class: 'curve-b', style: 'stroke-width:3' }, F.plot);
+  const sLab = el('text', { class: 'txs', style: 'fill:var(--c-b)' }, F.plot);
+  let p = { ...MODES[0], xd: [...MODES[0].xd] };
+  const anim = {};
+  function draw() {
+    F.set(p.xd, [0, yMax]);
+    const tr = (v) => (v - p.sh) / p.sc;
+    counts.forEach((c, k) => {
+      const x0 = F.sx(tr(edges[k])), x1 = F.sx(tr(edges[k + 1]));
+      bars[k].setAttribute('x', x0); bars[k].setAttribute('width', Math.max(0, x1 - x0));
+      bars[k].setAttribute('y', F.sy(c)); bars[k].setAttribute('height', F.sy(0) - F.sy(c));
+    });
+    const mx = F.sx(tr(m)), sxv = F.sx(tr(m + s)), top = F.T + 22;
+    mLine.setAttribute('x1', mx); mLine.setAttribute('x2', mx); mLine.setAttribute('y1', top + 34); mLine.setAttribute('y2', F.H - F.B);
+    mLab.setAttribute('x', mx); mLab.setAttribute('y', top + 8);
+    mLab.textContent = 'mean = ' + minus(fmt(tr(m), 1));
+    sLine.setAttribute('d', `M${mx} ${top + 64}H${sxv}M${mx} ${top + 52}V${top + 76}M${sxv} ${top + 52}V${top + 76}`);
+    sLab.setAttribute('x', sxv + 12); sLab.setAttribute('y', top + 72);
+    sLab.textContent = '1 std = ' + fmt(s / p.sc, 1);
+  }
+  segmented(['std-0', 'std-1', 'std-2'], (k) => {
+    const from = { ...p, xd: [...p.xd] }, to = MODES[k];
+    F.xl.textContent = to.lab;
+    tween(anim, 900, (e) => {
+      p = { sh: mix(from.sh, to.sh, e), sc: mix(from.sc, to.sc, e), xd: [mix(from.xd[0], to.xd[0], e), mix(from.xd[1], to.xd[1], e)] };
+      draw();
+    });
+  });
+  draw();
+  return {};
+})();
+
+DEMOS.cmp = (() => {
+  const svg = $('cmp-svg');
+  const r = rng(7);
+  const pts = Array.from({ length: 40 }, () => {
+    const a = Math.round(clamp(44 + 15 * gauss(r), 18, 80));
+    const i = clamp(250000 + a * 22000 + 480000 * gauss(r), 300000, 3000000);
+    return [a, i];
+  });
+  const col = (j) => pts.map((p) => p[j]);
+  const st = [0, 1].map((j) => {
+    const v = col(j), mu = mean(v);
+    return { min: Math.min(...v), max: Math.max(...v), mu, sd: Math.sqrt(mean(v.map((x) => (x - mu) ** 2))) };
+  });
+  const F = dynFrame(svg, { W: 1160, H: 700, l: 110, t: 24, b: 84, ylo: 80, nx: 8, ny: 5, xl: 'age', yl: 'income' });
+  const pw = F.W - F.R - F.L, ph = F.H - F.B - F.T, asp = pw / ph;
+  const domain = (cx, y0, y1) => { const w = ((y1 - y0) * asp) / 2; return { xd: [cx - w, cx + w], yd: [y0, y1] }; };
+  const MODES = [
+    { f: (p) => p, ...domain(50, -0.2e6, 3.3e6) },
+    { f: (p) => p.map((v, j) => (v - st[j].min) / (st[j].max - st[j].min)), ...domain(0.5, -0.15, 1.15) },
+    { f: (p) => p.map((v, j) => (v - st[j].mu) / st[j].sd), ...domain(0, -2.8, 2.8) },
+  ];
+  const dots = pts.map(() => el('circle', { class: 'pt fa', r: 10 }, F.plot));
+  const note = el('g', {}, svg);
+  el('path', { class: 'wire', d: '', 'marker-end': 'url(#ah)' }, note);
+  const noteText = el('text', { class: 'txs', text: 'every age fits in this thin column' }, note);
+  let cur = { xd: [...MODES[0].xd], yd: [...MODES[0].yd], xy: pts.map(MODES[0].f) };
+  const anim = {};
+  function draw(noteOpacity) {
+    F.set(cur.xd, cur.yd);
+    dots.forEach((d, k) => { d.setAttribute('cx', F.sx(cur.xy[k][0])); d.setAttribute('cy', F.sy(cur.xy[k][1])); });
+    const x0 = F.sx(50), y0 = F.sy(2.2e6);
+    note.querySelector('path').setAttribute('d', `M${x0 + 150} ${y0 - 60}C${x0 + 80} ${y0 - 60} ${x0 + 40} ${y0 - 40} ${x0 + 18} ${y0}`);
+    noteText.setAttribute('x', x0 + 160); noteText.setAttribute('y', y0 - 52);
+    note.style.opacity = noteOpacity;
+  }
+  const RANGE = [
+    () => [`${st[0].min} to ${st[0].max}`, `${fmt(Math.round(st[1].min / 1e3) * 1e3)} to ${fmt(Math.round(st[1].max / 1e3) * 1e3)}`],
+    () => ['0 to 1', '0 to 1'],
+    () => [0, 1].map((j) => `${minus(fmt((st[j].min - st[j].mu) / st[j].sd, 1))} to ${fmt((st[j].max - st[j].mu) / st[j].sd, 1)}`),
+  ];
+  function readouts(k) { const [a, b] = RANGE[k](); $('cmp-age').textContent = a; $('cmp-inc').textContent = b; }
+  segmented(['cmp-0', 'cmp-1', 'cmp-2'], (k) => {
+    const from = { xd: [...cur.xd], yd: [...cur.yd], xy: cur.xy.map((p) => [...p]) }, to = MODES[k], txy = pts.map(to.f);
+    const op0 = +note.style.opacity, op1 = k === 0 ? 1 : 0;
+    readouts(k);
+    tween(anim, 1000, (e) => {
+      cur = {
+        xd: from.xd.map((v, j) => mix(v, to.xd[j], e)),
+        yd: from.yd.map((v, j) => mix(v, to.yd[j], e)),
+        xy: from.xy.map((p, n) => [mix(p[0], txy[n][0], e), mix(p[1], txy[n][1], e)]),
+      };
+      draw(mix(op0, op1, e));
+    });
+  });
+  draw(1); readouts(0);
+  return {};
+})();
+
+DEMOS.out = (() => {
+  const svg = $('out-svg');
+  const typical = [420, 510, 560, 600, 650, 700, 760, 820, 880, 950, 1050].map((v) => v * 1000);
+  const X0 = 110, X1 = 1110;
+  const panels = [
+    { y: 230, title: 'min-max scaling', d: [0, 1], t: [0, 0.25, 0.5, 0.75, 1] },
+    { y: 560, title: 'robust scaling (median and IQR)', d: [-2, 6], t: [-2, -1, 0, 1, 2, 3, 4, 5, 6] },
+  ];
+  panels.forEach((P) => {
+    P.sx = lin(P.d[0], P.d[1], X0, X1);
+    el('text', { class: 'ttl', x: X0 - 40, y: P.y - 150, text: P.title }, svg);
+    P.zone = el('rect', { class: 'zone', y: P.y - 70, height: 80, rx: 4 }, svg);
+    P.zlab = el('text', { class: 'txs', y: P.y - 86, 'text-anchor': 'middle', style: 'fill:var(--c-a)' }, svg);
+    el('line', { class: 'ax', x1: X0 - 40, x2: X1 + 40, y1: P.y, y2: P.y }, svg);
+    P.t.forEach((v) => {
+      el('line', { class: 'ax', x1: P.sx(v), x2: P.sx(v), y1: P.y, y2: P.y + 10 }, svg);
+      el('text', { class: 'tk', x: P.sx(v), y: P.y + 40, 'text-anchor': 'middle', text: minus(v) }, svg);
+    });
+    P.dots = typical.map(() => el('circle', { class: 'pt fa', cy: P.y - 30, r: 11, style: 'fill-opacity:.85' }, svg));
+    P.out = el('circle', { class: 'pt fb', cy: P.y - 30, r: 13 }, svg);
+    P.flag = el('g', {}, svg);
+    el('path', { class: 'fb', d: `M${X1 + 44} ${P.y - 30}l-22 -14v28z` }, P.flag);
+    P.flagText = el('text', { class: 'txs', x: X1 + 20, y: P.y - 54, 'text-anchor': 'end', style: 'fill:var(--c-b)' }, P.flag);
+  });
+  const slider = $('out-s');
+  const value = (s) => 1.5e6 * (30 / 1.5) ** (s / 100);
+  function draw() {
+    const ext = Math.round(value(+slider.value) / 1e5) * 1e5, all = [...typical, ext];
+    $('out-val').textContent = fmt(ext);
+    const mn = Math.min(...all), mx = Math.max(...all);
+    const med = quant(all, 0.5), iqr = quant(all, 0.75) - quant(all, 0.25);
+    const scalers = [(v) => (v - mn) / (mx - mn), (v) => (v - med) / iqr];
+    panels.forEach((P, k) => {
+      const f = scalers[k], lo = f(typical[0]), hi = f(typical[typical.length - 1]);
+      typical.forEach((v, n) => P.dots[n].setAttribute('cx', P.sx(f(v))));
+      const xo = f(ext), inside = xo <= P.d[1];
+      P.out.setAttribute('cx', P.sx(Math.min(xo, P.d[1])));
+      P.out.style.display = inside ? '' : 'none';
+      P.flag.style.display = inside ? 'none' : '';
+      P.flagText.textContent = 'extreme value at ' + fmt(xo, 1) + ' →';
+      P.zone.setAttribute('x', P.sx(lo) - 16); P.zone.setAttribute('width', P.sx(hi) - P.sx(lo) + 32);
+      P.zlab.setAttribute('x', clamp((P.sx(lo) + P.sx(hi)) / 2, X0 + 60, X1 - 200));
+      P.zlab.textContent = 'span ' + fmt(hi - lo, 2);
+      $(k ? 'out-rb' : 'out-mm').textContent = fmt(hi - lo, 2);
+    });
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.log = (() => {
+  const svg = $('log-svg');
+  const r = rng(13);
+  const prices = Array.from({ length: 400 }, () => Math.exp(Math.log(90) + 0.75 * gauss(r)));
+  const NB = 24;
+  const SET = [
+    { d: [0, 600], f: (v) => v, xt: [0, 100, 200, 300, 400, 500, 600].map((v) => [v, String(v)]), xl: 'price (millions of colones)' },
+    { d: [1.1, 3.0], f: (v) => Math.log10(v), xt: [20, 50, 100, 200, 500, 1000].map((v) => [Math.log10(v), String(v)]), xl: 'price (millions of colones, log scale)' },
+  ];
+  SET.forEach((S) => {
+    const w = (S.d[1] - S.d[0]) / NB;
+    S.counts = new Array(NB).fill(0);
+    prices.forEach((p) => { S.counts[clamp(Math.floor((S.f(p) - S.d[0]) / w), 0, NB - 1)]++; });
+    const fv = prices.map(S.f);
+    S.mean = mean(fv); S.median = quant(fv, 0.5);
+  });
+  const yMax = Math.ceil(Math.max(...SET[0].counts, ...SET[1].counts) / 20) * 20;
+  const F = dynFrame(svg, { W: 1160, H: 700, l: 100, t: 24, b: 84, ny: 5, yl: 'houses' });
+  F.set([0, 1], [0, yMax], []);
+  const bw = (F.W - F.R - F.L) / NB;
+  const bars = SET[0].counts.map((_, k) => el('rect', { class: 'fa', x: F.L + k * bw + 2, width: bw - 4, style: 'fill-opacity:.8' }, F.plot));
+  const ticksG = el('g', {}, svg);
+  const lines = ['mean', 'median'].map((name, k) => {
+    const g = el('g', {}, svg);
+    el('line', { y1: F.T + 40, y2: F.H - F.B, style: `stroke:${k ? 'var(--myst-color-text)' : 'var(--c-b)'};stroke-width:3;stroke-dasharray:${k ? '4 6' : '10 6'}` }, g);
+    el('text', { class: 'txs', y: F.T + 28, 'text-anchor': k ? 'end' : 'start', style: k ? '' : 'fill:var(--c-b)', text: name }, g);
+    return g;
+  });
+  const pos = (S, v) => F.L + ((v - S.d[0]) / (S.d[1] - S.d[0])) * (F.W - F.R - F.L);
+  let cur = { h: [...SET[0].counts], mx: pos(SET[0], SET[0].mean), md: pos(SET[0], SET[0].median) };
+  const anim = {};
+  function draw() {
+    bars.forEach((b, k) => { b.setAttribute('y', F.sy(cur.h[k])); b.setAttribute('height', F.sy(0) - F.sy(cur.h[k])); });
+    [cur.mx, cur.md].forEach((x, k) => {
+      const g = lines[k];
+      g.querySelector('line').setAttribute('x1', x); g.querySelector('line').setAttribute('x2', x);
+      g.querySelector('text').setAttribute('x', x + (k ? -10 : 10));
+    });
+  }
+  function axis(S) {
+    ticksG.replaceChildren();
+    S.xt.forEach(([v, lab]) => el('text', { class: 'tk', x: pos(S, v), y: F.H - F.B + 32, 'text-anchor': 'middle', text: lab }, ticksG));
+    F.xl.textContent = S.xl;
+  }
+  segmented(['log-0', 'log-1'], (k) => {
+    const S = SET[k], from = { h: [...cur.h], mx: cur.mx, md: cur.md };
+    const to = { h: S.counts, mx: pos(S, S.mean), md: pos(S, S.median) };
+    axis(S);
+    $('log-tag').textContent = k ? 'Roughly symmetric' : 'Long right tail';
+    $('log-tag').style.color = k ? 'var(--c-c)' : 'var(--c-b)';
+    tween(anim, 900, (e) => {
+      cur = { h: from.h.map((v, n) => mix(v, to.h[n], e)), mx: mix(from.mx, to.mx, e), md: mix(from.md, to.md, e) };
+      draw();
+    });
+  });
+  axis(SET[0]); draw();
+  $('log-tag').style.color = 'var(--c-b)';
+  return {};
+})();
+
+drawMinMax();
+})();
+</script>
+</body>
+</html>

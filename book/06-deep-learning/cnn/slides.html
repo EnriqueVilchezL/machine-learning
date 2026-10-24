@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convolutional neural networks</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.bt:disabled{opacity:.45;cursor:default}
+.kbtns .bt{font-size:24px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 25</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Convolutional neural networks</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Networks that read images with small shared filters, from edges up to whole objects</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 25 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Images as grids of numbers</li>
+<li class="an-up" style="--d:.15s">Why dense layers struggle with images</li>
+<li class="an-up" style="--d:.25s">Convolution, padding and stride</li>
+<li class="an-up" style="--d:.35s">Channels, filters and pooling</li>
+<li class="an-up" style="--d:.45s">Building, training and using a CNN</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:36%"><col style="width:64%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{X}, \ X_{ij}</span></td><td>Input image and the pixel in row <span class="tex">i</span>, column <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.11s"><td><span class="tex">H \times W \times C</span></td><td>Height, width and number of channels (3 for color)</td></tr>
+<tr class="an-up" style="--d:.17s"><td><span class="tex">\mathbf{K}, \ K_{mn}</span></td><td>Kernel (filter) of size <span class="tex">k \times k</span> and its weights</td></tr>
+<tr class="an-up" style="--d:.23s"><td><span class="tex">\mathbf{Z}, \ Z_{ij}, \ b</span></td><td>Feature map, one of its entries, and the bias</td></tr>
+<tr class="an-up" style="--d:.29s"><td><span class="tex">s, \ p</span></td><td>Stride (step size) and padding (border of zeros)</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">F</span></td><td>Number of filters in a layer</td></tr>
+<tr class="an-up" style="--d:.41s"><td><span class="tex">\mathbf{a}^{(l)} = g(\mathbf{z}^{(l)})</span></td><td>Activations of layer <span class="tex">l</span>, as in Topic 23</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">\hat{y}, \ L, \ J, \ \boldsymbol{\theta}, \ \alpha</span></td><td>Output, loss, cost, all parameters, learning rate</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold capitals are grids of numbers: images, kernels and feature maps.</p><p>Here <span class="tex">W</span> alone is the image width. Bold <span class="tex">\mathbf{W}^{(l)}</span> is still a weight matrix.</p><p>Rows and columns are counted from 0.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Images as numbers</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A computer sees a picture as a table of brightness values.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="An image is a grid">
+<div class="hdr" data-s="Images as numbers"></div>
+<h2>An image is a grid</h2>
+<div class="fr">
+<div class="figbox"><svg id="img-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A grayscale image is a table with one number per pixel: 0 is black, 255 is white.</p>
+<p class="small frag up" data-step="rgb" style="margin:0">A color image has three tables of the same size, one per <strong>channel</strong>: red, green and blue. Its shape is <span class="tex">H \times W \times 3</span>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) A handwritten 7 as 8 × 8 pixels. (b) A color image: three stacked channels.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Dense layers on images">
+<div class="hdr" data-s="Images as numbers"></div>
+<h2>Dense layers on images</h2>
+<div class="fr">
+<div class="figbox"><svg id="dense-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Recap of Topic 23: a dense layer has one weight per input and neuron.</p>
+<div class="small" style="text-align:center"><span class="tex">\mathbf{a} = g(\mathbf{W}\mathbf{x} + \mathbf{b})</span></div>
+<p class="small frag up" data-step="d1" style="margin:0"><strong>Too many weights:</strong> a 200 × 200 color image has 120 000 inputs; 1 000 neurons need 120 million weights.</p>
+<p class="small frag up" data-step="d2" style="margin:0"><strong>No sense of place:</strong> flattening loses the neighbours, and a shifted object lights up other inputs.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>(a) Dense layer, 4 × 4 image. (b) A shifted stroke.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two ideas">
+<div class="hdr" data-s="Images as numbers"></div>
+<h2>Two ideas</h2>
+<div class="fr">
+<div class="figbox"><svg id="ideas-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0"><strong>Local connections:</strong> each output looks only at a small patch of neighbouring inputs.</p>
+<p class="small frag up" data-step="i1" style="margin:0"><strong>Shared weights:</strong> every patch uses the same few weights, so a pattern is detected wherever it appears.</p>
+<p class="small frag up" data-step="i2" style="margin:0">Together, the two ideas give the <strong>convolution</strong>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Seven inputs, five outputs, drawn in one dimension. In (c) each color is one weight, reused at every position.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Convolution and pooling</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Slide a small filter over the image, then shrink the result.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The convolution">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>The convolution</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Place the <span class="tex">k \times k</span> kernel on the image with its corner at row <span class="tex">i</span>, column <span class="tex">j</span>. Multiply the overlapping numbers, add them up, and add the bias:</p>
+<div class="eq"><div class="m tex-d">Z_{ij} = \sum_{m=0}^{k-1} \sum_{n=0}^{k-1} X_{i+m,\,j+n} \, K_{mn} + b</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="c1" style="margin:0">Moving the kernel to every position fills the <strong>feature map</strong> <span class="tex">\mathbf{Z}</span>. A large <span class="tex">Z_{ij}</span> means the patch looks like the kernel.</p>
+<p class="small frag up" data-step="c2" style="margin:16px 0 0">The weights <span class="tex">K_{mn}</span> and the bias <span class="tex">b</span> are learned, like any other weights. Strictly this is a cross-correlation; deep learning calls it convolution.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Patch and kernel, with <span class="tex">b = 1</span>:</p><p><span class="tex">\begin{bmatrix} 3 & 1 \\ 4 & 2 \end{bmatrix}, \ \begin{bmatrix} 1 & 0 \\ 0 & -1 \end{bmatrix}</span></p><p><span class="tex">3 \cdot 1 + 1 \cdot 0 + 4 \cdot 0</span></p><p><span class="tex">+ \, 2 \cdot (-1) + 1 = 2</span></p></aside>
+<aside class="am frag up" data-step="c1"><div class="t">Size</div><p>A 4 × 4 image and a 3 × 3 kernel give 2 × 2 positions, so <span class="tex">\mathbf{Z}</span> is 2 × 2.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A worked example" id="work-sec">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>A worked example</h2>
+<div class="fr">
+<div class="figbox"><svg id="work-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">This kernel adds the left column of the patch and subtracts the right column. The bias is 0.</p>
+<p class="small" style="margin:0">Press → to move the kernel one position at a time.</p>
+<p class="small frag up" data-step="w4" style="margin:0">The largest value, 11, is where the image is bright on the left and dark on the right: a <strong>vertical edge</strong>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Equation (1) on a 4 × 4 image. The orange frame is the current patch.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Sliding a kernel" data-demo="conv">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Sliding a kernel</h2>
+<div class="fr">
+<div class="figbox"><svg id="conv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Choose a kernel, then step or play to fill the feature map.</p>
+<div class="btns kbtns" id="conv-kern"><button class="bt" data-k="v">Vertical edge</button><button class="bt chip" data-k="h">Horizontal edge</button><button class="bt chip" data-k="blur">Blur</button><button class="bt chip" data-k="sharp">Sharpen</button></div>
+<div class="btns"><button class="bt" id="conv-step">▶ Step</button><button class="bt" id="conv-play">Play</button><button class="bt chip" id="conv-reset">Reset</button></div>
+<div class="ro"><span>Position <span class="tex">(i, j)</span></span><b id="conv-pos">—</b></div>
+<div class="ro"><span>Output <span class="tex">Z_{ij}</span></span><b id="conv-val" class="bb">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>A 12 × 12 picture of a house. Orange: positive output, blue: negative.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Output size">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Output size</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Two settings change how many positions the kernel visits:</p>
+<p class="small" style="margin:0"><strong>Padding</strong> <span class="tex">p</span> adds a border of zeros around the image. <strong>Stride</strong> <span class="tex">s</span> is how many pixels the kernel jumps each move.</p>
+<p class="small frag up" data-step="o1" style="margin:16px 0 0">For an <span class="tex">n \times n</span> input and a <span class="tex">k \times k</span> kernel, the output is <span class="tex">n_{\text{out}} \times n_{\text{out}}</span> with</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">n_{\text{out}} = \left\lfloor \frac{n + 2p - k}{s} \right\rfloor + 1</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="o2" style="margin:0"><span class="tex">\lfloor \cdot \rfloor</span> rounds down: a last step that would leave the image is skipped. With <span class="tex">s = 1</span> and <span class="tex">p = (k-1)/2</span> the size does not change.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">n = 32, \ k = 5, \ p = 0, \ s = 1</span>:</p><p><span class="tex">\tfrac{32 - 5}{1} + 1 = 28</span></p><p><span class="tex">n = 7, \ k = 3, \ p = 0, \ s = 2</span>:</p><p><span class="tex">\lfloor \tfrac{7 - 3}{2} \rfloor + 1 = 3</span></p></aside>
+<aside class="am frag up" data-step="o2"><div class="t">Same size</div><p><span class="tex">n = 32, \ k = 3, \ p = 1, \ s = 1</span>:</p><p><span class="tex">\tfrac{32 + 2 - 3}{1} + 1 = 32</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Stride and padding" data-demo="size">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Stride and padding</h2>
+<div class="fr">
+<div class="figbox"><svg id="size-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<div class="ctl"><label><span>Input size <span class="tex">n</span></span><b id="size-n-val">7</b></label><input type="range" id="size-n" min="4" max="9" step="1" value="7"></div>
+<div class="ctl"><label><span>Kernel size <span class="tex">k</span></span><b id="size-k-val">3</b></label><input type="range" id="size-k" min="1" max="5" step="1" value="3"></div>
+<div class="ctl"><label><span>Stride <span class="tex">s</span></span><b id="size-s-val">1</b></label><input type="range" id="size-s" min="1" max="3" step="1" value="1"></div>
+<div class="ctl"><label><span>Padding <span class="tex">p</span></span><b id="size-p-val">0</b></label><input type="range" id="size-p" min="0" max="2" step="1" value="0"></div>
+<div class="btns"><button class="bt" id="size-step">▶ Step</button><button class="bt" id="size-play">Play</button></div>
+<div class="ro"><span>Output size <span class="tex">n_{\text{out}}</span></span><b id="size-out" class="bb">5</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Dashed cells are padding zeros. The orange frame visits every position; each lights one output cell.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Channels and filters">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Channels and filters</h2>
+<div class="bm">
+<div style="display:flex;flex-direction:column">
+<p class="small" style="margin:0">With <span class="tex">C</span> input channels, each kernel is <span class="tex">k \times k \times C</span>. Filter <span class="tex">f</span> sums over all channels and gives one map:</p>
+<div class="eq"><div class="m tex-d">Z^{(f)}_{ij} = \sum_{c=1}^{C} \sum_{m=0}^{k-1} \sum_{n=0}^{k-1} X_{i+m,\,j+n,\,c} \, K^{(f)}_{mnc} + b^{(f)}</div><div class="n">(3)</div></div>
+<div class="figbox" style="flex:none;height:470px"><svg id="chan-svg" viewBox="0 0 1160 470"></svg></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">In words</div><p>Each filter looks for one pattern. <span class="tex">F</span> filters give <span class="tex">F</span> maps, stacked as the channels of the next layer.</p></aside>
+<aside class="am frag up"><div class="t">Example</div><p>Input <span class="tex">32 \times 32 \times 3</span>, <span class="tex">F = 16</span> filters of size <span class="tex">5 \times 5 \times 3</span>.</p><p>Each filter: <span class="tex">5 \cdot 5 \cdot 3 = 75</span> weights and 1 bias.</p><p>Output: <span class="tex">28 \times 28 \times 16</span>.</p></aside>
+<p class="cap" style="margin-top:auto"><b>Figure 7:</b>Four filters on a color image give four feature maps.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="ReLU after convolution">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>ReLU after convolution</h2>
+<div class="fr">
+<div class="figbox"><svg id="relu-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">As in Topic 23, a nonlinearity follows each layer. ReLU acts on every entry of the feature map:</p>
+<div class="small" style="text-align:center"><span class="tex">A_{ij} = \max(0, \, Z_{ij})</span></div>
+<p class="small frag up" style="margin:0">Without it, a stack of convolutions would equal one single convolution.</p>
+<aside class="am"><div class="t">Example</div><p><span class="tex">\max(0, -6) = 0</span>, <span class="tex">\ \max(0, 4) = 4</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Negative entries (blue) become 0; positive entries (orange) pass unchanged.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Pooling">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Pooling</h2>
+<div class="fr">
+<div class="figbox"><svg id="pool-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Pooling keeps one number per 2 × 2 window (stride 2), so each map shrinks by half.</p>
+<p class="small" style="margin:0"><strong>Max pooling</strong> keeps the largest value; <strong>average pooling</strong> keeps the mean.</p>
+<p class="small frag up" data-step="p1" style="margin:0">No weights to learn, and small shifts rarely change the result.</p>
+<aside class="am"><div class="t">Example</div><p>Top-left window <span class="tex">\{1, 3, 5, 2\}</span>: max 5, average <span class="tex">\tfrac{11}{4} = 2.75</span>.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>Circles: the values max pooling keeps.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Counting parameters">
+<div class="hdr" data-s="Convolution and pooling"></div>
+<h2>Counting parameters</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A convolutional layer has <span class="tex">F</span> filters, each with <span class="tex">k \cdot k \cdot C</span> weights and one bias:</p>
+<div class="eq"><div class="m tex-d">\text{params}_{\text{conv}} = F \, (k \cdot k \cdot C + 1)</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="q1" style="margin:0">A dense layer with <span class="tex">n_{\text{in}}</span> inputs and <span class="tex">n_{\text{out}}</span> neurons needs one weight per pair, plus one bias per neuron:</p>
+<div class="eq frag up" data-step="q1"><div class="m tex-d">\text{params}_{\text{dense}} = (n_{\text{in}} + 1) \, n_{\text{out}}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="q2" style="margin:0">Equation (4) does not contain the image size: the same weights work on a small or a large image.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example: conv</div><p>Color input (<span class="tex">C = 3</span>), <span class="tex">F = 64</span> filters of <span class="tex">3 \times 3</span>:</p><p><span class="tex">64 \cdot (3 \cdot 3 \cdot 3 + 1)</span></p><p><span class="tex">= 64 \cdot 28 = 1\,792</span></p></aside>
+<aside class="am frag up" data-step="q1"><div class="t">Example: dense</div><p><span class="tex">200 \times 200 \times 3 = 120\,000</span> inputs, 1 000 neurons:</p><p><span class="tex">120\,001 \cdot 1\,000 = 120\,001\,000</span></p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Building a CNN</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Stack the blocks, train them with backpropagation, and use them.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A typical CNN">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>A typical CNN</h2>
+<p class="small" style="margin:-8px 0 8px">Repeat convolution, ReLU and pooling. Then flatten, and finish with a dense layer and softmax (Topic 23).</p>
+<div class="figbox"><svg id="stack-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 10:</b>A small network for 28 × 28 digit images, in the style of LeNet-5. Maps get smaller and more numerous; orange numbers count the parameters of each layer.</p>
+</section>
+
+<section class="s ats-prose" data-label="What the layers learn">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>What the layers learn</h2>
+<p class="small" style="margin:-8px 0 8px">Nobody designs the kernels: training finds them. Early layers find simple patterns; later layers combine them.</p>
+<div class="figbox"><svg id="learn-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 11:</b>Schematic view of the patterns that make neurons fire, from the first layer to the last.</p>
+</section>
+
+<section class="s ats-prose" data-label="Receptive field" data-demo="rf">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Receptive field</h2>
+<div class="fr">
+<div class="figbox"><svg id="rf-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">The <strong>receptive field</strong>: input pixels one neuron sees. Stride 1:</p>
+<div class="small" style="text-align:center"><span class="tex">r = 1 + L\,(k - 1)</span></div>
+<div class="ctl"><label><span>Layers <span class="tex">L</span></span><b id="rf-l-val">3</b></label><input type="range" id="rf-l" min="1" max="4" step="1" value="3"></div>
+<div class="ctl"><label><span>Kernel size <span class="tex">k</span></span><b id="rf-k-val">3</b></label><input type="range" id="rf-k" min="3" max="5" step="2" value="3"></div>
+<div class="ctl"><label><span>Stride <span class="tex">s</span></span><b id="rf-s-val">1</b></label><input type="range" id="rf-s" min="1" max="2" step="1" value="1"></div>
+<aside class="am"><div class="t">Example: <span class="tex">L = k = 3</span></div><p><span class="tex">r = 1 + 3 \cdot 2 = 7</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>Orange: what the top neuron sees.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Training a CNN">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Training a CNN</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Softmax gives a probability per class. For one image with true class <span class="tex">t</span>, the cross-entropy loss is</p>
+<div class="eq"><div class="m tex-d">L = -\log \hat{y}_{t}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="t1" style="margin:0">Backpropagation gives the gradient for every kernel, bias and dense weight in <span class="tex">\boldsymbol{\theta}</span>. Gradient descent then updates them:</p>
+<div class="eq frag up" data-step="t1"><div class="m tex-d">\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \alpha \, \frac{\partial J}{\partial \boldsymbol{\theta}}</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="t2" style="margin:0">A shared weight is used at every position, so its gradient adds up the contributions of all positions:</p>
+<div class="eq frag up" data-step="t2"><div class="m tex-d">\frac{\partial L}{\partial K_{mn}} = \sum_{i} \sum_{j} \frac{\partial L}{\partial Z_{ij}} \, X_{i+m,\,j+n}</div><div class="n">(8)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example: loss</div><p>Softmax gives the true class <span class="tex">\hat{y}_t = 0.7</span>:</p><p><span class="tex">L = -\log 0.7 \approx 0.36</span></p></aside>
+<aside class="am frag up" data-step="t2"><div class="t">Example: shared weight</div><p>Two positions with <span class="tex">\partial L / \partial Z = 0.5</span> and <span class="tex">-0.2</span>, and inputs 2 and 1 under <span class="tex">K_{mn}</span>:</p><p><span class="tex">0.5 \cdot 2 + (-0.2) \cdot 1 = 0.8</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Data augmentation">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Data augmentation</h2>
+<p class="small" style="margin:-8px 0 8px">CNNs need many labeled images. Small changes that keep the label create new training examples for free.</p>
+<div class="figbox"><svg id="aug-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 13:</b>One training image and four new versions. The network learns that the label does not depend on these changes.</p>
+</section>
+
+<section class="s ats-prose" data-label="Famous architectures">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Famous architectures</h2>
+<div class="fr">
+<div class="figbox"><svg id="arch-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Networks grew deeper. ResNet made very deep ones trainable with a <strong>skip connection</strong>: a block's input is added to its output.</p>
+<div class="small" style="text-align:center"><span class="tex">\mathbf{a}^{(l+2)} = g\big(\mathbf{z}^{(l+2)} + \mathbf{a}^{(l)}\big)</span></div>
+<aside class="am frag up"><div class="t">Example</div><p><span class="tex">(-0.3, \, 0.5) + (0.8, \, 0.2) = (0.5, \, 0.7)</span>; ReLU keeps <span class="tex">(0.5, \, 0.7)</span>.</p><p>If <span class="tex">\mathbf{z}^{(l+2)} = \mathbf{0}</span>, the block passes <span class="tex">\mathbf{a}^{(l)}</span> through unchanged.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>Bar height: number of layers (log scale).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Beyond classification">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Beyond classification</h2>
+<div class="fr">
+<div class="figbox"><svg id="uses-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The same convolutional layers can feed other outputs.</p>
+<p class="small frag up" style="margin:0"><strong>Detection:</strong> a box and a label for each object. <strong>Segmentation:</strong> a class for every pixel.</p>
+<p class="small frag up" style="margin:0"><strong>Medical images:</strong> find tumours in scans or count cells. A network trained on one task can be reused for another (Topic 29).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 15:</b>Four tasks on images, drawn schematically.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Building a CNN"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Convolutional networks at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Few weights, thanks to local connections and sharing</td><td>Need many labeled images to train from scratch</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Find a pattern anywhere in the image</td><td>Training takes a lot of computing time</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Learn their own features, from edges to objects</td><td>Hard to explain why a decision was made</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Work on any grid of numbers: images, sound, signals</td><td>Large rotations or size changes need augmentation</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Trained networks can be reused for new tasks</td><td>Tiny pixel changes can fool them</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>The standard choice for images and other grid data, especially when a pretrained network for a similar task exists.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An image is a grid of numbers with height, width and channels.</li>
+<li class="an-up" style="--d:.15s">A convolution slides a small learned kernel over the image; local connections and shared weights keep the weight count small.</li>
+<li class="an-up" style="--d:.25s">Padding and stride set the output size; pooling shrinks the maps.</li>
+<li class="an-up" style="--d:.35s">A CNN stacks conv, ReLU and pooling, then dense layers and softmax; deeper layers see larger patches and more complex patterns.</li>
+<li class="an-up" style="--d:.45s">It is trained with cross-entropy and backpropagation, helped by data augmentation and skip connections.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The papers behind the four milestones, a textbook chapter, and a guide to output sizes.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">LeCun, Y., Bottou, L., Bengio, Y., &amp; Haffner, P. (1998). Gradient-based learning applied to document recognition. <em>Proceedings of the IEEE</em>, 86(11), 2278-2324.</li>
+<li style="margin:.4em 0">Krizhevsky, A., Sutskever, I., &amp; Hinton, G. E. (2012). ImageNet classification with deep convolutional neural networks. <em>Advances in Neural Information Processing Systems 25</em>, 1097-1105.</li>
+<li style="margin:.4em 0">Simonyan, K., &amp; Zisserman, A. (2015). Very deep convolutional networks for large-scale image recognition. <em>International Conference on Learning Representations</em>.</li>
+<li style="margin:.4em 0">He, K., Zhang, X., Ren, S., &amp; Sun, J. (2016). Deep residual learning for image recognition. <em>Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition</em>, 770-778.</li>
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Chapter 9. MIT Press.</li>
+<li style="margin:.4em 0">Dumoulin, V., &amp; Visin, F. (2016). A guide to convolution arithmetic for deep learning. <em>arXiv:1603.07285</em>.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 26: recurrent neural networks.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, clamp, fmt } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const BORDER = 'stroke:var(--myst-color-border-strong);stroke-width:2';
+const gray = (v) => `rgb(${v},${v},${v})`;
+const MINUS = (v) => (v < 0 ? '−' + Math.abs(v) : String(v));
+/* Diverging fill: orange for positive, blue for negative, strength |v| / max */
+const divFill = (v, max) => {
+  if (!max || Math.abs(v) < 1e-9) return 'fill:var(--myst-color-bg)';
+  const o = (0.15 + 0.75 * Math.min(1, Math.abs(v) / max)).toFixed(2);
+  return `fill:var(${v > 0 ? '--c-b' : '--c-a'});fill-opacity:${o}`;
+};
+function cell(g, x, y, w, style, text, tstyle) {
+  el('rect', { x, y, width: w, height: w, style: (style || 'fill:var(--myst-color-bg)') + ';' + BORDER }, g);
+  if (text !== undefined) el('text', { class: 'txs', x: x + w / 2, y: y + w / 2 + 8, 'text-anchor': 'middle', style: tstyle || 'fill:var(--myst-color-text)', text }, g);
+}
+/* Grid of numbers: M is an array of rows */
+function numGrid(g, x0, y0, M, w, styleOf, textOf) {
+  M.forEach((row, i) => row.forEach((v, j) => cell(g, x0 + j * w, y0 + i * w, w, styleOf ? styleOf(v, i, j) : null, textOf ? textOf(v, i, j) : MINUS(v))));
+}
+function arrow(g, x1, y1, x2, y2, cls = 'wire') {
+  return el('path', { class: cls, d: `M${x1} ${y1}L${x2} ${y2}`, 'marker-end': cls === 'wire-a' ? 'url(#ah-a)' : 'url(#ah)' }, g);
+}
+const label = (g, x, y, text, cls = 'txs', anchor = 'middle', style) => el('text', Object.assign({ class: cls, x, y, 'text-anchor': anchor, text }, style ? { style } : {}), g);
+
+/* A small scene (sky, sun, house, tree) in a 400 × 260 box */
+function scene(g, opts = {}) {
+  el('rect', { x: 0, y: 0, width: 400, height: 260, style: 'fill:#bfdbfe' }, g);
+  el('rect', { x: 0, y: 200, width: 400, height: 60, style: 'fill:#86efac' }, g);
+  el('circle', { cx: 340, cy: 52, r: 28, style: 'fill:#facc15' }, g);
+  el('rect', { x: 70, y: 110, width: 140, height: 100, style: 'fill:#fb923c' }, g);
+  el('path', { d: 'M55 112L140 50L225 112Z', style: 'fill:#b91c1c' }, g);
+  el('rect', { x: 125, y: 150, width: 34, height: 60, style: 'fill:#78350f' }, g);
+  el('rect', { x: 84, y: 128, width: 28, height: 26, style: 'fill:#e0f2fe' }, g);
+  if (opts.tree !== false) {
+    el('rect', { x: 296, y: 150, width: 16, height: 60, style: 'fill:#78350f' }, g);
+    el('circle', { cx: 304, cy: 132, r: 40, style: 'fill:#15803d' }, g);
+  }
+  return g;
+}
+
+/* ───────── Part 1 figures ───────── */
+function drawImage() {
+  const svg = $('img-svg');
+  const D = [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 200, 255, 255, 255, 255, 120, 0],
+    [0, 0, 0, 0, 30, 250, 90, 0],
+    [0, 0, 0, 0, 160, 220, 0, 0],
+    [0, 0, 0, 40, 250, 80, 0, 0],
+    [0, 0, 0, 170, 200, 0, 0, 0],
+    [0, 0, 20, 255, 90, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+  ];
+  const g = el('g', {}, svg), w = 64, x0 = 10, y0 = 70;
+  label(g, x0, 40, '(a) grayscale: one number per pixel', 'ttl', 'start');
+  numGrid(g, x0, y0, D, w, (v) => `fill:${gray(v)}`, (v) => String(v));
+  g.querySelectorAll('text.txs').forEach((t) => { if (+t.textContent > 120) t.setAttribute('style', 'fill:#111827'); else t.setAttribute('style', 'fill:#f9fafb'); });
+  label(g, x0 + 256, y0 + 8 * w + 50, '8 × 8 = 64 numbers', 'tx');
+
+  const f = el('g', { class: 'frag', 'data-step': 'rgb' }, svg);
+  label(f, 640, 40, '(b) color: three channels', 'ttl', 'start');
+  const R = [[220, 200, 60, 40], [230, 210, 50, 30], [90, 80, 20, 10], [70, 60, 10, 0]];
+  const G = [[120, 140, 160, 150], [110, 130, 170, 160], [200, 190, 120, 110], [210, 200, 130, 120]];
+  const B = [[40, 60, 200, 230], [30, 50, 210, 240], [60, 70, 150, 160], [50, 60, 140, 170]];
+  const cw = 70, layers = [[B, 'B', (v) => `rgb(0,0,${v})`, 780, 100], [G, 'G', (v) => `rgb(0,${v},0)`, 730, 150], [R, 'R', (v) => `rgb(${v},0,0)`, 680, 200]];
+  layers.forEach(([M, name, c, x, y], k) => {
+    numGrid(f, x, y, M, cw, (v) => `fill:${c(v)}`, k === 2 ? (v) => String(v) : () => '');
+    if (k < 2) label(f, x + 35, y + 36, name, 'tx', 'middle', 'font-weight:700;fill:#fff');
+    else label(f, x - 16, y + 46, name, 'tx', 'end', 'font-weight:700');
+  });
+  f.querySelectorAll('text.txs').forEach((t) => t.setAttribute('style', 'fill:#f9fafb'));
+  f.querySelectorAll('text.tx').forEach((t) => { if (t.textContent === 'B' || t.textContent === 'G') f.appendChild(t); });
+  el('rect', { x: 680, y: 200, width: cw, height: cw, style: 'fill:none;stroke:var(--c-b);stroke-width:6' }, f);
+  el('rect', { x: 680, y: 530, width: 56, height: 56, rx: 4, style: 'fill:rgb(220,120,40);' + BORDER }, f);
+  label(f, 752, 556, 'one pixel = (220, 120, 40)', 'txs', 'start');
+  label(f, 752, 588, 'red, green, blue', 'txs', 'start', 'fill:var(--myst-color-text-tertiary)');
+  label(f, 820, 650, 'H × W × 3 numbers', 'tx');
+}
+
+function drawDense() {
+  const svg = $('dense-svg');
+  const I = [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]];
+  const g = el('g', {}, svg), w = 52;
+  label(g, 0, 40, '(a) flatten, then connect all', 'ttl', 'start');
+  numGrid(g, 10, 250, I, w, (v) => `fill:${gray(v ? 235 : 30)}`, () => '');
+  arrow(g, 230, 354, 300, 354);
+  label(g, 265, 330, 'flatten', 'txs');
+  const cy = (i) => 90 + i * 34, nx = 340, hx = 600, hy = [190, 300, 410, 520];
+  const lines = el('g', { style: 'opacity:.55' }, g);
+  for (let i = 0; i < 16; i++) hy.forEach((y) => el('line', { x1: nx, y1: cy(i), x2: hx, y2: y, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5' }, lines));
+  for (let i = 0; i < 16; i++) el('circle', { cx: nx, cy: cy(i), r: 12, style: `fill:${gray(I[Math.floor(i / 4)][i % 4] ? 235 : 30)};${BORDER}` }, g);
+  hy.forEach((y) => el('circle', { cx: hx, cy: y, r: 24, class: 'box-a' }, g));
+  label(g, 470, 650, '16 × 4 = 64 weights', 'tx');
+
+  const f = el('g', { class: 'frag', 'data-step': 'd2' }, svg);
+  label(f, 700, 40, '(b) shift one pixel', 'ttl', 'start');
+  const A = I, Bm = I.map((r) => [0, 0, 1, 0]);
+  const flat = (M) => M.flat();
+  [[A, 140], [Bm, 400]].forEach(([M, y], k) => {
+    numGrid(f, 720, y, M, 40, (v) => `fill:${gray(v ? 235 : 30)}`, () => '');
+    label(f, 900, y + 30, k ? 'shifted' : 'original', 'txs', 'start');
+    flat(M).forEach((v, i) => el('rect', { x: 720 + i * 26, y: y + 180, width: 22, height: 34, style: `fill:${gray(v ? 235 : 30)};${BORDER}` }, f));
+  });
+  label(f, 930, 650, 'different inputs light up', 'txs', 'middle', 'fill:var(--c-b);font-weight:600');
+}
+
+function drawIdeas() {
+  const svg = $('ideas-svg');
+  const xin = (i) => 420 + i * 112, xout = (j) => xin(j + 1);
+  const ROWS = [
+    { y: 60, name: '(a) dense', w: '35 weights', mode: 'dense', cls: '' },
+    { y: 290, name: '(b) local', w: '15 weights', mode: 'local', cls: 'frag', step: 'i1' },
+    { y: 520, name: '(c) local + shared', w: '3 weights', mode: 'shared', cls: 'frag', step: 'i1' },
+  ];
+  const WC = ['var(--c-a)', 'var(--c-b)', 'var(--c-c)'];
+  ROWS.forEach((R) => {
+    const g = el('g', R.cls ? { class: R.cls, 'data-step': R.step } : {}, svg), yo = R.y, yi = R.y + 120;
+    label(g, 0, yo + 50, R.name, 'tx', 'start', 'font-weight:600');
+    label(g, 0, yo + 90, R.w, 'tx', 'start', 'fill:var(--c-b)');
+    for (let j = 0; j < 5; j++) {
+      for (let i = 0; i < 7; i++) {
+        const d = i - j;
+        if (R.mode !== 'dense' && (d < 0 || d > 2)) continue;
+        const st = R.mode === 'shared' ? `stroke:${WC[d]};stroke-width:4` : 'stroke:var(--myst-color-text-tertiary);stroke-width:2;opacity:.7';
+        el('line', { x1: xin(i), y1: yi, x2: xout(j), y2: yo, style: st }, g);
+      }
+    }
+    for (let i = 0; i < 7; i++) el('circle', { cx: xin(i), cy: yi, r: 16, class: 'box' }, g);
+    for (let j = 0; j < 5; j++) el('circle', { cx: xout(j), cy: yo, r: 20, class: 'box-a' }, g);
+  });
+}
+
+/* ───────── Part 2 figures ───────── */
+function drawWork() {
+  const svg = $('work-svg'), sec = $('work-sec');
+  const X = [[3, 1, 0, 2], [4, 2, 1, 0], [5, 3, 0, 1], [2, 1, 2, 0]];
+  const K = [[1, 0, -1], [1, 0, -1], [1, 0, -1]];
+  const Z = [[11, 3], [8, 5]];
+  const g = el('g', {}, svg), xw = 84, kw = 72, zw = 100, X0 = 10, Y0 = 90, K0 = 430, KY = 130, Z0 = 820, ZY = 140;
+  label(g, X0 + 2 * xw, 60, 'image X', 'ttl');
+  label(g, K0 + 1.5 * kw, 60, 'kernel K', 'ttl');
+  label(g, Z0 + zw, 60, 'feature map Z', 'ttl');
+  numGrid(g, X0, Y0, X, xw, () => 'fill:var(--myst-color-bg-secondary)');
+  numGrid(g, K0, KY, K, kw, (v) => divFill(v, 1.6));
+  label(g, 385, Y0 + 2 * xw + 12, 'with', 'txs');
+  label(g, 740, Y0 + 2 * xw + 14, '=', 'tx', 'middle', 'font-size:48px');
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) cell(g, Z0 + j * zw, ZY + i * zw, zw, 'fill:var(--myst-color-bg-secondary)');
+  const win = el('rect', { width: 3 * xw, height: 3 * xw, style: 'fill:var(--c-b);fill-opacity:.12;stroke:var(--c-b);stroke-width:6;display:none' }, svg);
+  const LINES = ['(3 + 4 + 5) − (0 + 1 + 0) = 11', '(1 + 2 + 3) − (2 + 0 + 1) = 3', '(4 + 5 + 2) − (1 + 0 + 2) = 8', '(2 + 3 + 1) − (0 + 1 + 0) = 5'];
+  const SUB = ['₀₀', '₀₁', '₁₀', '₁₁'];
+  for (let s = 0; s < 4; s++) {
+    const i = s >> 1, j = s & 1;
+    const f = el('g', { class: 'frag', 'data-step': 'w' + (s + 1) }, svg);
+    el('rect', { x: Z0 + j * zw, y: ZY + i * zw, width: zw, height: zw, style: divFill(Z[i][j], 12) + ';' + BORDER }, f);
+    label(f, Z0 + j * zw + zw / 2, ZY + i * zw + zw / 2 + 11, String(Z[i][j]), 'tx', 'middle', 'font-weight:700');
+    label(f, 10, 470 + s * 56, `Z${SUB[s]} = ${LINES[s]}`, 'tx', 'start');
+  }
+  const groups = ['w1', 'w2', 'w3', 'w4'].map((k) => [...sec.querySelectorAll(`[data-step="${k}"]`)]);
+  const sync = () => {
+    let last = -1;
+    groups.forEach((gr, k) => { if (gr.some((n) => n.classList.contains('on'))) last = k; });
+    if (last < 0) { win.style.display = 'none'; return; }
+    win.style.display = '';
+    win.setAttribute('x', X0 + (last & 1) * xw);
+    win.setAttribute('y', Y0 + (last >> 1) * xw);
+  };
+  new MutationObserver(sync).observe(sec, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  sync();
+}
+
+function drawChannels() {
+  const svg = $('chan-svg'), g = el('g', {}, svg);
+  const CH = ['#dc2626', '#16a34a', '#2563eb'];
+  const stack = (x, y, s, n, colorOf, off) => {
+    for (let c = n - 1; c >= 0; c--) el('rect', { x: x + c * off, y: y - c * off, width: s, height: s, style: `fill:${colorOf(c)};fill-opacity:.22;stroke:${colorOf(c)};stroke-width:3` }, g);
+  };
+  stack(20, 120, 220, 3, (c) => CH[c], 22);
+  label(g, 152, 400, 'input 32 × 32 × 3', 'txs');
+  const FC = ['var(--c-a)', 'var(--c-b)', 'var(--c-c)', 'var(--c-d)'];
+  for (let f = 0; f < 4; f++) {
+    const y = 40 + f * 92;
+    for (let c = 2; c >= 0; c--) el('rect', { x: 430 + c * 8, y: y - c * 8, width: 56, height: 56, style: `fill:${CH[c]};fill-opacity:.25;stroke:${FC[f]};stroke-width:3` }, g);
+    arrow(g, 520, y + 24, 676, 214 + f * 34, 'wire');
+  }
+  label(g, 470, 420, 'F = 4 filters,', 'txs');
+  label(g, 470, 452, 'each 5 × 5 × 3', 'txs');
+  for (let f = 3; f >= 0; f--) el('rect', { x: 690 + f * 24, y: 110 - f * 24 + 72, width: 190, height: 190, style: `fill:${FC[f]};fill-opacity:.18;stroke:${FC[f]};stroke-width:3` }, g);
+  label(g, 870, 420, 'output 28 × 28 × 4', 'txs');
+  label(g, 1040, 140, 'one map', 'txs', 'start');
+  label(g, 1040, 172, 'per filter', 'txs', 'start');
+  arrow(g, 360, 240, 420, 240, 'wire');
+}
+
+function drawRelu() {
+  const svg = $('relu-svg'), g = el('g', {}, svg);
+  const Z = [[3, -2, 0, 5], [-1, 4, -6, 2], [2, -3, 1, -4], [0, 6, -1, 3]];
+  const A = Z.map((r) => r.map((v) => Math.max(0, v)));
+  const w = 88;
+  label(g, 10 + 2 * w, 90, 'feature map Z', 'ttl');
+  numGrid(g, 10, 120, Z, w, (v) => divFill(v, 6));
+  const f = el('g', { class: 'frag', 'data-step': 'r1' }, svg);
+  label(f, 760 + 2 * w, 90, 'after ReLU', 'ttl');
+  numGrid(f, 760, 120, A, w, (v) => divFill(v, 6));
+  /* small ReLU graph between the grids */
+  const ox = 500, oy = 330, s = 26;
+  el('path', { class: 'ax', d: `M${ox - 3 * s} ${oy}H${ox + 4 * s}M${ox} ${oy + 1.5 * s}V${oy - 4.5 * s}` }, g);
+  el('path', { class: 'curve-b', d: `M${ox - 3 * s} ${oy}L${ox} ${oy}L${ox + 4 * s} ${oy - 4 * s}` }, g);
+  label(g, ox - 3 * s, oy - 4.2 * s, 'max(0, z)', 'txs', 'start');
+  arrow(g, 390, 450, 730, 450);
+  label(g, 560, 430, 'ReLU on every entry', 'txs');
+  label(g, 560, 640, 'Negative values become 0. Positive values pass unchanged.', 'tx');
+  svg.closest('section').querySelector('.side .frag')?.setAttribute('data-step', 'r1');
+}
+
+function drawPool() {
+  const svg = $('pool-svg'), g = el('g', {}, svg);
+  const P = [[1, 3, 2, 0], [5, 2, 1, 4], [0, 1, 6, 2], [3, 2, 1, 1]];
+  const BC = ['--c-a', '--c-b', '--c-c', '--c-d'], w = 100, X0 = 10, Y0 = 150;
+  const blk = (i, j) => (i >> 1) * 2 + (j >> 1);
+  label(g, X0 + 2 * w, 120, 'feature map (4 × 4)', 'ttl');
+  numGrid(g, X0, Y0, P, w, (v, i, j) => `fill:var(${BC[blk(i, j)]});fill-opacity:.16`);
+  const M = [[0, 0], [0, 0]], Av = [[0, 0], [0, 0]];
+  for (let b = 0; b < 4; b++) {
+    const bi = b >> 1, bj = b & 1, vals = [];
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) vals.push([P[2 * bi + i][2 * bj + j], 2 * bi + i, 2 * bj + j]);
+    const best = vals.reduce((a, c) => (c[0] > a[0] ? c : a));
+    M[bi][bj] = best[0]; Av[bi][bj] = vals.reduce((s, c) => s + c[0], 0) / 4;
+    el('circle', { cx: X0 + best[2] * w + w / 2, cy: Y0 + best[1] * w + w / 2, r: 30, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g);
+  }
+  const ow = 100, OX = 720;
+  label(g, OX + ow, 50, 'max pooling', 'ttl');
+  numGrid(g, OX, 70, M, ow, (v, i, j) => `fill:var(${BC[i * 2 + j]});fill-opacity:.3`);
+  arrow(g, 440, 300, 690, 180);
+  const f = el('g', { class: 'frag', 'data-step': 'p1' }, svg);
+  label(f, OX + ow, 400, 'average pooling', 'ttl');
+  numGrid(f, OX, 420, Av, ow, (v, i, j) => `fill:var(${BC[i * 2 + j]});fill-opacity:.3`, (v) => String(v));
+  arrow(f, 440, 400, 690, 520);
+}
+
+/* ───────── Part 3 figures ───────── */
+function drawStack() {
+  const svg = $('stack-svg'), g = el('g', {}, svg);
+  const CY = 260;
+  /* 3D slab: front square side s, depth d */
+  const slab = (cx, s, d, cls) => {
+    const x = cx - (s + d * 0.5) / 2, y = CY - s / 2 + d * 0.25, dx = d * 0.5, dy = d * 0.5;
+    el('path', { d: `M${x} ${y}l${dx} ${-dy}h${s}l${-dx} ${dy}Z`, class: cls, style: 'fill-opacity:.55' }, g);
+    el('path', { d: `M${x + s} ${y}l${dx} ${-dy}v${s}l${-dx} ${dy}Z`, class: cls, style: 'fill-opacity:.8' }, g);
+    el('rect', { x, y, width: s, height: s, class: cls }, g);
+  };
+  const ITEMS = [
+    { x: 90, s: 168, d: 6, cls: 'box', l1: '28 × 28 × 1', l2: 'input' },
+    { x: 370, s: 144, d: 48, cls: 'box-a', l1: '24 × 24 × 6', l2: 'conv + ReLU', pc: '156' },
+    { x: 610, s: 72, d: 48, cls: 'box-a', l1: '12 × 12 × 6', l2: 'max pool' },
+    { x: 830, s: 48, d: 110, cls: 'box-b', l1: '8 × 8 × 16', l2: 'conv + ReLU', pc: '2 416' },
+    { x: 1050, s: 24, d: 110, cls: 'box-b', l1: '4 × 4 × 16', l2: 'max pool' },
+  ];
+  ITEMS.forEach((it) => {
+    slab(it.x, it.s, it.d, it.cls);
+    label(g, it.x, 470, it.l1, 'tx');
+    label(g, it.x, 506, it.l2, 'txs');
+    if (it.pc) label(g, it.x, 546, it.pc, 'txs', 'middle', 'fill:var(--c-b);font-weight:700');
+  });
+  /* flatten bar */
+  el('rect', { x: 1255, y: 120, width: 26, height: 280, class: 'box' }, g);
+  for (let k = 1; k < 10; k++) el('line', { x1: 1255, x2: 1281, y1: 120 + k * 28, y2: 120 + k * 28, class: 'gl' }, g);
+  label(g, 1268, 470, '256', 'tx');
+  label(g, 1268, 506, 'flatten', 'txs');
+  /* dense + softmax */
+  for (let k = 0; k < 10; k++) el('circle', { cx: 1500, cy: 125 + k * 30, r: 12, class: k === 7 ? 'fb' : 'box-a' }, g);
+  label(g, 1530, 343, '“7”', 'txs', 'start', 'fill:var(--c-b);font-weight:700');
+  label(g, 1500, 470, '10 classes', 'tx');
+  label(g, 1500, 506, 'dense + softmax', 'txs');
+  label(g, 1500, 546, '2 570', 'txs', 'middle', 'fill:var(--c-b);font-weight:700');
+  const OPS = [[200, 280, 'conv 5 × 5'], [470, 550, 'pool 2 × 2'], [680, 760, 'conv 5 × 5'], [900, 990, 'pool 2 × 2'], [1120, 1240, 'flatten'], [1300, 1475, 'dense']];
+  OPS.forEach(([a, b, t]) => { arrow(g, a, CY, b, CY); label(g, (a + b) / 2, 130, t, 'txs'); });
+}
+
+function drawLearn() {
+  const svg = $('learn-svg'), g = el('g', {}, svg);
+  const PW = 330, X = [0, 450, 900, 1350];
+  const TITLES = [['first layer', 'edges'], ['second layer', 'textures'], ['middle layers', 'parts'], ['last layers', 'objects']];
+  TITLES.forEach(([a, b], k) => {
+    label(g, X[k] + PW / 2, 40, a, 'ttl');
+    label(g, X[k] + PW / 2, 520, b, 'tx', 'middle', 'font-weight:700');
+    el('rect', { x: X[k], y: 70, width: PW, height: 400, rx: 8, class: 'box' }, g);
+    if (k < 3) arrow(g, X[k] + PW + 20, 270, X[k + 1] - 20, 270);
+  });
+  const patch = (x, y, s) => el('rect', { x, y, width: s, height: s, style: 'fill:#f3f4f6;stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+  /* edges: patches split by a line at different angles */
+  const ANG = [0, 45, 90, 135, 20, 160];
+  ANG.forEach((a, i) => {
+    const s = 120, x = X[0] + 30 + (i % 2) * 150, y = 90 + Math.floor(i / 2) * 125, cx = x + s / 2, cy = y + s / 2;
+    patch(x, y, s);
+    const id = 'lclip' + i, cp = el('clipPath', { id }, g);
+    el('rect', { x, y, width: s, height: s }, cp);
+    const cg = el('g', { 'clip-path': `url(#${id})` }, g);
+    el('rect', { x: cx - s, y: cy, width: 2 * s, height: s, transform: `rotate(${a} ${cx} ${cy})`, style: 'fill:#1f2937' }, cg);
+  });
+  /* textures */
+  const TX = X[1] + 30;
+  [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]].forEach(([c, r], i) => {
+    const x = TX + c * 150, y = 90 + r * 125, s = 120;
+    patch(x, y, s);
+    const t = el('g', {}, g);
+    if (i === 0) for (let k = 0; k < 5; k++) el('rect', { x: x + 6 + k * 24, y: y + 4, width: 10, height: s - 8, style: 'fill:#1f2937' }, t);
+    if (i === 1) for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) el('circle', { cx: x + 18 + a * 28, cy: y + 18 + b * 28, r: 7, style: 'fill:#1f2937' }, t);
+    if (i === 2) for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) if ((a + b) % 2) el('rect', { x: x + a * 30, y: y + b * 30, width: 30, height: 30, style: 'fill:#1f2937' }, t);
+    if (i === 3) for (let k = 0; k < 4; k++) el('path', { d: `M${x + 4} ${y + 20 + k * 28}q15 -16 28 0t28 0t28 0t28 0`, style: 'fill:none;stroke:#1f2937;stroke-width:5' }, t);
+    if (i === 4) for (let k = 0; k < 4; k++) el('circle', { cx: x + 60, cy: y + 60, r: 12 + k * 14, style: 'fill:none;stroke:#1f2937;stroke-width:5' }, t);
+    if (i === 5) for (let k = -4; k < 5; k++) el('line', { x1: x + k * 28, y1: y + s, x2: x + k * 28 + s, y2: y, style: 'stroke:#1f2937;stroke-width:6', 'clip-path': 'url(#lclip-t5)' }, t);
+  });
+  const cp5 = el('clipPath', { id: 'lclip-t5' }, g);
+  el('rect', { x: TX + 150, y: 340, width: 120, height: 120 }, cp5);
+  /* parts: eye, wheel, ear, window */
+  const PX = X[2] + 30;
+  patch(PX, 90, 120); el('ellipse', { cx: PX + 60, cy: 150, rx: 48, ry: 26, style: 'fill:#fff;stroke:#1f2937;stroke-width:4' }, g); el('circle', { cx: PX + 60, cy: 150, r: 16, style: 'fill:#1f2937' }, g);
+  patch(PX + 150, 90, 120); el('circle', { cx: PX + 210, cy: 150, r: 46, style: 'fill:#1f2937' }, g); el('circle', { cx: PX + 210, cy: 150, r: 20, style: 'fill:#9ca3af' }, g);
+  patch(PX, 230, 120); el('path', { d: `M${PX + 25} ${330}L${PX + 60} ${245}L${PX + 95} ${330}Z`, style: 'fill:#d97706;stroke:#1f2937;stroke-width:3' }, g);
+  patch(PX + 150, 230, 120); el('path', { d: `M${PX + 175} ${330}q35 -90 70 0`, style: 'fill:none;stroke:#1f2937;stroke-width:6' }, g); el('circle', { cx: PX + 210, cy: 300, r: 8, style: 'fill:#1f2937' }, g);
+  label(g, X[2] + PW / 2, 400, 'eye, wheel, ear, nose', 'txs');
+  /* objects: face and car */
+  const OX = X[3];
+  const face = el('g', {}, g);
+  el('circle', { cx: OX + 100, cy: 200, r: 75, style: 'fill:#fcd34d;stroke:#1f2937;stroke-width:4' }, face);
+  el('circle', { cx: OX + 75, cy: 185, r: 10, style: 'fill:#1f2937' }, face);
+  el('circle', { cx: OX + 125, cy: 185, r: 10, style: 'fill:#1f2937' }, face);
+  el('path', { d: `M${OX + 70} 230q30 25 60 0`, style: 'fill:none;stroke:#1f2937;stroke-width:5' }, face);
+  const car = el('g', {}, g);
+  el('path', { d: `M${OX + 120} 400h190v-50l-40 -40h-90l-40 40h-20z`, style: 'fill:#2563eb;stroke:#1f2937;stroke-width:4' }, car);
+  el('circle', { cx: OX + 165, cy: 405, r: 22, style: 'fill:#1f2937' }, car);
+  el('circle', { cx: OX + 270, cy: 405, r: 22, style: 'fill:#1f2937' }, car);
+  label(g, X[3] + 250, 160, 'face', 'txs');
+  label(g, X[3] + 90, 330, 'car', 'txs');
+}
+
+function drawAug() {
+  const svg = $('aug-svg');
+  const S = 300, H = 195, X = [0, 345, 690, 1035, 1380];
+  const NAMES = ['original', 'flip', 'crop and resize', 'small rotation', 'darker'];
+  NAMES.forEach((name, k) => {
+    const x = X[k], y = 120;
+    const id = 'aug-clip' + k, cp = el('clipPath', { id }, svg);
+    el('rect', { x, y, width: S, height: H }, cp);
+    const outer = el('g', { 'clip-path': `url(#${id})`, class: k ? 'an-up' : '', style: `--d:${0.1 + k * 0.15}s` }, svg);
+    let tr = `translate(${x} ${y}) scale(${S / 400})`;
+    if (k === 1) tr = `translate(${x + S} ${y}) scale(${-S / 400} ${S / 400})`;
+    if (k === 2) tr = `translate(${x - 50} ${y - 50}) scale(${(S / 400) * 1.5})`;
+    if (k === 3) tr = `translate(${x} ${y}) rotate(12 ${S / 2} ${H / 2}) scale(${S / 400})`;
+    if (k === 3) el('rect', { x, y, width: S, height: H, style: 'fill:#111827' }, outer);
+    scene(el('g', { transform: tr }, outer));
+    if (k === 4) el('rect', { x, y, width: S, height: H, style: 'fill:#000;fill-opacity:.45' }, outer);
+    el('rect', { x, y, width: S, height: H, style: 'fill:none;' + BORDER }, svg);
+    label(svg, x + S / 2, y + H + 50, name, 'tx', 'middle', k ? '' : 'font-weight:700');
+    label(svg, x + S / 2, y + H + 90, 'label: house', 'txs', 'middle', 'fill:var(--c-b)');
+  });
+  label(svg, 0, 60, 'one image', 'ttl', 'start');
+  label(svg, 345, 60, 'four new training images with the same label', 'ttl', 'start');
+}
+
+function drawArch() {
+  const svg = $('arch-svg'), g = el('g', {}, svg);
+  const A = [
+    { n: 'LeNet-5', y: '1998', L: 7, l: ['7 layers', '60 thousand weights', 'digits on checks'] },
+    { n: 'AlexNet', y: '2012', L: 8, l: ['8 layers', '60 million weights', 'ReLU, graphics cards'] },
+    { n: 'VGG', y: '2014', L: 19, l: ['16 to 19 layers', '138 million weights', 'only 3 × 3 kernels'] },
+    { n: 'ResNet', y: '2015', L: 152, l: ['up to 152 layers', 'skip connections', ''] },
+  ];
+  const AX = 360, CW = 280;
+  el('line', { x1: 0, x2: 1160, y1: AX, y2: AX, class: 'ax' }, g);
+  A.forEach((a, k) => {
+    const cx = 140 + k * 293, h = 40 * Math.log2(a.L);
+    const bg = el('g', { class: 'an-growy', style: `--d:${0.1 + k * 0.15}s` }, g);
+    el('rect', { x: cx - 50, y: AX - h, width: 100, height: h, class: k === 3 ? 'fb' : 'fa', style: 'fill-opacity:.8' }, bg);
+    label(g, cx, AX - h - 14, String(a.L), 'tx', 'middle', 'font-weight:700');
+    el('circle', { cx, cy: AX, r: 9, class: 'ink' }, g);
+    label(g, cx, AX + 46, a.y, 'tx', 'middle', 'fill:var(--myst-color-text-tertiary)');
+    label(g, cx, AX + 96, a.n, 'tx', 'middle', 'font-weight:700');
+    a.l.forEach((t, i) => label(g, cx, AX + 140 + i * 36, t, 'txs'));
+  });
+  el('path', { d: `M${140 + 293 - 160} ${AX - 12}l10 24M${140 + 293 - 145} ${AX - 12}l10 24`, style: 'stroke:var(--myst-color-text);stroke-width:3' }, g);
+  /* small skip-connection sketch under ResNet */
+  const sx = 1019;
+  const sk = el('g', {}, g);
+  el('rect', { x: sx - 100, y: AX + 205, width: 70, height: 40, rx: 4, class: 'box-a' }, sk);
+  el('rect', { x: sx - 10, y: AX + 205, width: 70, height: 40, rx: 4, class: 'box-a' }, sk);
+  el('path', { d: `M${sx - 30} ${AX + 225}H${sx - 14}`, class: 'wire', 'marker-end': 'url(#ah)' }, sk);
+  el('path', { d: `M${sx - 120} ${AX + 225}H${sx - 104}`, class: 'wire', 'marker-end': 'url(#ah)' }, sk);
+  el('path', { d: `M${sx - 112} ${AX + 225}C${sx - 112} ${AX + 300} ${sx + 90} ${AX + 300} ${sx + 90} ${AX + 248}`, class: 'wire-a', 'marker-end': 'url(#ah-a)' }, sk);
+  el('path', { d: `M${sx + 60} ${AX + 225}H${sx + 78}`, class: 'wire', 'marker-end': 'url(#ah)' }, sk);
+  label(sk, sx + 90, AX + 233, '+', 'tx', 'middle', 'font-weight:700');
+  label(g, 140, 50, 'layers', 'ttl');
+}
+
+function drawUses() {
+  const svg = $('uses-svg');
+  const PW = 540, PH = 270, POS = [[0, 40], [610, 40], [0, 400], [610, 400]];
+  const TITLES = ['(a) classification', '(b) detection', '(c) segmentation', '(d) medical images'];
+  POS.forEach(([x, y], k) => {
+    label(svg, x, y - 10, TITLES[k], 'ttl', 'start');
+    const id = 'uses-clip' + k, cp = el('clipPath', { id }, svg);
+    el('rect', { x, y, width: PW, height: PH }, cp);
+    const g = el('g', { 'clip-path': `url(#${id})` }, svg);
+    if (k < 3) {
+      scene(el('g', { transform: `translate(${x} ${y}) scale(${PW / 400} ${PH / 260})` }, g));
+    }
+    const sx = PW / 400, sy = PH / 260;
+    if (k === 0) {
+      el('rect', { x: x + 300, y: y + 210, width: 230, height: 46, rx: 4, style: 'fill:var(--myst-color-bg);opacity:.92' }, g);
+      label(g, x + 415, y + 242, 'house: 93%', 'tx', 'middle', 'font-weight:700');
+    }
+    if (k === 1) {
+      el('rect', { x: x + 50 * sx, y: y + 45 * sy, width: 180 * sx, height: 168 * sy, style: 'fill:none;stroke:var(--c-b);stroke-width:5' }, g);
+      el('rect', { x: x + 258 * sx, y: y + 86 * sy, width: 92 * sx, height: 128 * sy, style: 'fill:none;stroke:var(--c-a);stroke-width:5' }, g);
+      el('rect', { x: x + 50 * sx, y: y + 45 * sy - 34, width: 100, height: 34, style: 'fill:var(--c-b)' }, g);
+      label(g, x + 50 * sx + 50, y + 45 * sy - 9, 'house', 'txs', 'middle', 'fill:#fff');
+      el('rect', { x: x + 258 * sx, y: y + 86 * sy - 34, width: 76, height: 34, style: 'fill:var(--c-a)' }, g);
+      label(g, x + 258 * sx + 38, y + 86 * sy - 9, 'tree', 'txs', 'middle', 'fill:#fff');
+    }
+    if (k === 2) {
+      const cs = 18;
+      for (let px = 0; px < PW; px += cs) for (let py = 0; py < PH; py += cs) {
+        const u = (px + cs / 2) / sx, v = (py + cs / 2) / sy;
+        let c = null;
+        const inRoof = v >= 50 && v <= 112 && Math.abs(u - 140) <= (v - 50) * (85 / 62);
+        if ((u >= 70 && u <= 210 && v >= 110 && v <= 210) || inRoof) c = '--c-b';
+        else if ((u - 304) ** 2 + (v - 132) ** 2 <= 40 * 40 || (u >= 296 && u <= 312 && v >= 150 && v <= 210)) c = '--c-c';
+        else if (v > 200) c = '--c-d';
+        else c = '--c-a';
+        el('rect', { x: x + px, y: y + py, width: cs, height: cs, style: `fill:var(${c});fill-opacity:.7` }, g);
+      }
+    }
+    if (k === 3) {
+      el('rect', { x, y, width: PW, height: PH, style: 'fill:#111827' }, g);
+      el('ellipse', { cx: x + 190, cy: y + 140, rx: 95, ry: 115, style: 'fill:#6b7280' }, g);
+      el('ellipse', { cx: x + 350, cy: y + 140, rx: 95, ry: 115, style: 'fill:#6b7280' }, g);
+      el('circle', { cx: x + 380, cy: y + 110, r: 18, style: 'fill:#e5e7eb' }, g);
+      el('circle', { cx: x + 380, cy: y + 110, r: 40, style: 'fill:none;stroke:var(--c-b);stroke-width:5' }, g);
+      label(g, x + 430, y + 60, 'spot found', 'txs', 'start', 'fill:#fdba74');
+    }
+    el('rect', { x, y, width: PW, height: PH, style: 'fill:none;' + BORDER }, svg);
+  });
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.conv = (() => {
+  const svg = $('conv-svg');
+  const PIC = [
+    '............',
+    '.....##.....',
+    '....####....',
+    '...######...',
+    '..########..',
+    '..########..',
+    '..#oo#####..',
+    '..#oo#####..',
+    '..####oo##..',
+    '..####oo##..',
+    '..####oo##..',
+    '............',
+  ].map((r) => [...r].map((c) => (c === '#' ? 1 : c === 'o' ? 0.35 : 0)));
+  const KERNELS = {
+    v: { K: [[1, 0, -1], [1, 0, -1], [1, 0, -1]], m: 1 },
+    h: { K: [[1, 1, 1], [0, 0, 0], [-1, -1, -1]], m: 1 },
+    blur: { K: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], m: 1 / 9 },
+    sharp: { K: [[0, -1, 0], [-1, 5, -1], [0, -1, 0]], m: 1 },
+  };
+  const N = 12, O = 10, cw = 34, IX = 0, IY = 100, KX = 470, KY = 180, kw = 64, OX = 730, OY = 134;
+  label(svg, IX + N * cw / 2, 70, 'image X (12 × 12)', 'ttl');
+  label(svg, KX + 1.5 * kw, 150, 'kernel K', 'ttl');
+  label(svg, OX + O * cw / 2, 104, 'feature map Z (10 × 10)', 'ttl');
+  PIC.forEach((row, i) => row.forEach((v, j) => el('rect', { x: IX + j * cw, y: IY + i * cw, width: cw, height: cw, style: `fill:${gray(Math.round(20 + 220 * v))};stroke:var(--myst-color-border);stroke-width:1` }, svg)));
+  const kG = el('g', {}, svg), outG = el('g', {}, svg);
+  const outCells = [];
+  for (let i = 0; i < O; i++) for (let j = 0; j < O; j++) outCells.push(el('rect', { x: OX + j * cw, y: OY + i * cw, width: cw, height: cw, style: 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border);stroke-width:1' }, outG));
+  const win = el('rect', { width: 3 * cw, height: 3 * cw, style: 'fill:none;stroke:var(--c-b);stroke-width:5;display:none' }, svg);
+  const cur = el('rect', { width: cw, height: cw, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:4;display:none' }, svg);
+  const link = el('path', { class: 'wire', style: 'display:none;stroke-dasharray:6 6' }, svg);
+  const msg = label(svg, 0, 600, '', 'tx', 'start');
+  const lg = el('g', {}, svg);
+  el('rect', { x: 0, y: 636, width: 26, height: 26, style: 'fill:var(--c-b);fill-opacity:.8' }, lg);
+  label(lg, 38, 657, 'positive', 'txs', 'start');
+  el('rect', { x: 170, y: 636, width: 26, height: 26, style: 'fill:var(--c-a);fill-opacity:.8' }, lg);
+  label(lg, 208, 657, 'negative', 'txs', 'start');
+  el('rect', { x: 345, y: 636, width: 26, height: 26, style: 'fill:var(--myst-color-bg);' + BORDER }, lg);
+  label(lg, 383, 657, 'zero', 'txs', 'start');
+  let kname = 'v', Z = [], max = 1, pos = 0, timer = null;
+  const playBtn = $('conv-play'), stepBtn = $('conv-step');
+  function compute() {
+    const { K, m } = KERNELS[kname];
+    Z = [];
+    for (let i = 0; i < O; i++) for (let j = 0; j < O; j++) {
+      let s = 0;
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) s += PIC[i + a][j + b] * K[a][b];
+      Z.push(s * m);
+    }
+    max = Math.max(...Z.map(Math.abs)) || 1;
+  }
+  function drawKernel() {
+    clear(kG);
+    const { K, m } = KERNELS[kname];
+    numGrid(kG, KX, KY, K, kw, (v) => divFill(v, kname === 'sharp' ? 5 : 1.6));
+    label(kG, KX + 1.5 * kw, KY + 3 * kw + 46, m === 1 ? '' : '× 1/9', 'tx');
+  }
+  function show() {
+    outCells.forEach((c, k) => { c.setAttribute('style', (k < pos ? divFill(Z[k], max) : 'fill:var(--myst-color-bg-secondary)') + ';stroke:var(--myst-color-border);stroke-width:1'); });
+    if (pos === 0) {
+      [win, cur, link].forEach((n) => { n.style.display = 'none'; });
+      msg.textContent = 'Press Step or Play to slide the kernel.';
+      $('conv-pos').textContent = '—'; $('conv-val').textContent = '—';
+    } else {
+      const k = pos - 1, i = Math.floor(k / O), j = k % O;
+      [win, cur, link].forEach((n) => { n.style.display = ''; });
+      win.setAttribute('x', IX + j * cw); win.setAttribute('y', IY + i * cw);
+      cur.setAttribute('x', OX + j * cw); cur.setAttribute('y', OY + i * cw);
+      link.setAttribute('d', `M${IX + (j + 3) * cw} ${IY + i * cw + 1.5 * cw}L${OX + j * cw} ${OY + i * cw + cw / 2}`);
+      $('conv-pos').textContent = `(${i}, ${j})`;
+      $('conv-val').textContent = fmt(Z[k], 2);
+      msg.textContent = pos === O * O ? 'Done: all 100 positions filled.' : `Z(${i}, ${j}) = sum of 9 products = ${fmt(Z[k], 2)}`;
+    }
+    stepBtn.disabled = pos >= O * O;
+  }
+  function stop() { clearInterval(timer); timer = null; playBtn.textContent = 'Play'; }
+  function step() { if (pos < O * O) pos++; show(); if (pos >= O * O) stop(); }
+  function reset() { stop(); pos = 0; show(); }
+  stepBtn.addEventListener('click', () => { stop(); step(); });
+  playBtn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    if (pos >= O * O) pos = 0;
+    if (REDUCED) { pos = O * O; show(); return; }
+    playBtn.textContent = 'Pause';
+    timer = setInterval(step, 90);
+  });
+  $('conv-reset').addEventListener('click', reset);
+  $('conv-kern').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    kname = b.dataset.k;
+    $('conv-kern').querySelectorAll('button').forEach((o) => o.classList.toggle('chip', o !== b));
+    compute(); drawKernel(); show();
+  }));
+  compute(); drawKernel();
+  pos = O * O; show(); /* start with the full map visible */
+  return {};
+})();
+
+DEMOS.size = (() => {
+  const svg = $('size-svg');
+  const inG = el('g', {}, svg), outG = el('g', {}, svg);
+  const win = el('rect', { style: 'fill:var(--c-b);fill-opacity:.12;stroke:var(--c-b);stroke-width:5' }, svg);
+  const hit = el('rect', { style: 'fill:var(--c-b);fill-opacity:.5;stroke:var(--c-b);stroke-width:3' }, svg);
+  const t1 = label(svg, 0, 40, '', 'ttl', 'start'), t2 = label(svg, 620, 40, '', 'ttl', 'start');
+  const eqT = label(svg, 0, 670, '', 'tx', 'start');
+  const S = { n: 7, k: 3, s: 1, p: 0 };
+  let positions = [], idx = 0, cs = 40, o = 0;
+  const Y0 = 80;
+  function build() {
+    clear(inG); clear(outG);
+    const Np = S.n + 2 * S.p;
+    cs = Math.min(52, Math.floor(540 / Np));
+    o = S.k > Np ? 0 : Math.floor((Np - S.k) / S.s) + 1;
+    t1.textContent = `input ${S.n} × ${S.n}, padding ${S.p}`;
+    t2.textContent = o ? `output ${o} × ${o}` : 'no output';
+    for (let i = 0; i < Np; i++) for (let j = 0; j < Np; j++) {
+      const pad = i < S.p || j < S.p || i >= S.p + S.n || j >= S.p + S.n;
+      el('rect', { x: j * cs, y: Y0 + i * cs, width: cs, height: cs, style: pad ? 'fill:var(--myst-color-bg);stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:5 4' : 'fill:var(--myst-color-surface);stroke:var(--myst-color-border-strong);stroke-width:2' }, inG);
+      if (pad && cs >= 40) label(inG, j * cs + cs / 2, Y0 + i * cs + cs / 2 + 8, '0', 'txs', 'middle', 'fill:var(--myst-color-text-tertiary)');
+    }
+    for (let i = 0; i < o; i++) for (let j = 0; j < o; j++) el('rect', { x: 620 + j * cs, y: Y0 + i * cs, width: cs, height: cs, style: 'fill:var(--myst-color-accent-surface);stroke:var(--c-a);stroke-width:2' }, outG);
+    positions = [];
+    for (let i = 0; i < o; i++) for (let j = 0; j < o; j++) positions.push([i, j]);
+    idx = 0;
+    const num = S.n + 2 * S.p - S.k;
+    eqT.textContent = o ? `⌊(${S.n} + ${2 * S.p} − ${S.k}) / ${S.s}⌋ + 1 = ⌊${num} / ${S.s}⌋ + 1 = ${o}` : 'The kernel is larger than the padded input.';
+    $('size-out').textContent = o ? `${o} × ${o}` : '—';
+    ['n', 'k', 's', 'p'].forEach((key) => { $(`size-${key}-val`).textContent = S[key]; });
+    show();
+  }
+  function show() {
+    if (!o) { win.style.display = 'none'; hit.style.display = 'none'; return; }
+    win.style.display = ''; hit.style.display = '';
+    const [i, j] = positions[idx % positions.length];
+    win.setAttribute('x', j * S.s * cs); win.setAttribute('y', Y0 + i * S.s * cs);
+    win.setAttribute('width', S.k * cs); win.setAttribute('height', S.k * cs);
+    hit.setAttribute('x', 620 + j * cs); hit.setAttribute('y', Y0 + i * cs);
+    hit.setAttribute('width', cs); hit.setAttribute('height', cs);
+  }
+  ['n', 'k', 's', 'p'].forEach((key) => $(`size-${key}`).addEventListener('input', (e) => { S[key] = +e.target.value; build(); }));
+  let timer = null;
+  const playBtn = $('size-play');
+  const next = () => { if (positions.length) { idx = (idx + 1) % positions.length; show(); } };
+  const stop = () => { clearInterval(timer); timer = null; playBtn.textContent = 'Play'; };
+  $('size-step').addEventListener('click', () => { stop(); next(); });
+  playBtn.addEventListener('click', () => {
+    if (timer) { stop(); return; }
+    playBtn.textContent = 'Pause';
+    timer = setInterval(next, REDUCED ? 1500 : 600);
+  });
+  build();
+  return {};
+})();
+
+DEMOS.rf = (() => {
+  const svg = $('rf-svg');
+  const g = el('g', {}, svg);
+  const S = { L: 3, k: 3, s: 1 };
+  function draw() {
+    clear(g);
+    const { L, k, s } = S;
+    /* receptive field r_l and jump J_l (input pixels between neighbours) for each layer */
+    const r = [1], J = [1];
+    for (let l = 1; l <= L; l++) { r.push(r[l - 1] + (k - 1) * J[l - 1]); J.push(J[l - 1] * s); }
+    const N = r[L] + 2 * J[L];
+    const counts = [N];
+    for (let l = 1; l <= L; l++) counts.push(Math.floor((counts[l - 1] - k) / s) + 1);
+    const x0 = 150, x1 = 1140, step = (x1 - x0) / N, cwid = Math.max(4, Math.min(48, step - 3));
+    const xc = (l, i) => x0 + step * (i * J[l] + (r[l] - 1) / 2) + step / 2;
+    const ytop = 110, ybot = 560, rowY = (l) => ybot - (l * (ybot - ytop)) / L;
+    /* highlighted range per layer, going down from the middle top neuron */
+    const rng = new Array(L + 1);
+    const t = Math.floor((counts[L] - 1) / 2);
+    rng[L] = [t, t];
+    for (let l = L; l >= 1; l--) rng[l - 1] = [rng[l][0] * s, rng[l][1] * s + k - 1];
+    const lines = el('g', {}, g);
+    for (let l = L; l >= 1; l--) {
+      for (let i = rng[l][0]; i <= rng[l][1]; i++) for (let m = 0; m < k; m++) {
+        el('line', { x1: xc(l, i), y1: rowY(l) + 14, x2: xc(l - 1, i * s + m), y2: rowY(l - 1) - 14, style: 'stroke:var(--c-b);stroke-width:1.5;opacity:.5' }, lines);
+      }
+    }
+    for (let l = 0; l <= L; l++) {
+      label(g, 0, rowY(l) + 9, l ? `layer ${l}` : 'input', 'txs', 'start');
+      for (let i = 0; i < counts[l]; i++) {
+        const on = i >= rng[l][0] && i <= rng[l][1];
+        el('rect', { x: xc(l, i) - cwid / 2, y: rowY(l) - 14, width: cwid, height: 28, rx: 3, style: on ? 'fill:var(--c-b);stroke:var(--c-b);stroke-width:1' : 'fill:var(--myst-color-surface);stroke:var(--myst-color-border-strong);stroke-width:1' }, g);
+      }
+    }
+    const a = xc(0, rng[0][0]) - cwid / 2, b = xc(0, rng[0][1]) + cwid / 2;
+    el('path', { d: `M${a} ${ybot + 34}v12H${b}v-12`, style: 'fill:none;stroke:var(--c-b);stroke-width:3' }, g);
+    label(g, (a + b) / 2, ybot + 90, `r = ${r[L]} input pixels`, 'tx', 'middle', 'font-weight:700;fill:var(--c-b)');
+    label(g, 0, 40, s === 1 ? `1 + ${L} · (${k} − 1) = ${r[L]}` : 'stride 2 doubles the step of every layer above', 'tx', 'start');
+    $('rf-l-val').textContent = L; $('rf-k-val').textContent = k; $('rf-s-val').textContent = s;
+  }
+  ['l', 'k', 's'].forEach((key) => $(`rf-${key}`).addEventListener('input', (e) => { S[key.toUpperCase() === 'L' ? 'L' : key] = +e.target.value; draw(); }));
+  draw();
+  return {};
+})();
+
+drawImage(); drawDense(); drawIdeas(); drawWork(); drawChannels(); drawRelu(); drawPool();
+drawStack(); drawLearn(); drawAug(); drawArch(); drawUses();
+})();
+</script>
+</body>
+</html>

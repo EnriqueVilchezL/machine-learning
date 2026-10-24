@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markov decision processes</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+#mv-svg,#pe-svg{cursor:pointer;outline:none}
+.bt:disabled{opacity:.45;cursor:default}
+.gcell{fill:var(--myst-color-bg);stroke:var(--myst-color-border-strong);stroke-width:2}
+.gwall{fill:var(--myst-color-border-strong);stroke:var(--myst-color-border-strong);stroke-width:2}
+.garr{stroke:var(--myst-color-text);fill:var(--myst-color-text);stroke-linecap:round}
+.gval{font-size:28px;fill:var(--myst-color-text);font-variant-numeric:tabular-nums}
+.gbig{font-size:40px;font-weight:700;fill:var(--myst-color-text)}
+.st{fill:var(--myst-color-bg);stroke:var(--myst-color-text);stroke-width:3}
+.act{fill:var(--myst-color-text)}
+#not-tb td,#not-tb th{padding:.3em .6em}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 20</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Markov decision processes</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">A model of the environment, and how to compute the best way to act in it</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 20 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">States, actions, chances and rewards</li>
+<li class="an-up" style="--d:.15s">The Markov property and the grid world</li>
+<li class="an-up" style="--d:.25s">Policies and their values</li>
+<li class="an-up" style="--d:.35s">The Bellman equations</li>
+<li class="an-up" style="--d:.45s">Value iteration and policy iteration</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic and the rest of chapter 5.</p>
+<table class="tb" id="not-tb">
+<colgroup><col style="width:38%"><col style="width:62%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">s, s' \in \mathcal{S}</span></td><td>A state and the next state</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">a \in \mathcal{A}</span></td><td>An action</td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">S_t, \ A_t, \ R_{t+1}</span></td><td>State, action and reward at time <span class="tex">t</span></td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">P(s' \mid s, a), \ R(s, a, s')</span></td><td>Chance of moving to <span class="tex">s'</span>, and the reward for that move</td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">\gamma \in [0, 1)</span></td><td>Discount factor</td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">\pi(a \mid s), \ \pi(s)</span></td><td>Policy: chance of each action, or one fixed action</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">G_t</span></td><td>Return: discounted sum of future rewards</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">V^\pi(s), \ Q^\pi(s, a)</span></td><td>Expected return of a state, or of a state and an action</td></tr>
+<tr class="an-up" style="--d:.45s"><td><span class="tex">V^*, \ Q^*, \ \pi^*</span></td><td>The best values and a best policy</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Capital letters with a time index, like <span class="tex">S_t</span>, are random: they change from run to run.</p><p>Lowercase <span class="tex">s</span> and <span class="tex">a</span> are fixed values we plug in.</p><p>A star marks the best possible choice.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Recap">
+<div class="hdr" data-s="Opening"></div>
+<h2>Recap: agent and return</h2>
+<div class="fr">
+<div class="figbox"><svg id="loop-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Topic 19: the agent acts, the environment answers with a state and a reward.</p>
+<p class="small" style="margin:0">The agent wants a large <strong>return</strong>:<br><span class="tex">G_t = R_{t+1} + \gamma R_{t+2} + \cdots</span></p>
+<p class="small frag up" data-step="rc" style="margin:0">Today: write the environment down as a model, then <strong>compute</strong> the best policy.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>The loop and the sequence it produces.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The MDP model</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Five pieces describe the whole problem: states, actions, chances, rewards and a discount.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The five pieces">
+<div class="hdr" data-s="The MDP model"></div>
+<h2>The five pieces</h2>
+<div class="fr">
+<div class="figbox"><svg id="robot-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0 0 4px">A cleaning robot with a battery. A Markov decision process (MDP) has:</p>
+<div class="ro"><span><span class="tex">\mathcal{S}</span> states</span><b style="font-size:26px">High, Low, Flat</b></div>
+<div class="ro"><span><span class="tex">\mathcal{A}</span> actions</span><b style="font-size:26px">search, wait, recharge</b></div>
+<div class="ro"><span><span class="tex">P</span> chances</span><b style="font-size:26px">first number</b></div>
+<div class="ro"><span><span class="tex">R</span> rewards</span><b style="font-size:26px">second number</b></div>
+<div class="ro"><span><span class="tex">\gamma</span> discount</span><b style="font-size:26px">0.9</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Circles are states, black dots are actions. Each arrow shows the chance of that outcome and its reward. Flat ends the episode.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Markov property">
+<div class="hdr" data-s="The MDP model"></div>
+<h2>The Markov property</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The next state depends only on the current state and action. The past adds nothing:</p>
+<div class="eq"><div class="m tex-d">P(S_{t+1} = s' \mid S_t, A_t, S_{t-1}, A_{t-1}, \dots, S_0) = P(S_{t+1} = s' \mid S_t, A_t)</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="m1" style="margin:0">So one table <span class="tex">P(s' \mid s, a)</span> describes all the dynamics. For each state and action, the chances form a distribution:</p>
+<div class="eq frag up" data-step="m1"><div class="m tex-d">\sum_{s' \in \mathcal{S}} P(s' \mid s, a) = 1, \qquad P(s' \mid s, a) \ge 0</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="m2" style="margin:0">The state must hold everything that matters for the future, like the battery level for the robot.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The robot is in Low and searches. The next state is Low with chance 0.6 or Flat with 0.4.</p><p>It does not matter how long it has been in Low.</p><p><span class="tex">0.6 + 0.4 = 1</span></p><p>From High: <span class="tex">0.7 + 0.3 = 1</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A grid world" data-demo="mv">
+<div class="hdr" data-s="The MDP model"></div>
+<h2>A slippery grid world</h2>
+<div class="fr">
+<div class="figbox"><svg id="mv-svg" class="interactive" tabindex="0" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">A move goes the intended way with chance 0.8 and slips to each side with 0.1. Hitting a wall means staying.</p>
+<div class="btns" id="mv-dirs"><button class="bt chip" data-a="N" aria-label="North">↑</button><button class="bt chip" data-a="E" aria-label="East">→</button><button class="bt chip" data-a="S" aria-label="South">↓</button><button class="bt chip" data-a="W" aria-label="West">←</button></div>
+<div class="btns"><button class="bt" id="mv-one">Sample 1</button><button class="bt chip" id="mv-100">Sample 100</button><button class="bt chip" id="mv-reset">Reset</button></div>
+<div class="ro"><span>Moves sampled</span><b id="mv-n">0</b></div>
+<div class="ro"><span>Went the intended way</span><b id="mv-int" class="a">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>The 4 × 3 grid world. Wall at (2, 2), goal +1 at (4, 3), pit −1 at (4, 2), start S at (1, 1). Each step costs −0.04.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Episodes and return">
+<div class="hdr" data-s="The MDP model"></div>
+<h2>Episodes and the return</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">An <strong>episode</strong> runs from a start state until a <strong>terminal</strong> state: Flat for the robot, the goal or the pit in the grid. Its return is</p>
+<div class="eq"><div class="m tex-d">G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} = R_{t+1} + \gamma \, G_{t+1}</div><div class="n">(3)</div></div>
+<div style="height:250px;position:relative"><svg id="ep-svg" viewBox="0 0 1160 250" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"></svg></div>
+<p class="cap" style="margin-top:8px"><b>Figure 4:</b>One episode of the robot. After a terminal state all rewards are 0.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Rewards <span class="tex">+2, +2, -3</span>, <span class="tex">\gamma = 0.9</span>:</p><p><span class="tex">G_0 = 2 + 0.9 \cdot 2</span><br><span class="tex">+\, 0.81 \cdot (-3)</span></p><p><span class="tex">= 2 + 1.8 - 2.43 = 1.37</span></p></aside>
+<aside class="am frag up" data-step="ret"><div class="t">Why discount</div><p>With <span class="tex">\gamma \lt 1</span> the sum stays finite even if the episode never ends, and sooner rewards count more.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Policies and values</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A rule for acting, and how much return that rule earns from each state.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Policies">
+<div class="hdr" data-s="Policies and values"></div>
+<h2>A policy maps states to actions</h2>
+<div class="fr">
+<div class="figbox"><svg id="pol-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A <strong>policy</strong> <span class="tex">\pi(s)</span> picks an action in every state. A random policy <span class="tex">\pi(a \mid s)</span> gives a chance to each action.</p>
+<p class="small frag up" data-step="pol" style="margin:0">Policy B is shorter but passes next to the pit, where a slip costs −1. Which is better? We need a number for each policy.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Two policies on the grid world. The number below each grid is the expected return from the start, computed later in this part.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Value functions">
+<div class="hdr" data-s="Policies and values"></div>
+<h2>Value of a state</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The <strong>state value</strong> is the expected return when we start in <span class="tex">s</span> and follow <span class="tex">\pi</span>:</p>
+<div class="eq"><div class="m tex-d">V^\pi(s) = \mathbb{E}_\pi \big[ G_t \mid S_t = s \big]</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="q1" style="margin:0">The <strong>action value</strong> fixes the first action <span class="tex">a</span>, then follows <span class="tex">\pi</span>:</p>
+<div class="eq frag up" data-step="q1"><div class="m tex-d">Q^\pi(s, a) = \mathbb{E}_\pi \big[ G_t \mid S_t = s, \ A_t = a \big]</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="q2" style="margin:0">Expected means averaged over all the ways the episode can go. Larger is better.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Policy: wait in Low. The rewards are <span class="tex">1, 1, 1, \dots</span> forever.</p><p><span class="tex">G = 1 + 0.9 + 0.9^2 + \cdots</span></p><p><span class="tex">= \frac{1}{1 - 0.9} = 10</span></p><p>So <span class="tex">V^\pi(\text{Low}) = 10</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bellman expectation">
+<div class="hdr" data-s="Policies and values"></div>
+<h2>The Bellman equation</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The return is the first reward plus the discounted return after it. Averaging over actions and next states gives</p>
+<div class="eq"><div class="m tex-d">V^\pi(s) = \sum_{a} \pi(a \mid s) \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma V^\pi(s') \big]</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="b1" style="margin:0">One equation per state. The value of a state is linked to the values of the states one step ahead. The same idea for an action:</p>
+<div class="eq frag up" data-step="b1"><div class="m tex-d">Q^\pi(s, a) = \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma V^\pi(s') \big]</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Policy: search in High, wait in Low.</p><p><span class="tex">V^\pi(\text{Low}) = 10</span><br><span class="tex">V^\pi(\text{High}) = 12.70</span></p><p>Check High:</p><p><span class="tex">0.7(2 + 0.9 \cdot 12.70)</span><br><span class="tex">+\, 0.3(2 + 0.9 \cdot 10)</span><br><span class="tex">= 9.40 + 3.30 = 12.70</span></p></aside>
+<aside class="am frag up" data-step="b1"><div class="t">Example: an action</div><p><span class="tex">Q^\pi(\text{Low}, \text{recharge})</span></p><p><span class="tex">= 0 + 0.9 \cdot 12.70 = 11.43</span></p><p>More than the 10 of waiting.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Policy evaluation" data-demo="pe">
+<div class="hdr" data-s="Policies and values"></div>
+<h2>Policy evaluation</h2>
+<div class="fr">
+<div class="figbox"><svg id="pe-svg" class="interactive" tabindex="0" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Start with <span class="tex">V = 0</span> and apply (6) to every state, again and again. The values settle on <span class="tex">V^\pi</span>. Click a cell to turn its arrow.</p>
+<div class="btns"><button class="bt" id="pe-step">▶ Sweep</button><button class="bt chip" id="pe-run">Evaluate</button><button class="bt chip" id="pe-reset">Reset</button></div>
+<div class="ro"><span>Sweeps</span><b id="pe-k">0</b></div>
+<div class="ro"><span>Largest change</span><b id="pe-d" class="bb">—</b></div>
+<div class="ro"><span><span class="tex">V^\pi</span> at start</span><b id="pe-v" class="a">0.00</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Policy B of Figure 5, <span class="tex">\gamma = 0.9</span>, step reward −0.04. Evaluate sweeps until no value changes by more than 0.001.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Finding the best policy</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Replace the average over actions with the best action, and repeat.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bellman optimality">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Optimal values</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The optimal value <span class="tex">V^*(s)</span> is the largest value any policy can reach. It solves the <strong>Bellman optimality equation</strong>:</p>
+<div class="eq"><div class="m tex-d">V^*(s) = \max_{a} \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma V^*(s') \big]</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="o1" style="margin:0">Once we know <span class="tex">V^*</span>, a best policy looks one step ahead and takes the best action, the <strong>greedy</strong> one:</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">\pi^*(s) = \underset{a}{\arg\max} \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma V^*(s') \big]</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="o2" style="margin:0">The sum inside is <span class="tex">Q^*(s, a)</span>, so <span class="tex">V^*(s) = \max_a Q^*(s, a)</span>.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Robot: <span class="tex">V^*(\text{High}) = 15.75</span>, <span class="tex">V^*(\text{Low}) = 14.17</span>.</p><p>In Low:</p><p>search: <span class="tex">0.6(2 + 0.9 \cdot 14.17)</span><br><span class="tex">+\, 0.4(-3) = 7.65</span></p><p>wait: <span class="tex">1 + 0.9 \cdot 14.17 = 13.76</span></p><p>recharge: <span class="tex">0.9 \cdot 15.75 = 14.17</span></p><p>Best: recharge.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Value iteration">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Value iteration</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Turn equation (8) into an update. <span class="tex">V_k</span> is the guess after <span class="tex">k</span> sweeps:</p>
+<div class="eq"><div class="m tex-d">V_{k+1}(s) = \max_{a} \sum_{s'} P(s' \mid s, a) \big[ R(s, a, s') + \gamma V_k(s') \big]</div><div class="n">(10)</div></div>
+<ol class="small" style="margin:8px 0 0">
+<li class="frag up" data-step="v1">Start with <span class="tex">V_0(s) = 0</span> for every state.</li>
+<li class="frag up" data-step="v1">Sweep: update every state with (10), using the old values.</li>
+<li class="frag up" data-step="v2">Repeat until the largest change is below a small threshold.</li>
+<li class="frag up" data-step="v2">Read the policy with the greedy rule (9).</li>
+</ol>
+<p class="small frag up" data-step="v3" style="margin:16px 0 0">With <span class="tex">\gamma \lt 1</span> the values always converge to <span class="tex">V^*</span>.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Cell (3, 3), action East, <span class="tex">\gamma = 0.9</span>, step <span class="tex">-0.04</span>.</p><p>Sweep 1, all <span class="tex">V_0 = 0</span>:<br><span class="tex">0.8(1) + 0.1(-0.04) + 0.1(-0.04)</span><br><span class="tex">= 0.792</span></p><p>Sweep 2, slip north (stays):<br><span class="tex">-0.04 + 0.9 \cdot 0.792 = 0.673</span><br>slip south:<br><span class="tex">-0.04 + 0.9 \cdot (-0.04) = -0.076</span></p><p><span class="tex">0.8 + 0.1(0.673) + 0.1(-0.076)</span><br><span class="tex">= 0.860</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Running value iteration" data-demo="vi">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Running value iteration</h2>
+<div class="fr">
+<div class="figbox"><svg id="vi-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Each sweep applies (10) to every cell. Arrows show the greedy action for the current values. Value spreads back from the goal.</p>
+<div class="btns"><button class="bt" id="vi-step">▶ Sweep</button><button class="bt chip" id="vi-run">Run</button><button class="bt chip" id="vi-reset">Reset</button></div>
+<div class="ro"><span>Iteration <span class="tex">k</span></span><b id="vi-k">0</b></div>
+<div class="ro"><span>Largest change</span><b id="vi-d" class="bb">—</b></div>
+<div class="ro"><span><span class="tex">V_k</span> at start</span><b id="vi-v" class="a">0.00</b></div>
+<div><span class="tag" id="vi-tag">Not started</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b><span class="tex">\gamma = 0.9</span>, step reward −0.04. Blue: positive value. Orange: negative.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Policy iteration">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Policy iteration</h2>
+<p class="small" style="margin:-8px 0 8px"><strong>Evaluate</strong> the current policy with (6). <strong>Improve</strong> it by taking the greedy action (9) for those values. Repeat until the policy stops changing.</p>
+<div class="figbox"><svg id="pi-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>Policy iteration on the grid world, starting from "always go West". Each improvement uses the values of the policy before it. The number is the value at the start cell.</p>
+</section>
+
+<section class="s ats-prose" data-label="Discount and step reward" data-demo="gl">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Discount and step reward</h2>
+<div class="fr">
+<div class="figbox"><svg id="gl-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">The best policy depends on the rewards and on <span class="tex">\gamma</span>. Each change reruns value iteration.</p>
+<div class="ctl"><label><span>Discount <span class="tex">\gamma</span></span><b id="gl-g-val">0.90</b></label><input type="range" id="gl-g" min="0.5" max="0.99" step="0.01" value="0.9"></div>
+<div class="ctl"><label><span>Step reward <span class="tex">r</span></span><b id="gl-r-val">−0.04</b></label><input type="range" id="gl-r" min="-2" max="0.2" step="0.01" value="-0.04"></div>
+<div class="ro"><span><span class="tex">V^*</span> at start</span><b id="gl-v" class="a">0</b></div>
+<div><span class="tag" id="gl-tag">Route</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>A large step cost makes the pit attractive. A positive step reward makes the agent avoid both exits.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Limits">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Two limits</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="lim1-svg" viewBox="0 0 792 600"></svg></div>
+<div class="figbox"><svg id="lim2-svg" viewBox="0 0 792 600"></svg></div>
+<div class="subcap">(a) The model must be known</div>
+<div class="subcap">(b) Every sweep visits every state</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 10:</b>(a) Value and policy iteration need <span class="tex">P</span> and <span class="tex">R</span>; a real agent usually only sees samples. (b) Approximate number of states, log scale. Topic 21 learns from samples without a model.</p>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Finding the best policy"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>MDPs and dynamic programming at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>One clear language for sequential decisions</td><td>Needs the transition chances and the rewards</td></tr>
+<tr class="an-up" style="--d:.15s">
+<td>Handles chance: plans account for slips</td><td>Every sweep touches every state</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Value and policy iteration always converge</td><td>Assumes the agent sees the full state</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Values explain why an action is preferred</td><td>Results depend on how rewards are designed</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Basis for Q-learning and later methods</td><td>Hard with continuous states and actions</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>When the states fit in a table and the dynamics are known or can be estimated, compute the policy directly with value or policy iteration.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An MDP has states, actions, transition chances, rewards and a discount.</li>
+<li class="an-up" style="--d:.15s">Markov property: the next state depends only on the current state and action.</li>
+<li class="an-up" style="--d:.25s">A policy picks actions; its value is the expected discounted return from each state.</li>
+<li class="an-up" style="--d:.35s">Bellman equations link each value to the values one step ahead.</li>
+<li class="an-up" style="--d:.45s">Value iteration repeats the max update; the greedy policy of <span class="tex">V^*</span> is optimal.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The textbook chapters and the two classic books on dynamic programming and MDPs.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.), Chapters 3 and 4. MIT Press.</li>
+<li style="margin:.4em 0">Bellman, R. (1957). <em>Dynamic Programming</em>. Princeton University Press.</li>
+<li style="margin:.4em 0">Puterman, M. L. (1994). <em>Markov Decision Processes: Discrete Stochastic Dynamic Programming</em>. Wiley.</li>
+<li style="margin:.4em 0">Russell, S., &amp; Norvig, P. (2021). <em>Artificial Intelligence: A Modern Approach</em> (4th ed.), Chapter 17. Pearson.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 21: Q-learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, lin, clamp, fmt, toSvgPoint } = window.Deck;
+
+/* ───────── helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const num = (v, d = 2) => fmt(v, d).replace('-', '−');
+/* text with a subscript: base, then a lowered smaller part */
+function subText(parent, x, y, base, sub, attrs = {}) {
+  const t = el('text', { x, y, ...attrs }, parent);
+  el('tspan', { text: base }, t);
+  if (sub) el('tspan', { dy: 8, style: 'font-size:24px', text: sub }, t);
+  return t;
+}
+
+/* ───────── grid world model (shared by every grid figure and demo) ───────── */
+const COLS = 4, ROWS = 3, WALL = '2,2', GOAL = '4,3', PIT = '4,2', START = '1,1';
+const key = (c, r) => c + ',' + r;
+const cr = (k) => k.split(',').map(Number);
+const KEYS = [];
+for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (key(c, r) !== WALL) KEYS.push(key(c, r));
+const isTerm = (k) => k === GOAL || k === PIT;
+const ACTS = ['N', 'E', 'S', 'W'];
+const DIR = { N: [0, 1], E: [1, 0], S: [0, -1], W: [-1, 0] };
+const SIDE = { N: ['E', 'W'], S: ['E', 'W'], E: ['N', 'S'], W: ['N', 'S'] };
+function move(k, a) {
+  const [c, r] = cr(k), c2 = c + DIR[a][0], r2 = r + DIR[a][1];
+  if (c2 < 1 || c2 > COLS || r2 < 1 || r2 > ROWS || key(c2, r2) === WALL) return k;
+  return key(c2, r2);
+}
+/* P(s' | s, a) as a map from next state to chance */
+function trans(k, a) {
+  const out = new Map();
+  [[a, 0.8], [SIDE[a][0], 0.1], [SIDE[a][1], 0.1]].forEach(([b, p]) => {
+    const t = move(k, b);
+    out.set(t, (out.get(t) || 0) + p);
+  });
+  return out;
+}
+const reward = (t, step) => (t === GOAL ? 1 : t === PIT ? -1 : step);
+function qval(V, k, a, g, step) {
+  let s = 0;
+  trans(k, a).forEach((p, t) => { s += p * (reward(t, step) + g * V[t]); });
+  return s;
+}
+function greedy(V, k, g, step) {
+  let best = ACTS[0], bq = -Infinity;
+  ACTS.forEach((a) => { const q = qval(V, k, a, g, step); if (q > bq + 1e-12) { bq = q; best = a; } });
+  return best;
+}
+const zeros = () => Object.fromEntries(KEYS.map((k) => [k, 0]));
+/* one synchronous sweep: optimal update (10) when pol is null, policy update (6) otherwise */
+function sweep(V, g, step, pol) {
+  const V2 = {};
+  let d = 0;
+  KEYS.forEach((k) => {
+    V2[k] = isTerm(k) ? 0 : pol ? qval(V, k, pol[k], g, step) : Math.max(...ACTS.map((a) => qval(V, k, a, g, step)));
+    d = Math.max(d, Math.abs(V2[k] - V[k]));
+  });
+  return { V: V2, d };
+}
+function converge(g, step, pol, tol = 1e-9) {
+  let V = zeros(), n = 0;
+  for (; n < 20000; n++) { const res = sweep(V, g, step, pol); V = res.V; if (res.d < tol) break; }
+  return { V, n: n + 1 };
+}
+const greedyPolicy = (V, g, step) => Object.fromEntries(KEYS.filter((k) => !isTerm(k)).map((k) => [k, greedy(V, k, g, step)]));
+const G0 = 0.9, STEP0 = -0.04, TOL = 1e-3;
+const polFrom = (s) => { const p = {}; s.split(' ').forEach((w) => { const [k, a] = w.split(':'); p[k] = a; }); return p; };
+const POL_A = polFrom('1,1:N 1,2:N 1,3:E 2,3:E 3,3:E 2,1:W 3,1:W 4,1:W 3,2:N');
+const POL_B = polFrom('1,1:E 2,1:E 3,1:N 3,2:N 3,3:E 4,1:W 1,2:N 1,3:E 2,3:E');
+
+/* draws a grid; returns per-cell geometry plus layers for shading, arrows and text */
+function gridView(svg, x0, y0, cs, o = {}) {
+  const g = el('g', {}, svg);
+  const X = (c) => x0 + (c - 1) * cs, Y = (r) => y0 + (ROWS - r) * cs;
+  const base = el('g', {}, g), shade = el('g', {}, g), marks = el('g', {}, g), arrows = el('g', {}, g), texts = el('g', {}, g);
+  const cells = {};
+  for (let r = ROWS; r >= 1; r--) for (let c = 1; c <= COLS; c++) {
+    const k = key(c, r), x = X(c), y = Y(r);
+    if (k === WALL) { el('rect', { class: 'gwall', x, y, width: cs, height: cs }, base); continue; }
+    el('rect', { class: 'gcell', x, y, width: cs, height: cs }, base);
+    const ov = el('rect', { x: x + 1, y: y + 1, width: cs - 2, height: cs - 2, style: 'fill:none' }, shade);
+    cells[k] = { x, y, cx: x + cs / 2, cy: y + cs / 2, ov };
+  }
+  const big = cs >= 120;
+  [[GOAL, '+1', 'var(--c-c)'], [PIT, '−1', 'var(--c-b)']].forEach(([k, s, c]) => {
+    cells[k].ov.style.fill = c; cells[k].ov.style.opacity = '.35';
+    el('text', { class: big ? 'gbig' : 'tx', x: cells[k].cx, y: cells[k].cy + (big ? 14 : 10), 'text-anchor': 'middle', text: s }, texts);
+  });
+  if (o.start !== false) el('text', { class: 'txs', x: cells[START].x + 10, y: cells[START].y + 30, style: 'font-weight:700', text: 'S' }, texts);
+  if (o.labels) {
+    for (let c = 1; c <= COLS; c++) el('text', { class: 'tk', x: X(c) + cs / 2, y: y0 + ROWS * cs + 34, 'text-anchor': 'middle', style: 'font-size:24px', text: c }, g);
+    for (let r = 1; r <= ROWS; r++) el('text', { class: 'tk', x: x0 - 16, y: Y(r) + cs / 2 + 8, 'text-anchor': 'end', style: 'font-size:24px', text: r }, g);
+  }
+  const vtext = {};
+  function setValues(V, scale = 1) {
+    KEYS.filter((k) => !isTerm(k)).forEach((k) => {
+      const v = V ? V[k] : null, ov = cells[k].ov;
+      if (v === null) { ov.style.fill = 'none'; if (vtext[k]) vtext[k].textContent = ''; return; }
+      ov.style.fill = v >= 0 ? 'var(--c-a)' : 'var(--c-b)';
+      ov.style.opacity = (0.06 + 0.5 * Math.min(1, Math.abs(v) / scale)).toFixed(3);
+      if (o.values) {
+        if (!vtext[k]) vtext[k] = el('text', { class: 'gval', x: cells[k].cx, y: cells[k].cy + cs * 0.36, 'text-anchor': 'middle' }, texts);
+        vtext[k].textContent = num(v);
+      }
+    });
+  }
+  function setPolicy(pol) {
+    clear(arrows);
+    if (!pol) return;
+    Object.entries(pol).forEach(([k, a]) => {
+      const cy = o.values ? cells[k].cy - cs * 0.1 : cells[k].cy;
+      arrow(arrows, cells[k].cx, cy, a, cs * (o.values ? 0.38 : 0.5));
+    });
+  }
+  function cellAt(p) {
+    return KEYS.find((k) => p.x >= cells[k].x && p.x < cells[k].x + cs && p.y >= cells[k].y && p.y < cells[k].y + cs);
+  }
+  return { g, cells, cs, marks, texts, setValues, setPolicy, cellAt };
+}
+function arrow(parent, cx, cy, a, len, style = '') {
+  const dx = DIR[a][0], dy = -DIR[a][1];
+  const tx = cx + dx * len / 2, ty = cy + dy * len / 2, hx = tx - dx * len * 0.32, hy = ty - dy * len * 0.32;
+  const w = Math.max(7, len * 0.2), px = -dy * w, py = dx * w, sw = Math.max(3, len * 0.09);
+  const g = el('g', { class: 'garr', style }, parent);
+  el('line', { x1: cx - dx * len / 2, y1: cy - dy * len / 2, x2: hx, y2: hy, style: `stroke-width:${sw}` }, g);
+  el('path', { d: `M${tx} ${ty}L${hx + px} ${hy + py}L${hx - px} ${hy - py}Z`, style: 'stroke:none' }, g);
+  return g;
+}
+const vScale = (V) => Math.max(1, ...KEYS.map((k) => Math.abs(V[k])));
+
+/* ───────── static figures ───────── */
+function drawLoop() {
+  const svg = $('loop-svg');
+  const ag = el('g', { class: 'an-fade' }, svg);
+  el('rect', { class: 'box-a', x: 60, y: 120, width: 330, height: 200, rx: 12 }, ag);
+  el('text', { class: 'tx', x: 225, y: 230, 'text-anchor': 'middle', style: 'font-weight:700', text: 'Agent' }, ag);
+  const en = el('g', { class: 'an-fade', style: '--d:.2s' }, svg);
+  el('rect', { class: 'box-b', x: 770, y: 120, width: 330, height: 200, rx: 12 }, en);
+  el('text', { class: 'tx', x: 935, y: 230, 'text-anchor': 'middle', style: 'font-weight:700', text: 'Environment' }, en);
+  const ar = el('g', { class: 'an-fade', style: '--d:.5s' }, svg);
+  el('path', { class: 'wire-a', d: 'M390 170H762', 'marker-end': 'url(#ah-a)' }, ar);
+  subText(ar, 580, 152, 'action A', 't', { class: 'txs', 'text-anchor': 'middle' });
+  el('path', { class: 'wire', d: 'M770 245H398', 'marker-end': 'url(#ah)' }, ar);
+  subText(ar, 580, 230, 'state S', 't+1', { class: 'txs', 'text-anchor': 'middle' });
+  el('path', { class: 'wire', d: 'M770 295H398', 'marker-end': 'url(#ah)' }, ar);
+  subText(ar, 580, 340, 'reward R', 't+1', { class: 'txs', 'text-anchor': 'middle' });
+  /* timeline */
+  const tl = el('g', { class: 'an-fade', style: '--d:.9s' }, svg);
+  el('text', { class: 'ttl', x: 60, y: 460, text: 'one run of the loop' }, tl);
+  const items = [['S', '0', 'a'], ['A', '0', 'b'], ['R', '1', 'c'], ['S', '1', 'a'], ['A', '1', 'b'], ['R', '2', 'c'], ['S', '2', 'a'], ['A', '2', 'b'], ['R', '3', 'c']];
+  const fill = { a: 'var(--myst-color-accent-surface)', b: 'var(--c-b-soft)', c: 'var(--c-c-soft)' };
+  items.forEach(([b, s, kind], i) => {
+    const x = 60 + i * 112;
+    el('rect', { x, y: 490, width: 96, height: 72, rx: 10, style: `fill:${fill[kind]};stroke:var(--myst-color-border-strong);stroke-width:2` }, tl);
+    subText(tl, x + 42, 536, b, s, { class: 'tx', 'text-anchor': 'middle' });
+  });
+  el('text', { class: 'tx', x: 60 + 9 * 112 + 4, y: 536, text: '…' }, tl);
+  el('text', { class: 'txs', x: 60, y: 620, text: 'states, actions and rewards alternate until a terminal state' }, tl);
+}
+
+function drawRobot() {
+  const svg = $('robot-svg');
+  const H = [230, 360], L = [760, 360], F = [1020, 620], R = 82;
+  const g = el('g', { class: 'an-fade' }, svg);
+  const lab = (x, y, t, anchor = 'middle', extra = '') => el('text', { class: 'txs', x, y, 'text-anchor': anchor, style: extra, text: t }, g);
+  const line = (d) => el('path', { d, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g);
+  const arr = (d) => el('path', { class: 'wire', d, 'marker-end': 'url(#ah)', style: 'stroke-width:3' }, g);
+  const dot = (x, y, name, lx, ly, anchor) => { el('circle', { class: 'act', cx: x, cy: y, r: 11 }, g); lab(lx, ly, name, anchor, 'font-weight:700;font-style:italic'); };
+  /* High: wait (self loop above) */
+  line(`M${H[0] - 40} ${H[1] - 72}L${H[0] - 40} 160`); dot(H[0] - 40, 150, 'wait', H[0] - 62, 158, 'end');
+  arr(`M${H[0] - 40} 150C${H[0] + 10} 110 ${H[0] + 50} 180 ${H[0] + 32} ${H[1] - 76}`);
+  lab(H[0] + 70, 150, '1.0, +1', 'start');
+  /* High: search */
+  line(`M${H[0] + 58} ${H[1] - 58}L480 250`); dot(490, 245, 'search', 490, 210, 'middle');
+  arr(`M500 250L${L[0] - 80} ${L[1] - 22}`); lab(600, 268, '0.3, +2', 'start');
+  arr(`M484 258C450 330 380 350 ${H[0] + 90} ${H[1] - 4}`); lab(440, 360, '0.7, +2', 'middle');
+  /* Low: recharge */
+  line(`M${L[0] - 78} ${L[1] + 26}L500 470`); dot(490, 474, 'recharge', 490, 525, 'middle');
+  arr(`M480 474L${H[0] + 66} ${H[1] + 56}`); lab(350, 490, '1.0, 0', 'middle');
+  /* Low: wait (self loop above) */
+  line(`M${L[0] + 30} ${L[1] - 76}L${L[0] + 30} 160`); dot(L[0] + 30, 150, 'wait', L[0] + 52, 158, 'start');
+  arr(`M${L[0] + 30} 150C${L[0] - 20} 110 ${L[0] - 60} 180 ${L[0] - 40} ${L[1] - 74}`);
+  lab(L[0] - 70, 150, '1.0, +1', 'end');
+  /* Low: search */
+  line(`M${L[0] + 80} ${L[1] + 10}L${990} ${L[1] + 10}`); dot(1000, L[1] + 10, 'search', 1000, L[1] - 24, 'middle');
+  arr(`M1000 ${L[1] + 22}C990 470 900 470 ${L[0] + 50} ${L[1] + 66}`); lab(930, 492, '0.6, +2', 'middle');
+  arr(`M1010 ${L[1] + 22}L${F[0] + 10} ${F[1] - 52}`); lab(1030, 520, '0.4, −3', 'start');
+  /* states on top */
+  [[H, 'High'], [L, 'Low']].forEach(([p, name]) => {
+    el('circle', { class: 'st', cx: p[0], cy: p[1], r: R }, g);
+    el('text', { class: 'tx', x: p[0], y: p[1] + 10, 'text-anchor': 'middle', style: 'font-weight:700', text: name }, g);
+  });
+  el('rect', { class: 'st', x: F[0] - 70, y: F[1] - 44, width: 140, height: 88, rx: 8, style: 'stroke-width:5' }, g);
+  el('text', { class: 'tx', x: F[0], y: F[1] + 10, 'text-anchor': 'middle', style: 'font-weight:700', text: 'Flat' }, g);
+}
+
+function drawEpisode() {
+  const svg = $('ep-svg');
+  const S = [['High', 'a'], ['High', 'a'], ['Low', 'a'], ['Flat', 'b']];
+  const R = ['+2', '+2', '−3'], X = [70, 400, 730, 1060];
+  S.forEach(([n, kind], i) => {
+    const g = el('g', { class: 'an-pop', style: `--d:${0.3 * i}s` }, svg);
+    if (kind === 'b') el('rect', { class: 'st', x: X[i] - 70, y: 55, width: 140, height: 90, rx: 8, style: 'stroke-width:5' }, g);
+    else el('circle', { class: 'st', cx: X[i], cy: 100, r: 62 }, g);
+    el('text', { class: 'tx', x: X[i], y: 110, 'text-anchor': 'middle', style: 'font-weight:700', text: n }, g);
+    subText(g, X[i], 212, 'S', String(i), { class: 'txs', 'text-anchor': 'middle' });
+  });
+  R.forEach((r, i) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${0.3 * i + 0.15}s` }, svg);
+    const x0 = X[i] + 74, x1 = X[i + 1] - (i === 2 ? 82 : 74);
+    el('path', { class: 'wire', d: `M${x0} 100H${x1}`, 'marker-end': 'url(#ah)' }, g);
+    el('text', { class: 'txs', x: (x0 + x1) / 2, y: 82, 'text-anchor': 'middle', style: 'font-style:italic', text: 'search' }, g);
+    const t = el('text', { class: 'tx', x: (x0 + x1) / 2, y: 146, 'text-anchor': 'middle' }, g);
+    el('tspan', { text: 'R' }, t);
+    el('tspan', { dy: 8, style: 'font-size:24px', text: String(i + 1) }, t);
+    el('tspan', { dy: -8, style: 'font-weight:700;fill:' + (r[0] === '+' ? 'var(--c-a)' : 'var(--c-b)'), text: ' = ' + r }, t);
+  });
+}
+
+function drawPolicies() {
+  const svg = $('pol-svg'), cs = 125;
+  [[POL_A, 30, '(a) policy A: the long way', 'an-fade'], [POL_B, 620, '(b) policy B: the short way', 'frag']].forEach(([pol, x0, title, cls]) => {
+    const g = el('g', cls === 'frag' ? { class: 'frag', 'data-step': 'pol' } : { class: cls }, svg);
+    el('text', { class: 'ttl', x: x0, y: 110, text: title }, g);
+    const G = gridView(g, x0, 130, cs);
+    G.setPolicy(pol);
+    const V = converge(G0, STEP0, pol).V;
+    el('text', { class: 'tx', x: x0 + 2 * cs, y: 130 + 3 * cs + 60, 'text-anchor': 'middle', text: `value at start: ${num(V[START])}` }, g);
+  });
+}
+
+function drawPolicyIteration() {
+  const svg = $('pi-svg');
+  let pol = Object.fromEntries(KEYS.filter((k) => !isTerm(k)).map((k) => [k, 'W']));
+  const hist = [];
+  for (let it = 0; it < 12; it++) {
+    const V = converge(G0, STEP0, pol).V;
+    hist.push({ pol, V });
+    const nxt = greedyPolicy(V, G0, STEP0);
+    if (KEYS.every((k) => isTerm(k) || nxt[k] === pol[k])) break;
+    pol = nxt;
+  }
+  const n = hist.length, cs = 66, W = 4 * cs, gap = (1680 - n * W) / (n - 1), Y0 = 200;
+  /* the cycle at the top */
+  const cyc = el('g', { class: 'an-fade' }, svg);
+  const boxes = [[560, 'policy π'], [1120, 'values V^π']];
+  boxes.forEach(([cx, t]) => {
+    el('rect', { class: 'box', x: cx - 150, y: 20, width: 300, height: 70, rx: 10 }, cyc);
+    const [b, s] = t.split('^');
+    const tt = el('text', { class: 'tx', x: cx, y: 66, 'text-anchor': 'middle' }, cyc);
+    el('tspan', { text: b }, tt);
+    if (s) el('tspan', { dy: -12, style: 'font-size:24px', text: s }, tt);
+  });
+  el('path', { class: 'wire-a', d: 'M710 40H962', 'marker-end': 'url(#ah-a)' }, cyc);
+  el('text', { class: 'txs', x: 840, y: 26, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'evaluate (6)' }, cyc);
+  el('path', { class: 'wire', d: 'M970 72H718', 'marker-end': 'url(#ah)' }, cyc);
+  el('text', { class: 'txs', x: 840, y: 120, 'text-anchor': 'middle', text: 'improve (9)' }, cyc);
+  hist.forEach((h, i) => {
+    const x0 = i * (W + gap);
+    const g = el('g', { class: 'an-fade', style: `--d:${0.3 + 0.35 * i}s` }, svg);
+    const tt = el('text', { class: 'txs', x: x0, y: Y0 - 20 }, g);
+    el('tspan', { text: 'π' }, tt);
+    el('tspan', { dy: 8, style: 'font-size:24px', text: String(i) }, tt);
+    if (i === n - 1) el('tspan', { dy: -8, text: ' stable' }, tt);
+    const G = gridView(g, x0, Y0, cs, { start: false });
+    G.setValues(h.V, 1);
+    G.setPolicy(h.pol);
+    el('text', { class: 'tx', x: x0 + W / 2, y: Y0 + 3 * cs + 50, 'text-anchor': 'middle', text: `start: ${num(h.V[START])}` }, g);
+    if (i < n - 1) el('path', { class: 'wire', d: `M${x0 + W + 8} ${Y0 + 1.5 * cs}H${x0 + W + gap - 8}`, 'marker-end': 'url(#ah)' }, svg);
+  });
+  el('text', { class: 'txs', x: 0, y: Y0 + 3 * cs + 120, text: `${n - 1} improvements. The last policy is the same one value iteration finds.` }, svg);
+}
+
+function drawLimits() {
+  const s1 = $('lim1-svg');
+  const g = el('g', { class: 'an-fade' }, s1);
+  const box = (x, y, w, h, cls, lines) => {
+    el('rect', { class: cls, x, y, width: w, height: h, rx: 12 }, g);
+    lines.forEach((t, i) => el('text', { class: i ? 'txs' : 'tx', x: x + w / 2, y: y + 46 + i * 36, 'text-anchor': 'middle', style: i ? '' : 'font-weight:700', text: t }, g));
+  };
+  box(30, 40, 330, 190, 'box-a', ['Model known', 'P and R given', 'plan with sweeps', 'this topic']);
+  box(432, 40, 330, 190, 'box-b', ['Model unknown', 'only samples', 'learn by trying', 'Topic 21']);
+  /* a cell with unknown slip chances */
+  const cx = 396, cy = 420, cs = 110;
+  el('rect', { class: 'gcell', x: cx - cs / 2, y: cy - cs / 2, width: cs, height: cs }, g);
+  arrow(g, cx, cy, 'N', 70);
+  [['?', cx, cy - cs / 2 - 30], ['?', cx + cs / 2 + 34, cy + 10], ['?', cx - cs / 2 - 34, cy + 10]].forEach(([t, x, y]) => el('text', { class: 'gbig', x, y, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: t }, g));
+  el('text', { class: 'txs', x: cx, y: cy + cs / 2 + 50, 'text-anchor': 'middle', text: 'a real robot does not know its slip chances' }, g);
+  /* (b) number of states, log scale */
+  const s2 = $('lim2-svg');
+  const D = [['grid world', 11], ['tic-tac-toe', 5478], ['backgammon', 1e20], ['Go', 1e170]];
+  const L = 230, Rr = 760, T = 40, rowH = 120;
+  const sx = lin(0, 180, L, Rr);
+  const g2 = el('g', {}, s2);
+  [0, 50, 100, 150].forEach((v) => {
+    el('line', { class: 'gl', x1: sx(v), x2: sx(v), y1: T, y2: T + D.length * rowH }, g2);
+    const t = el('text', { class: 'tk', x: sx(v), y: T + D.length * rowH + 34, 'text-anchor': 'middle', style: 'font-size:24px' }, g2);
+    el('tspan', { text: v ? '10' : '1' }, t);
+    if (v) el('tspan', { dy: -12, style: 'font-size:24px', text: String(v) }, t);
+  });
+  el('text', { class: 'lb', x: (L + Rr) / 2, y: T + D.length * rowH + 80, 'text-anchor': 'middle', text: 'number of states (log scale)' }, g2);
+  D.forEach(([name, v], i) => {
+    const y = T + i * rowH + 30, w = Math.max(6, sx(Math.log10(v)) - L);
+    el('text', { class: 'txs', x: L - 16, y: y + 38, 'text-anchor': 'end', text: name }, g2);
+    el('rect', { class: 'fa an-grow', x: L, y, width: w, height: 56, style: `--d:${0.2 * i}s` }, g2);
+    const t = el('text', { class: 'txs', x: L + w + 12, y: y + 38, 'text-anchor': i === 3 ? 'end' : 'start', style: i === 3 ? 'fill:#fff;font-weight:700' : '' }, g2);
+    const lbl = [['11'], ['5 478'], ['about 10', '20'], ['about 10', '170']][i];
+    if (i === 3) t.setAttribute('x', L + w - 12);
+    el('tspan', { text: lbl[0] }, t);
+    if (lbl[1]) el('tspan', { dy: -12, style: 'font-size:24px', text: lbl[1] }, t);
+  });
+  el('path', { class: 'ax', d: `M${L} ${T}V${T + D.length * rowH}` }, g2);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.mv = (() => {
+  const svg = $('mv-svg'), cs = 170, x0 = 220, y0 = 60;
+  const G = gridView(svg, x0, y0, cs, { labels: true });
+  const hi = el('rect', { width: cs, height: cs, style: 'fill:none;stroke:var(--c-a);stroke-width:6' }, G.marks);
+  const lines = el('g', {}, G.marks), lab = el('g', {}, G.texts);
+  const agent = el('circle', { r: 16, style: 'fill:var(--c-d);stroke:var(--myst-color-bg);stroke-width:3' }, svg);
+  const msg = el('text', { class: 'txs', x: x0, y: y0 + 3 * cs + 100, text: '' }, svg);
+  const r = rng(20);
+  let sel = '3,2', act = 'N', n = 0, intended = 0, counts = new Map(), anim = 0, actArrow = null;
+  function draw() {
+    const c = G.cells[sel];
+    hi.setAttribute('x', c.x); hi.setAttribute('y', c.y);
+    clear(lines); clear(lab);
+    if (actArrow) actArrow.remove();
+    actArrow = arrow(G.marks, c.cx, c.cy, act, 64, 'opacity:.35');
+    trans(sel, act).forEach((p, t) => {
+      const tc = G.cells[t];
+      if (t !== sel) el('rect', { x: tc.x + 6, y: tc.y + 6, width: cs - 12, height: cs - 12, style: 'fill:none;stroke:var(--c-a);stroke-width:3;stroke-dasharray:8 6' }, lines);
+      el('text', { class: 'txs', x: tc.cx, y: tc.y + 34, 'text-anchor': 'middle', style: 'font-weight:700;fill:var(--c-a)', text: `P = ${fmt(p, 1)}` }, lab);
+      const seen = n ? Math.round(100 * (counts.get(t) || 0) / n) + '%' : '—';
+      el('text', { class: 'txs', x: tc.cx, y: tc.y + cs - 16, 'text-anchor': 'middle', text: `seen ${seen}` }, lab);
+    });
+    $('mv-n').textContent = n;
+    $('mv-int').textContent = n ? Math.round(100 * intended / n) + '%' : '—';
+    document.querySelectorAll('#mv-dirs button').forEach((b) => { b.className = b.dataset.a === act ? 'bt' : 'bt chip'; });
+  }
+  function place(k, jitter) {
+    const c = G.cells[k];
+    return [c.cx + jitter[0], c.cy + jitter[1]];
+  }
+  function sample(m) {
+    let last = null, dirLast = null;
+    for (let i = 0; i < m; i++) {
+      const u = r();
+      const b = u < 0.8 ? act : u < 0.9 ? SIDE[act][0] : SIDE[act][1];
+      const t = move(sel, b);
+      counts.set(t, (counts.get(t) || 0) + 1);
+      if (b === act) intended++;
+      n++; last = t; dirLast = b;
+    }
+    const names = { N: 'north', E: 'east', S: 'south', W: 'west' };
+    const where = last === sel ? 'hit a wall and stayed' : last === GOAL ? 'reached the goal' : last === PIT ? 'fell in the pit' : `landed in (${last.replace(',', ', ')})`;
+    msg.textContent = `Last move: slipped ${dirLast === act ? 'nowhere' : names[dirLast]}, ${where}`;
+    if (dirLast === act) msg.textContent = `Last move: went ${names[act]} as intended, ${where}`;
+    const from = place(sel, [-48, 30]), to = place(last, [-48, 30]);
+    cancelAnimationFrame(anim);
+    const t0 = performance.now(), dur = REDUCED || m > 1 ? 0 : 450;
+    const tick = (t) => {
+      const a = dur ? clamp((t - t0) / dur, 0, 1) : 1, e = 1 - (1 - a) ** 3;
+      agent.setAttribute('cx', from[0] + (to[0] - from[0]) * e);
+      agent.setAttribute('cy', from[1] + (to[1] - from[1]) * e);
+      if (a < 1) anim = requestAnimationFrame(tick);
+    };
+    anim = requestAnimationFrame(tick);
+    draw();
+  }
+  function reset() {
+    n = 0; intended = 0; counts = new Map(); msg.textContent = 'Click a cell, pick a direction, then sample a move';
+    const p = place(sel, [-48, 30]); agent.setAttribute('cx', p[0]); agent.setAttribute('cy', p[1]);
+    draw();
+  }
+  svg.addEventListener('click', (ev) => {
+    const k = G.cellAt(toSvgPoint(svg, ev));
+    if (!k || isTerm(k)) return;
+    sel = k; reset();
+  });
+  document.querySelectorAll('#mv-dirs button').forEach((b) => b.addEventListener('click', () => { act = b.dataset.a; reset(); }));
+  $('mv-one').addEventListener('click', () => sample(1));
+  $('mv-100').addEventListener('click', () => sample(100));
+  $('mv-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.pe = (() => {
+  const svg = $('pe-svg'), cs = 170, x0 = 220, y0 = 60;
+  const G = gridView(svg, x0, y0, cs, { labels: true, values: true });
+  const msg = el('text', { class: 'txs', x: x0, y: y0 + 3 * cs + 100, text: '' }, svg);
+  let pol = { ...POL_B }, V = zeros(), k = 0, d = null;
+  function draw() {
+    G.setValues(V, 1); G.setPolicy(pol);
+    $('pe-k').textContent = k;
+    $('pe-d').textContent = d === null ? '—' : fmt(d, 3);
+    $('pe-v').textContent = num(V[START]);
+    msg.textContent = d !== null && d < TOL ? `Settled after ${k} sweeps: these are the values of this policy` : k ? `After ${k} sweep${k > 1 ? 's' : ''} of equation (6)` : 'All values start at 0';
+  }
+  function step() { const res = sweep(V, G0, STEP0, pol); V = res.V; d = res.d; k++; draw(); }
+  $('pe-step').addEventListener('click', step);
+  $('pe-run').addEventListener('click', () => {
+    for (let i = 0; i < 2000 && !(d !== null && d < TOL); i++) { const res = sweep(V, G0, STEP0, pol); V = res.V; d = res.d; k++; }
+    draw();
+  });
+  const restart = () => { V = zeros(); k = 0; d = null; draw(); };
+  $('pe-reset').addEventListener('click', () => { pol = { ...POL_B }; restart(); });
+  svg.addEventListener('click', (ev) => {
+    const c = G.cellAt(toSvgPoint(svg, ev));
+    if (!c || isTerm(c)) return;
+    pol[c] = ACTS[(ACTS.indexOf(pol[c]) + 1) % 4];
+    restart();
+  });
+  draw();
+  return {};
+})();
+
+DEMOS.vi = (() => {
+  const svg = $('vi-svg'), cs = 170, x0 = 220, y0 = 60;
+  const G = gridView(svg, x0, y0, cs, { labels: true, values: true });
+  let V = zeros(), k = 0, d = null, timer = 0;
+  const tag = $('vi-tag');
+  function draw() {
+    G.setValues(V, 1);
+    G.setPolicy(k ? greedyPolicy(V, G0, STEP0) : null);
+    $('vi-k').textContent = k;
+    $('vi-d').textContent = d === null ? '—' : fmt(d, 3);
+    $('vi-v').textContent = num(V[START]);
+    const done = d !== null && d < TOL;
+    tag.textContent = done ? `Converged after ${k} sweeps` : k ? 'Still changing' : 'Not started';
+    tag.style.color = done ? 'var(--c-c)' : k ? 'var(--c-b)' : '';
+    $('vi-step').disabled = done;
+    return done;
+  }
+  function step() { const res = sweep(V, G0, STEP0, null); V = res.V; d = res.d; k++; return draw(); }
+  const stop = () => { clearInterval(timer); timer = 0; };
+  $('vi-step').addEventListener('click', () => { stop(); step(); });
+  $('vi-run').addEventListener('click', () => {
+    stop();
+    if (REDUCED) { while (!step()); return; }
+    timer = setInterval(() => { if (step()) stop(); }, 350);
+  });
+  $('vi-reset').addEventListener('click', () => { stop(); V = zeros(); k = 0; d = null; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.gl = (() => {
+  const svg = $('gl-svg'), cs = 170, x0 = 220, y0 = 60;
+  const G = gridView(svg, x0, y0, cs, { labels: true, values: true });
+  const msg = el('text', { class: 'txs', x: x0, y: y0 + 3 * cs + 100, text: '' }, svg);
+  const sg = $('gl-g'), sr = $('gl-r'), tag = $('gl-tag');
+  function route(pol) {
+    let s = START, seen = new Set([s]);
+    for (let i = 1; i <= 20; i++) {
+      s = move(s, pol[s]);
+      if (s === GOAL) return [`Goes to +1 in ${i} steps`, 'var(--c-c)'];
+      if (s === PIT) return [`Heads for the pit in ${i} steps`, 'var(--c-b)'];
+      if (seen.has(s)) return ['Never leaves', 'var(--c-d)'];
+      seen.add(s);
+    }
+    return ['Never leaves', 'var(--c-d)'];
+  }
+  function draw() {
+    const g = +sg.value, step = +sr.value;
+    const { V } = converge(g, step, null, 1e-9);
+    const pol = greedyPolicy(V, g, step);
+    G.setValues(V, vScale(V)); G.setPolicy(pol);
+    $('gl-g-val').textContent = fmt(g, 2);
+    $('gl-r-val').textContent = num(step);
+    $('gl-v').textContent = num(V[START]);
+    const [t, c] = route(pol);
+    tag.textContent = t; tag.style.color = c;
+    msg.textContent = 'Route: follow the arrows from S without slips';
+  }
+  sg.addEventListener('input', draw); sr.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawLoop(); drawRobot(); drawEpisode(); drawPolicies(); drawPolicyIteration(); drawLimits();
+})();
+</script>
+</body>
+</html>

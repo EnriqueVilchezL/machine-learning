@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regression</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+#out-svg .drag{cursor:grab}
+#out-svg.dragging .drag{cursor:grabbing}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 9</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Regression</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Predicting a number by fitting a line, or a curve, through the examples</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 9 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Predicting a number with a line</li>
+<li class="an-up" style="--d:.15s">Measuring the error and finding the best line</li>
+<li class="an-up" style="--d:.25s">Several features and curved patterns</li>
+<li class="an-up" style="--d:.35s">Outliers and how to score a regression</li>
+<li class="an-up" style="--d:.45s">Assumptions and limits</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, drags and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: a number, such as a price</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\boldsymbol{\theta} = (\theta_0, \theta_1, \dots, \theta_d)</span></td><td>Parameters: intercept <span class="tex">\theta_0</span> and one coefficient per feature</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">e_i = y_i - \hat{y}_i</span></td><td>Residual: the error on example <span class="tex">i</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">J(\boldsymbol{\theta})</span></td><td>Cost: the average squared error</td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">\bar{x}, \ \bar{y}</span></td><td>Averages of a feature and of the labels</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>A hat marks a prediction and a bar marks an average.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Fitting a line</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A straight line that turns a feature into a predicted number.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Predicting a number">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>Predicting a number</h2>
+<div class="fr">
+<div class="figbox"><svg id="house-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Regression predicts a <strong>number</strong>: a price, a temperature, a travel time. Classification predicts a category.</p>
+<p class="small frag up" data-step="line" style="margin:0">We draw the line that best follows the examples.</p>
+<p class="small frag up" data-step="new" style="margin:0">For a new house, we read its price off the line.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>24 houses in the Central Valley (synthetic). Feature: area. Label: sale price.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Slope and intercept">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>Slope and intercept</h2>
+<div class="fr">
+<div class="figbox"><svg id="si-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<div class="small" style="text-align:center"><span class="tex">\hat{y} = \text{slope} \cdot x + \text{intercept}</span></div>
+<p class="small" style="margin:0"><span class="tex">\hat{y}</span> is the predicted price and <span class="tex">x</span> the area.</p>
+<p class="small frag up" data-step="sl" style="margin:0"><strong style="color:var(--c-b)">Slope:</strong> how much the price grows for each extra m².</p>
+<p class="small frag up" data-step="ic" style="margin:0"><strong style="color:var(--c-c)">Intercept:</strong> where the line starts, the price at 0 m².</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>The line of Figure 1. Learning means choosing these two numbers.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Line formula">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>The line as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">With one feature, the intercept is <span class="tex">\theta_0</span> and the slope is <span class="tex">\theta_1</span>:</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \theta_0 + \theta_1 x</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="r1" style="margin:16px 0 8px">The <strong>residual</strong> of example <span class="tex">i</span> is the gap between its real label and the line:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">e_i = y_i - \hat{y}_i = y_i - (\theta_0 + \theta_1 x_i)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="r2" style="margin:16px 0 0">A positive residual means the point lies above the line; a negative one, below it.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Take <span class="tex">\theta_0 = 20</span> (₡ M) and <span class="tex">\theta_1 = 0.5</span> (₡ M per m²).</p><p>A house of 120 m²:</p><p><span class="tex">\hat{y} = 20 + 0.5 \cdot 120 = 80</span></p><p>It sold for 86, so its residual is</p><p><span class="tex">e = 86 - 80 = 6</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Measuring the error" data-demo="fit">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>Measuring the error</h2>
+<div class="fr">
+<div class="figbox"><svg id="fit-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<div class="small" style="text-align:center;font-size:24px"><span class="tex">\text{error} = \dfrac{\text{sum of } (\text{actual} - \text{predicted})^2}{\text{number of houses}}</span></div>
+<div class="ctl"><label><span>Slope (₡ M per m²)</span><b id="fit-m-val">0.20</b></label><input type="range" id="fit-m" min="0" max="1" step="0.01" value="0.2"></div>
+<div class="ctl"><label><span>Intercept (₡ M)</span><b id="fit-b-val">50</b></label><input type="range" id="fit-b" min="-20" max="80" step="1" value="50"></div>
+<div class="ro"><span>Average squared error</span><b id="fit-err" class="bb">0</b></div>
+<div class="ro"><span>Best possible</span><b id="fit-best" class="a">0</b></div>
+<div class="btns"><button class="bt" id="fit-go">Best fit</button><button class="bt chip" id="fit-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Orange segments are the errors of each house. Move the line to make them small.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Cost function">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>The cost function</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0 0 8px">The mean squared error (MSE) averages the squared residuals over the <span class="tex">n</span> examples:</p>
+<div class="eq"><div class="m tex-d">J(\theta_0, \theta_1) = \frac{1}{n} \sum_{i=1}^{n} \big(y_i - \hat{y}_i\big)^2</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="c1" style="margin:16px 0 0">It is the error shown in Figure 3. Each pair <span class="tex">(\theta_0, \theta_1)</span> is a different line and gets its own cost.</p>
+<p class="small frag up" data-step="c2" style="margin:16px 0 0">Learning means finding the pair with the smallest <span class="tex">J</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Four residuals: 1, −1, 2 and −4.</p><p>Squares: 1, 1, 4 and 16.</p><p><span class="tex">J = \tfrac{1 + 1 + 4 + 16}{4} = 5.5</span></p><p>The residual −4 alone gives 16 of the 22.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why squared errors">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>Why square the errors</h2>
+<div class="fr">
+<div class="figbox"><svg id="sq-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Squaring makes every error positive, so errors above and below the line do not cancel.</p>
+<p class="small frag up" data-step="big" style="margin:0">It also makes <strong>big mistakes count much more</strong>: an error of 4 costs 16, an error of 1 costs 1.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>(a) Each square has the error as its side. (b) Share of the total that each point contributes.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Least squares" data-demo="settle">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>Least squares</h2>
+<div class="fr">
+<div class="figbox"><svg id="ls-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">The <strong>least squares</strong> line is the one with the smallest average squared error.</p>
+<p class="small" style="margin:0">There is a known recipe that computes it in one step, so no guessing is needed.</p>
+<div class="ro"><span>Average squared error</span><b id="ls-err" class="bb">0</b></div>
+<div class="btns"><button class="bt" id="ls-play">Replay</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>A poor first line moves toward the least squares line. Right: the error at each moment.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Least squares formulas">
+<div class="hdr" data-s="Fitting a line"></div>
+<h2>The least squares recipe</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The slope compares how <span class="tex">x</span> and <span class="tex">y</span> move together with how much <span class="tex">x</span> moves alone:</p>
+<div class="eq"><div class="m tex-d">\theta_1 = \frac{\sum_{i=1}^{n} (x_i - \bar{x})(y_i - \bar{y})}{\sum_{i=1}^{n} (x_i - \bar{x})^2}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">The intercept then makes the line pass through the point of averages <span class="tex">(\bar{x}, \bar{y})</span>:</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">\theta_0 = \bar{y} - \theta_1 \bar{x}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="l2" style="margin:0">These two values give the smallest cost <span class="tex">J</span> of equation (3). With several features the same idea is solved with matrices.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Points <span class="tex">(1, 2)</span>, <span class="tex">(2, 3)</span>, <span class="tex">(3, 7)</span>.</p><p><span class="tex">\bar{x} = 2, \ \bar{y} = 4</span></p><p><span class="tex">\theta_1 = \tfrac{(-1)(-2) + 0 + (1)(3)}{1 + 0 + 1} = 2.5</span></p><p><span class="tex">\theta_0 = 4 - 2.5 \cdot 2 = -1</span></p><p>Line: <span class="tex">\hat{y} = -1 + 2.5x</span></p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">More features and curves</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">The same idea with several inputs, and with bends.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Several features">
+<div class="hdr" data-s="More features"></div>
+<h2>Several features</h2>
+<div class="fr">
+<div class="figbox"><svg id="plane-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">With two features the line becomes a flat <strong>plane</strong>. Each feature gets its own coefficient.</p>
+<div class="ro frag" data-step="c"><span>Starting price</span><b>₡30 M</b></div>
+<div class="ro frag" data-step="c"><span>Each extra m²</span><b class="a">+₡0.5 M</b></div>
+<div class="ro frag" data-step="c"><span>Each km farther</span><b class="bb">−₡1.2 M</b></div>
+<p class="small frag up" data-step="r" style="margin:0">Each value holds when the other feature stays fixed. Compare sizes only after normalizing (Topic 4).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Price from area and distance to San José. Stems show each house's error.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Curved patterns" data-demo="poly">
+<div class="hdr" data-s="More features"></div>
+<h2>Curved patterns</h2>
+<div class="fr">
+<div class="figbox"><svg id="poly-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Add <span class="tex">x^2</span>, <span class="tex">x^3</span>, … as extra features. The model stays a sum of coefficients times features, but the curve can bend.</p>
+<div class="ctl"><label><span>Polynomial degree</span><b id="poly-deg-val">1</b></label><input type="range" id="poly-deg" min="1" max="10" step="1" value="1"></div>
+<div class="ro"><span>Training error</span><b id="poly-tr" class="a">0</b></div>
+<div class="ro"><span>Test error</span><b id="poly-te" class="bb">0</b></div>
+<div><span class="tag" id="poly-diag">Too simple</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Coffee yield against farm altitude (synthetic). High degrees overfit (Topic 1); choose with cross-validation (Topic 6).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Features and curves formulas">
+<div class="hdr" data-s="More features"></div>
+<h2>Features and powers</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">With <span class="tex">d</span> features, each one gets its own coefficient:</p>
+<div class="eq"><div class="m tex-d">\hat{y} = \theta_0 + \theta_1 x_1 + \theta_2 x_2 + \cdots + \theta_d x_d = \boldsymbol{\theta}^\top \mathbf{x}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="f1" style="margin:0">The short form <span class="tex">\boldsymbol{\theta}^\top \mathbf{x}</span> multiplies each coefficient by its feature and adds them, with an extra feature <span class="tex">x_0 = 1</span> for the intercept.</p>
+<p class="small frag up" data-step="f2" style="margin:16px 0 0">Polynomial regression uses the powers of one feature as the features:</p>
+<div class="eq frag up" data-step="f2"><div class="m tex-d">\hat{y} = \theta_0 + \theta_1 x + \theta_2 x^2 + \cdots + \theta_p x^p</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>The plane of Figure 6:</p><p><span class="tex">\hat{y} = 30 + 0.5 x_1 - 1.2 x_2</span></p><p>A house of 120 m² at 10 km:</p><p><span class="tex">30 + 60 - 12 = 78</span> (₡ M)</p></aside>
+<aside class="am frag up" data-step="f2"><div class="t">Degree 2</div><p><span class="tex">\hat{y} = 10 + 2x - 0.5x^2</span> at <span class="tex">x = 3</span>:</p><p><span class="tex">10 + 6 - 4.5 = 11.5</span></p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Checking a regression</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Outliers, scores, and when a line is the wrong tool.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Outliers" data-demo="outlier">
+<div class="hdr" data-s="Checking"></div>
+<h2>Outliers pull the line</h2>
+<div class="fr">
+<div class="figbox"><svg id="out-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Drag the orange house, or use the slider. One extreme price drags the whole line, because its squared error is huge.</p>
+<div class="ctl"><label><span>Orange house price</span><b id="out-y-val">₡35 M</b></label><input type="range" id="out-y" min="0" max="250" step="1" value="35"></div>
+<div class="ro"><span>Slope with it</span><b id="out-m1" class="a">0</b></div>
+<div class="ro"><span>Slope without it</span><b id="out-m0">0</b></div>
+<div class="btns"><button class="bt chip" id="out-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Solid line: fit with all 13 houses. Dashed line: fit without the orange one.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Scoring a regression" data-demo="r2">
+<div class="hdr" data-s="Checking"></div>
+<h2>Scoring a regression</h2>
+<div class="fr">
+<div class="figbox"><svg id="r2-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0"><strong>Average error:</strong> how far off a prediction is, in ₡.</p>
+<p class="small" style="margin:0"><strong>R²:</strong> the share of the variation in prices that the line explains. 1 is perfect; 0 is no better than the average price.</p>
+<div class="ctl"><label><span>Noise in the prices</span><b id="r2-n-val">10</b></label><input type="range" id="r2-n" min="0" max="40" step="1" value="10"></div>
+<div class="ro"><span>Average error</span><b id="r2-mae" class="bb">0</b></div>
+<div class="ro"><span>R²</span><b id="r2-r2" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>(a) Spread around the average price. (b) Spread left around the line.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Score formulas">
+<div class="hdr" data-s="Checking"></div>
+<h2>Average error and R²</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Mean absolute error: the average size of the residuals, in the units of the label.</p>
+<div class="eq"><div class="m tex-d">\text{MAE} = \frac{1}{n} \sum_{i=1}^{n} \big|y_i - \hat{y}_i\big|</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="s1" style="margin:0"><span class="tex">R^2</span> compares the squared errors of the line with those of always predicting the average <span class="tex">\bar{y}</span>:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">R^2 = 1 - \frac{\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}{\sum_{i=1}^{n} (y_i - \bar{y})^2}</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="s2" style="margin:0">The fraction is the share of the spread the line leaves unexplained, as in Figure 9b over 9a.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Labels 2, 4, 6, so <span class="tex">\bar{y} = 4</span>.</p><p>Predictions 3, 4, 5.</p><p><span class="tex">\text{MAE} = \tfrac{1 + 0 + 1}{3} \approx 0.67</span></p><p><span class="tex">R^2 = 1 - \tfrac{1 + 0 + 1}{4 + 0 + 4} = 0.75</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Assumptions and limits">
+<div class="hdr" data-s="Checking"></div>
+<h2>Assumptions and limits</h2>
+<div class="figbox"><svg id="lim-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 10:</b>A line assumes the pattern is straight, the noise is similar everywhere, and new cases look like the training ones. Plot the errors to check.</p>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Regression predicts a number; a line does it with a slope and an intercept.</li>
+<li class="an-up" style="--d:.15s">The error is the average squared gap between actual and predicted values, so big mistakes weigh more.</li>
+<li class="an-up" style="--d:.25s">Least squares picks the line with the smallest such error.</li>
+<li class="an-up" style="--d:.35s">More features give one coefficient each; powers of a feature let the line bend, and too many overfit.</li>
+<li class="an-up" style="--d:.45s">Check outliers, report average error and R², and do not trust the line far outside the data.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers least squares, multiple regression and regularization in more detail.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 3. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Chapter 3. Springer.</li>
+<li style="margin:.4em 0">Montgomery, D. C., Peck, E. A., &amp; Vining, G. G. (2012). <em>Introduction to Linear Regression Analysis</em> (5th ed.). Wiley.</li>
+<li style="margin:.4em 0">Galton, F. (1886). Regression towards mediocrity in hereditary stature. <em>The Journal of the Anthropological Institute of Great Britain and Ireland</em>, 15, 246–263.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 10: decision trees.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared data ───────── */
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const money = (v) => '₡' + Math.round(v) + ' M';
+function linfit(xs, ys) {
+  const mx = mean(xs), my = mean(ys);
+  let sxy = 0, sxx = 0;
+  xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; });
+  const m = sxx ? sxy / sxx : 0;
+  return { m, b: my - m * mx };
+}
+const mse = (pts, m, b) => mean(pts.map(([x, y]) => (y - (m * x + b)) ** 2));
+const ease = (t) => 1 - (1 - t) ** 3;
+
+/* 24 houses: area (m²) and price (millions of colones) */
+const HOUSES = (() => {
+  const r = rng(41), pts = [];
+  for (let i = 0; i < 24; i++) {
+    const a = 60 + 180 * ((i + r()) / 24);
+    pts.push([a, clamp(20 + 0.5 * a + 9 * gauss(r), 30, 150)]);
+  }
+  return pts;
+})();
+const HFIT = linfit(HOUSES.map((p) => p[0]), HOUSES.map((p) => p[1]));
+const HOUSE_FRAME = { W: 1160, H: 700, l: 110, t: 30, x: [40, 260], y: [0, 160], xt: [50, 100, 150, 200, 250], yt: [0, 40, 80, 120, 160], xl: 'area (m²)', yl: 'price (₡ millions)' };
+
+/* ───────── static figures ───────── */
+function drawHouse() {
+  const svg = document.getElementById('house-svg');
+  const F = frame(svg, HOUSE_FRAME);
+  HOUSES.forEach(([x, y], i) => el('circle', { class: 'pt fa an-pop', cx: F.sx(x), cy: F.sy(y), r: 11, style: `--d:${i * 0.04}s` }, F.plot));
+  const gl = el('g', { class: 'frag', 'data-step': 'line' }, F.plot);
+  el('path', { class: 'curve-a', d: `M${F.sx(40)} ${F.sy(HFIT.m * 40 + HFIT.b)}L${F.sx(260)} ${F.sy(HFIT.m * 260 + HFIT.b)}` }, gl);
+  const xn = 175, yn = HFIT.m * xn + HFIT.b;
+  const gn = el('g', { class: 'frag', 'data-step': 'new' }, svg);
+  el('path', { class: 'curve-t', d: `M${F.sx(xn)} ${F.sy(0)}V${F.sy(yn)}H${F.L}` }, gn);
+  el('circle', { cx: F.sx(xn), cy: F.sy(yn), r: 14, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:5' }, gn);
+  el('text', { class: 'tx', x: F.sx(xn) + 26, y: F.sy(yn) + 52, 'font-weight': 600, style: 'fill:var(--c-b)', text: `new house, ${xn} m²` }, gn);
+  el('text', { class: 'tx', x: F.L + 16, y: F.sy(yn) - 16, 'font-weight': 600, style: 'fill:var(--c-b)', text: `predicted ≈ ${money(yn)}` }, gn);
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'house sold']]);
+}
+
+function drawSlope() {
+  const svg = document.getElementById('si-svg');
+  const m = 0.5, b = 20;
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [0, 260], y: [0, 160], xt: [0, 50, 100, 150, 200, 250], yt: [0, 40, 80, 120, 160], xl: 'area (m²)', yl: 'price (₡ millions)' });
+  HOUSES.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 9, style: 'opacity:.35' }, F.plot));
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: `M${F.sx(0)} ${F.sy(b)}L${F.sx(260)} ${F.sy(m * 260 + b)}` }, F.plot);
+  const gs = el('g', { class: 'frag', 'data-step': 'sl' }, svg);
+  const x0 = 120, x1 = 200;
+  el('path', { d: `M${F.sx(x0)} ${F.sy(m * x0 + b)}H${F.sx(x1)}V${F.sy(m * x1 + b)}`, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, gs);
+  el('text', { class: 'tx', x: (F.sx(x0) + F.sx(x1)) / 2, y: F.sy(m * x0 + b) + 40, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: '+80 m²' }, gs);
+  el('text', { class: 'tx', x: F.sx(x1) + 16, y: (F.sy(m * x0 + b) + F.sy(m * x1 + b)) / 2 + 10, style: 'fill:var(--c-b)', text: '+₡40 M' }, gs);
+  el('text', { class: 'txs', x: F.sx(x1) + 16, y: (F.sy(m * x0 + b) + F.sy(m * x1 + b)) / 2 + 46, text: 'slope = 40 / 80 = 0.5 per m²' }, gs);
+  const gi = el('g', { class: 'frag', 'data-step': 'ic' }, svg);
+  el('circle', { cx: F.sx(0), cy: F.sy(b), r: 12, class: 'fc' }, gi);
+  el('path', { class: 'wire', d: `M${F.sx(0) + 70} ${F.sy(b) + 34}L${F.sx(0) + 20} ${F.sy(b) + 10}`, 'marker-end': 'url(#ah)' }, gi);
+  el('text', { class: 'tx', x: F.sx(0) + 80, y: F.sy(b) + 52, style: 'fill:var(--c-c)', text: 'intercept = ₡20 M' }, gi);
+}
+
+function drawSquares() {
+  const svg = document.getElementById('sq-svg');
+  const S = 46, X0 = 70, Y0 = 520;
+  const px = (x) => X0 + x * S, py = (y) => Y0 - y * S;
+  el('text', { class: 'ttl', x: 0, y: 30, text: '(a) errors as squares' }, svg);
+  el('path', { class: 'ax', d: `M${X0} ${py(10)}V${Y0}H${px(10)}` }, svg);
+  const line = (x) => 0.5 + 0.6 * x;
+  el('path', { class: 'curve-a', d: `M${px(0)} ${py(line(0))}L${px(10)} ${py(line(10))}` }, svg);
+  const XS = [1.5, 3, 4.5, 6, 7.5], ER = [1, -1.5, 1, -1, 4];
+  XS.forEach((x, i) => {
+    const yl = line(x), y = yl + ER[i], e = Math.abs(ER[i]), big = i === 4;
+    const top = Math.max(y, yl);
+    el('rect', { class: 'an-pop', x: px(x), y: py(top), width: e * S, height: e * S, style: `--d:${0.3 + i * 0.15}s;fill:var(${big ? '--c-b' : '--c-a'});fill-opacity:.22;stroke:var(${big ? '--c-b' : '--c-a'});stroke-width:2` }, svg);
+    el('line', { x1: px(x), x2: px(x), y1: py(y), y2: py(yl), style: 'stroke:var(--c-b);stroke-width:4' }, svg);
+    el('circle', { class: `pt ${big ? 'fb' : 'fa'}`, cx: px(x), cy: py(y), r: 10 }, svg);
+    el('text', { class: 'tk', x: px(x) - 10, y: py(Math.min(y, yl)) + 34, 'text-anchor': 'middle', text: `${e}` }, svg);
+  });
+  el('text', { class: 'txs', x: px(7.5) + 2 * S, y: py(line(7.5) + 2) + 8, 'text-anchor': 'middle', text: '4 × 4 = 16' }, svg);
+  el('text', { class: 'lb', x: px(5), y: Y0 + 50, 'text-anchor': 'middle', text: 'numbers: size of each error' }, svg);
+
+  const BX = 640, BW = 500;
+  el('text', { class: 'ttl', x: BX, y: 30, text: '(b) share of the total' }, svg);
+  function bar(vals, y, title, step) {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : { class: 'an-fade', style: '--d:.4s' }, svg);
+    const tot = vals.reduce((a, v) => a + v, 0);
+    el('text', { class: 'tx', x: BX, y: y - 18, text: title }, g);
+    let x = BX;
+    vals.forEach((v, i) => {
+      const w = (v / tot) * BW, big = i === vals.length - 1;
+      el('rect', { x: x + 1, y, width: w - 2, height: 80, rx: 3, style: big ? 'fill:var(--c-b)' : `fill:var(--c-a);fill-opacity:${0.45 + 0.13 * i}` }, g);
+      x += w;
+    });
+    const share = vals[vals.length - 1] / tot;
+    el('text', { class: 'tx', x: BX + BW - (share * BW) / 2, y: y + 52, 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--myst-color-bg)', text: Math.round(share * 100) + '%' }, g);
+    el('text', { class: 'txs', x: BX, y: y + 120, text: `the big error is ${Math.round(share * 100)}% of the total` }, g);
+  }
+  bar(ER.map(Math.abs), 140, 'plain errors');
+  bar(ER.map((e) => e * e), 400, 'squared errors', 'big');
+  legend(svg, BX, 650, [['dot', 'fb', 'the point with error 4']]);
+}
+
+function drawPlane() {
+  const svg = document.getElementById('plane-svg');
+  const OX = 120, OY = 640, KA = 600 / 180, KDX = 170 / 40, KDY = 300 / 40, KZ = 2.3;
+  const P = (a, d, z) => [OX + (a - 60) * KA + d * KDX, OY - z * KZ - d * KDY];
+  const plane = (a, d) => 30 + 0.5 * a - 1.2 * d;
+  const pth = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('') + 'Z';
+  // floor and axes
+  el('path', { d: pth([P(60, 0, 0), P(240, 0, 0), P(240, 40, 0), P(60, 40, 0)]), style: 'fill:var(--myst-color-surface);stroke:var(--myst-color-border);stroke-width:1.5' }, svg);
+  const ax = (p, q) => el('path', { class: 'ax', d: `M${p[0]} ${p[1]}L${q[0]} ${q[1]}` }, svg);
+  ax(P(60, 0, 0), P(250, 0, 0)); ax(P(240, 0, 0), P(240, 44, 0)); ax(P(60, 0, 0), P(60, 0, 170));
+  [60, 150, 240].forEach((a) => { const [x, y] = P(a, 0, 0); el('text', { class: 'tk', x: x - (a === 240 ? 10 : 0), y: y + 32, 'text-anchor': 'middle', text: a }, svg); });
+  [0, 20, 40].forEach((d) => { const [x, y] = P(240, d, 0); el('text', { class: 'tk', x: x + 14, y: y + (d ? 6 : 24), text: d }, svg); });
+  [0, 50, 100, 150].forEach((z) => { const [x, y] = P(60, 0, z); el('text', { class: 'tk', x: x - 12, y: y + 8, 'text-anchor': 'end', text: z }, svg); });
+  { const [x, y] = P(150, 0, 0); el('text', { class: 'lb', x, y: y + 64, 'text-anchor': 'middle', text: 'area (m²)' }, svg); }
+  { const [x, y] = P(240, 44, 0); el('text', { class: 'lb', x: x + 14, y: y - 8, text: 'km to San José' }, svg); }
+  { const [x, y] = P(60, 0, 175); el('text', { class: 'lb', x: x + 14, y: y + 4, text: 'price (₡ M)' }, svg); }
+  // the fitted plane
+  const gp = el('g', { class: 'an-fade', style: '--d:.3s' }, svg);
+  el('path', { d: pth([P(60, 0, plane(60, 0)), P(240, 0, plane(240, 0)), P(240, 40, plane(240, 40)), P(60, 40, plane(60, 40))]), style: 'fill:var(--c-a);fill-opacity:.16;stroke:var(--c-a);stroke-width:3' }, gp);
+  for (let a = 90; a < 240; a += 30) { const p = P(a, 0, plane(a, 0)), q = P(a, 40, plane(a, 40)); el('path', { d: `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`, style: 'stroke:var(--c-a);stroke-opacity:.35;stroke-width:1.5' }, gp); }
+  for (let d = 10; d < 40; d += 10) { const p = P(60, d, plane(60, d)), q = P(240, d, plane(240, d)); el('path', { d: `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`, style: 'stroke:var(--c-a);stroke-opacity:.35;stroke-width:1.5' }, gp); }
+  // houses
+  const r = rng(8), pts = [];
+  for (let i = 0; i < 26; i++) { const a = 65 + 170 * r(), d = 2 + 36 * r(); pts.push([a, d, plane(a, d) + 7 * gauss(r)]); }
+  pts.sort((p, q) => q[1] - p[1]);
+  pts.forEach(([a, d, z], i) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${0.6 + i * 0.03}s` }, svg);
+    const p = P(a, d, z), q = P(a, d, plane(a, d));
+    el('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], style: 'stroke:var(--c-b);stroke-width:3' }, g);
+    el('circle', { class: `pt ${z >= plane(a, d) ? 'fa' : 'fd'}`, cx: p[0], cy: p[1], r: 10 }, g);
+  });
+  legend(svg, 640, 40, [['dot', 'fa', 'house above the plane'], ['dot', 'fd', 'house below the plane']]);
+}
+
+function drawLimits() {
+  const svg = document.getElementById('lim-svg');
+  const PW = 520, GAP = 60, PH = 400, T = 60;
+  const r = rng(13);
+  const panels = [
+    ['(a) curved pattern', ['a straight line misses the bend;', 'add curve features']],
+    ['(b) spread grows', ['errors are larger for big houses;', 'the average error hides this']],
+    ['(c) outside the data', ['the line keeps going,', 'reality may not']],
+  ];
+  panels.forEach(([title, lines], k) => {
+    const x0 = k * (PW + GAP), g = el('g', { class: 'an-up', style: `--d:${k * 0.25}s` }, svg);
+    const sx = lin(0, 10, x0 + 20, x0 + PW), sy = lin(0, 10, T + PH, T);
+    el('text', { class: 'ttl', x: x0, y: 30, text: title }, g);
+    el('path', { class: 'ax', d: `M${x0 + 20} ${T}V${T + PH}H${x0 + PW}` }, g);
+    const cp = el('clipPath', { id: 'lim-clip' + k }, svg);
+    el('rect', { x: x0 + 20, y: T, width: PW - 20, height: PH }, cp);
+    const gp = el('g', { 'clip-path': `url(#lim-clip${k})` }, g);
+    let f, xs, noise, fit;
+    if (k === 0) { f = (x) => 1 + 0.09 * (x - 1) ** 2; xs = [0.5, 9.5]; noise = () => 0.35; }
+    else if (k === 1) { f = (x) => 1 + 0.7 * x; xs = [0.5, 9.5]; noise = (x) => 0.12 + 0.2 * x; }
+    else { f = (x) => 1 + 1.6 * x - 0.11 * x * x; xs = [0.5, 4.5]; noise = () => 0.3; }
+    const pts = [];
+    for (let i = 0; i < 26; i++) { const x = xs[0] + (xs[1] - xs[0]) * ((i + r()) / 26); pts.push([x, clamp(f(x) + noise(x) * gauss(r), 0.2, 9.8)]); }
+    fit = linfit(pts.map((p) => p[0]), pts.map((p) => p[1]));
+    if (k === 2) {
+      el('rect', { x: sx(xs[1]) + 6, y: T, width: sx(10) - sx(xs[1]) - 6, height: PH, class: 'zone' }, gp);
+      el('text', { class: 'tk', x: sx(7.4), y: T + PH - 20, 'text-anchor': 'middle', text: 'no training data here' }, g);
+      el('path', { class: 'curve-t', d: curvePath(f, 0, 10, sx, sy) }, gp);
+      el('path', { class: 'curve-a', d: `M${sx(0)} ${sy(fit.b)}L${sx(xs[1])} ${sy(fit.m * xs[1] + fit.b)}` }, gp);
+      el('path', { class: 'curve-a', style: 'stroke-dasharray:4 12', d: `M${sx(xs[1])} ${sy(fit.m * xs[1] + fit.b)}L${sx(10)} ${sy(clamp(fit.m * 10 + fit.b, 0, 10.5))}` }, gp);
+    } else {
+      el('path', { class: 'curve-a', d: `M${sx(0)} ${sy(fit.b)}L${sx(10)} ${sy(fit.m * 10 + fit.b)}` }, gp);
+    }
+    pts.forEach(([x, y]) => el('circle', { class: 'pt fb', cx: sx(x), cy: sy(y), r: 8 }, gp));
+    lines.forEach((t, i) => el('text', { class: 'txs', x: x0 + 20, y: T + PH + 60 + i * 34, text: t }, g));
+  });
+  legend(svg, 0, 600, [['line', 'curve-a', 'fitted line']]);
+  legend(svg, 300, 600, [['line', 'curve-t', 'true pattern']]);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.fit = (() => {
+  const svg = document.getElementById('fit-svg');
+  const F = frame(svg, HOUSE_FRAME);
+  const sm = document.getElementById('fit-m'), sb = document.getElementById('fit-b');
+  const res = el('g', {}, F.plot);
+  const line = el('path', { class: 'curve-a' }, F.plot);
+  HOUSES.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 11 }, F.plot));
+  const segs = HOUSES.map(() => el('line', { style: 'stroke:var(--c-b);stroke-width:4' }, res));
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'house'], ['line', 'curve-a', 'your line']]);
+  const bestErr = mse(HOUSES, HFIT.m, HFIT.b);
+  document.getElementById('fit-best').textContent = fmt(bestErr, 0);
+  let anim = 0;
+  function draw() {
+    const m = +sm.value, b = +sb.value;
+    line.setAttribute('d', `M${F.sx(40)} ${F.sy(m * 40 + b)}L${F.sx(260)} ${F.sy(m * 260 + b)}`);
+    HOUSES.forEach(([x, y], i) => { const s = segs[i]; s.setAttribute('x1', F.sx(x)); s.setAttribute('x2', F.sx(x)); s.setAttribute('y1', F.sy(y)); s.setAttribute('y2', F.sy(m * x + b)); });
+    document.getElementById('fit-m-val').textContent = m.toFixed(2);
+    document.getElementById('fit-b-val').textContent = Math.round(b);
+    document.getElementById('fit-err').textContent = fmt(mse(HOUSES, m, b), 0);
+  }
+  function goTo(m1, b1) {
+    cancelAnimationFrame(anim);
+    const m0 = +sm.value, b0 = +sb.value, t0 = performance.now(), D = REDUCED ? 1 : 900;
+    const tick = (now) => {
+      const t = ease(clamp((now - t0) / D, 0, 1));
+      sm.value = m0 + (m1 - m0) * t; sb.value = b0 + (b1 - b0) * t;
+      if (t >= 1) { sm.value = m1; sb.value = b1; }
+      draw();
+      if (t < 1) anim = requestAnimationFrame(tick);
+    };
+    anim = requestAnimationFrame(tick);
+  }
+  sm.addEventListener('input', () => { cancelAnimationFrame(anim); draw(); });
+  sb.addEventListener('input', () => { cancelAnimationFrame(anim); draw(); });
+  document.getElementById('fit-go').addEventListener('click', () => goTo(Math.round(HFIT.m * 100) / 100, Math.round(HFIT.b)));
+  document.getElementById('fit-reset').addEventListener('click', () => goTo(0.2, 50));
+  draw();
+  return {};
+})();
+
+DEMOS.settle = (() => {
+  const svg = document.getElementById('ls-svg');
+  const gL = el('g', { id: 'ls-l' }, svg), gR = el('g', { id: 'ls-r' }, svg);
+  const FL = frame(gL, { W: 640, H: 700, l: 100, t: 64, x: [40, 260], y: [0, 160], xt: [50, 150, 250], yt: [0, 40, 80, 120, 160], xl: 'area (m²)', yl: 'price (₡ M)' });
+  const START = { m: 0.02, b: 120 }, N = 60;
+  const steps = Array.from({ length: N + 1 }, (_, i) => {
+    const t = ease(i / N);
+    const m = START.m + (HFIT.m - START.m) * t, b = START.b + (HFIT.b - START.b) * t;
+    return { m, b, e: mse(HOUSES, m, b) };
+  });
+  const EMAX = Math.ceil(steps[0].e / 500) * 500;
+  const FR = frame(gR, { W: 1160, H: 700, l: 790, t: 64, x: [0, N], y: [0, EMAX], xt: [0, 30, 60], yt: [0, EMAX / 2, EMAX], xl: 'step', yl: 'error' });
+  el('text', { class: 'ttl', x: 100, y: 36, text: 'the line' }, svg);
+  el('text', { class: 'ttl', x: 790, y: 36, text: 'average squared error' }, svg);
+  const trail = el('g', {}, FL.plot);
+  el('line', { class: 'curve-t', x1: FL.sx(40), x2: FL.sx(260), y1: FL.sy(HFIT.m * 40 + HFIT.b), y2: FL.sy(HFIT.m * 260 + HFIT.b) }, FL.plot);
+  HOUSES.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: FL.sx(x), cy: FL.sy(y), r: 9 }, FL.plot));
+  const line = el('path', { class: 'curve-b' }, FL.plot);
+  const curve = el('path', { class: 'curve-b' }, FR.plot);
+  const dot = el('circle', { class: 'fb', r: 10 }, FR.plot);
+  legend(svg, FL.L + 20, FL.T + 30, [['line', 'curve-b', 'current line'], ['line', 'curve-t', 'least squares']]);
+  const seg = (s) => `M${FL.sx(40)} ${FL.sy(s.m * 40 + s.b)}L${FL.sx(260)} ${FL.sy(s.m * 260 + s.b)}`;
+  let anim = 0;
+  function show(k) {
+    const s = steps[k];
+    line.setAttribute('d', seg(s));
+    curve.setAttribute('d', steps.slice(0, k + 1).map((q, i) => (i ? 'L' : 'M') + FR.sx(i) + ' ' + FR.sy(q.e)).join(''));
+    dot.setAttribute('cx', FR.sx(k)); dot.setAttribute('cy', FR.sy(s.e));
+    clear(trail);
+    for (let i = 0; i < k; i += 10) el('path', { d: seg(steps[i]), style: 'fill:none;stroke:var(--c-b);stroke-width:2;stroke-opacity:.3' }, trail);
+    document.getElementById('ls-err').textContent = fmt(s.e, 0);
+  }
+  function play() {
+    cancelAnimationFrame(anim);
+    if (REDUCED) { show(N); return; }
+    const t0 = performance.now();
+    const tick = (now) => {
+      const k = Math.min(N, Math.floor((now - t0) / 50));
+      show(k);
+      if (k < N) anim = requestAnimationFrame(tick);
+    };
+    show(0);
+    anim = requestAnimationFrame(tick);
+  }
+  document.getElementById('ls-play').addEventListener('click', play);
+  const slide = svg.closest('section');
+  document.querySelector('deck-stage').addEventListener('slidechange', (e) => { if (e.detail.slide === slide) play(); });
+  show(N);
+  return {};
+})();
+
+DEMOS.poly = (() => {
+  const svg = document.getElementById('poly-svg');
+  const f = (a) => { const u = (a - 1200) / 800; return 26 + 4 * u - 20 * u * u; };
+  const u = (a) => (a - 1200) / 800;
+  const r = rng(17);
+  const TR = Array.from({ length: 14 }, (_, i) => { const a = 400 + 1600 * ((i + r()) / 14); return [a, f(a) + 3 * gauss(r)]; });
+  const TE = Array.from({ length: 30 }, () => { const a = 400 + 1600 * r(); return [a, f(a) + 3 * gauss(r)]; });
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 30, x: [400, 2000], y: [0, 40], xt: [400, 800, 1200, 1600, 2000], yt: [0, 10, 20, 30, 40], xl: 'farm altitude (m)', yl: 'coffee yield (bags per ha)' });
+  const fitPath = el('path', { class: 'curve-a' }, F.plot);
+  TE.forEach(([x, y]) => el('circle', { cx: F.sx(x), cy: F.sy(y), r: 8, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:3' }, F.plot));
+  TR.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 11 }, F.plot));
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fa', 'training farm'], ['ring', '', 'test farm'], ['line', 'curve-a', 'fitted curve']]);
+  const err = (c, set) => mean(set.map(([x, y]) => (polyval(c, u(x)) - y) ** 2));
+  const fits = {}, te = {};
+  for (let d = 1; d <= 10; d++) { fits[d] = polyfit(TR.map((p) => u(p[0])), TR.map((p) => p[1]), d); te[d] = err(fits[d], TE); }
+  const best = Object.keys(te).map(Number).reduce((a, b) => (te[b] < te[a] ? b : a));
+  const slider = document.getElementById('poly-deg'), diag = document.getElementById('poly-diag');
+  function draw() {
+    const d = +slider.value, c = fits[d];
+    document.getElementById('poly-deg-val').textContent = d;
+    fitPath.setAttribute('d', curvePath((x) => polyval(c, u(x)), 400, 2000, F.sx, F.sy, 400));
+    document.getElementById('poly-tr').textContent = fmt(err(c, TR), 1);
+    document.getElementById('poly-te').textContent = fmt(te[d], 1);
+    let label = 'Good fit', col = 'var(--c-c)';
+    if (te[d] > 1.4 * te[best] && d < best) { label = 'Too simple'; col = 'var(--c-b)'; }
+    if (te[d] > 1.4 * te[best] && d > best) { label = 'Too flexible'; col = 'var(--c-d)'; }
+    diag.textContent = label; diag.style.color = col;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.outlier = (() => {
+  const svg = document.getElementById('out-svg');
+  const BASE = HOUSES.filter((_, i) => i % 2 === 0);
+  const HOME = [220, 35];
+  const F = frame(svg, HOUSE_FRAME);
+  const slider = document.getElementById('out-y');
+  const l0 = el('path', { class: 'curve-t' }, F.plot);
+  const l1 = el('path', { class: 'curve-a' }, F.plot);
+  BASE.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 11 }, F.plot));
+  const seg = el('line', { style: 'stroke:var(--c-b);stroke-width:4;stroke-dasharray:6 6' }, F.plot);
+  const halo = el('circle', { r: 26, class: 'drag', style: 'fill:var(--c-b);fill-opacity:.18' }, F.plot);
+  const pt = el('circle', { class: 'pt fb drag', r: 15 }, F.plot);
+  legend(svg, F.L + 24, F.T + 30, [['line', 'curve-a', 'with the orange house'], ['line', 'curve-t', 'without it']]);
+  const f0 = linfit(BASE.map((p) => p[0]), BASE.map((p) => p[1]));
+  const path = (fit) => `M${F.sx(40)} ${F.sy(fit.m * 40 + fit.b)}L${F.sx(260)} ${F.sy(fit.m * 260 + fit.b)}`;
+  l0.setAttribute('d', path(f0));
+  document.getElementById('out-m0').textContent = f0.m.toFixed(2);
+  let P = [...HOME];
+  function draw() {
+    const all = [...BASE, P], f1 = linfit(all.map((p) => p[0]), all.map((p) => p[1]));
+    l1.setAttribute('d', path(f1));
+    [pt, halo].forEach((c) => { c.setAttribute('cx', F.sx(P[0])); c.setAttribute('cy', F.sy(P[1])); });
+    seg.setAttribute('x1', F.sx(P[0])); seg.setAttribute('x2', F.sx(P[0]));
+    seg.setAttribute('y1', F.sy(P[1])); seg.setAttribute('y2', F.sy(f0.m * P[0] + f0.b));
+    slider.value = Math.round(P[1]);
+    document.getElementById('out-y-val').textContent = money(P[1]);
+    document.getElementById('out-m1').textContent = f1.m.toFixed(2);
+  }
+  let dragging = false;
+  const move = (ev) => {
+    const q = toSvgPoint(svg, ev);
+    P = [clamp(F.ix(q.x), 45, 255), clamp(F.iy(q.y), 0, 158)];
+    draw();
+  };
+  [pt, halo].forEach((c) => c.addEventListener('pointerdown', (ev) => {
+    dragging = true; svg.classList.add('dragging'); svg.setPointerCapture(ev.pointerId); ev.preventDefault(); ev.stopPropagation();
+  }));
+  svg.addEventListener('pointermove', (ev) => { if (dragging) move(ev); });
+  const stop = () => { dragging = false; svg.classList.remove('dragging'); };
+  svg.addEventListener('pointerup', stop);
+  svg.addEventListener('pointercancel', stop);
+  slider.addEventListener('input', () => { P = [P[0], +slider.value]; draw(); });
+  document.getElementById('out-reset').addEventListener('click', () => { P = [...HOME]; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.r2 = (() => {
+  const svg = document.getElementById('r2-svg');
+  const r = rng(29);
+  const XS = Array.from({ length: 16 }, (_, i) => 60 + 180 * ((i + 0.5) / 16)), Z = XS.map(() => gauss(r));
+  const gA = el('g', { id: 'r2-a' }, svg), gB = el('g', { id: 'r2-b' }, svg);
+  const opts = (l, W) => ({ W, H: 560, l, t: 54, x: [40, 260], y: [0, 180], xt: [100, 200], yt: [0, 60, 120, 180], xl: 'area (m²)', yl: 'price (₡ M)' });
+  const FA = frame(gA, opts(100, 540)), FB = frame(gB, opts(720, 1160));
+  el('text', { class: 'ttl', x: 100, y: 30, text: '(a) around the average' }, svg);
+  el('text', { class: 'ttl', x: 720, y: 30, text: '(b) around the line' }, svg);
+  const layer = (F) => ({ stems: el('g', {}, F.plot), line: el('path', {}, F.plot), dots: el('g', {}, F.plot) });
+  const A = layer(FA), B = layer(FB);
+  A.line.setAttribute('class', 'curve-t'); B.line.setAttribute('class', 'curve-a');
+  const BY = 640, BX = 100, BW = 1060;
+  el('text', { class: 'txs', x: BX, y: BY - 18, text: 'share of the variation explained by the line' }, svg);
+  el('rect', { x: BX, y: BY, width: BW, height: 44, rx: 4, style: 'fill:var(--myst-color-surface-hover)' }, svg);
+  const fill = el('rect', { x: BX, y: BY, height: 44, rx: 4, class: 'fa' }, svg);
+  const pctT = el('text', { class: 'tx', y: BY + 33, 'font-weight': 700, style: 'fill:var(--myst-color-bg)' }, svg);
+  const slider = document.getElementById('r2-n');
+  function draw() {
+    const n = +slider.value;
+    const pts = XS.map((x, i) => [x, clamp(20 + 0.5 * x + n * Z[i], 2, 178)]);
+    const fit = linfit(pts.map((p) => p[0]), pts.map((p) => p[1])), my = mean(pts.map((p) => p[1]));
+    const tot = mean(pts.map(([, y]) => (y - my) ** 2)), left = mse(pts, fit.m, fit.b);
+    const r2 = tot ? 1 - left / tot : 1;
+    [[A, FA, () => my, 'var(--myst-color-text-tertiary)'], [B, FB, (x) => fit.m * x + fit.b, 'var(--c-b)']].forEach(([L, F, g, col]) => {
+      clear(L.stems); clear(L.dots);
+      L.line.setAttribute('d', `M${F.sx(40)} ${F.sy(g(40))}L${F.sx(260)} ${F.sy(g(260))}`);
+      pts.forEach(([x, y]) => {
+        el('line', { x1: F.sx(x), x2: F.sx(x), y1: F.sy(y), y2: F.sy(g(x)), style: `stroke:${col};stroke-width:4` }, L.stems);
+        el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 9 }, L.dots);
+      });
+    });
+    const w = Math.max(0, r2) * BW;
+    fill.setAttribute('width', w);
+    pctT.textContent = Math.round(r2 * 100) + '%';
+    pctT.setAttribute('x', w > 120 ? BX + w - 16 : BX + w + 16);
+    pctT.setAttribute('text-anchor', w > 120 ? 'end' : 'start');
+    pctT.style.fill = w > 120 ? 'var(--myst-color-bg)' : 'var(--myst-color-text)';
+    document.getElementById('r2-n-val').textContent = n;
+    document.getElementById('r2-mae').textContent = money(mean(pts.map(([x, y]) => Math.abs(y - (fit.m * x + fit.b)))));
+    document.getElementById('r2-r2').textContent = fmt(r2, 2);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawHouse(); drawSlope(); drawSquares(); drawPlane(); drawLimits();
+})();
+</script>
+</body>
+</html>

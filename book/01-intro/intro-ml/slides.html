@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction to Machine Learning</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 1</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Introduction to machine learning</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">What it means for a program to learn from data, and how we check that it learned</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 1 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Abstract">
+<div class="hdr" data-s="Opening"></div>
+<div style="flex:1;display:grid;grid-template-columns:1160px;align-content:center">
+<div>
+<h2 style="margin-bottom:24px;font-size:32px;line-height:1.5;font-weight:600">Abstract</h2>
+<div style="padding:32px 48px;border-radius:2px;background:var(--myst-color-bg-secondary)"><p style="margin:0;font-size:36px;line-height:1.7">This lecture introduces machine learning: programs that improve from examples instead of following hand-written rules. We look at the pieces every model has, the types of learning, and why what matters is getting new data right. Each idea comes with a figure you can interact with.</p></div>
+<p style="margin-top:32px"><strong style="margin-right:16px">Keywords:</strong>data, model, training, generalization, overfitting</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">What learning from data means</li>
+<li class="an-up" style="--d:.15s">The pieces of a model</li>
+<li class="an-up" style="--d:.25s">Types of learning</li>
+<li class="an-up" style="--d:.35s">Generalization: underfitting and overfitting</li>
+<li class="an-up" style="--d:.45s">Workflow</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">What learning from data means</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">From hand-written rules to rules inferred from examples.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Programming vs learning">
+<div class="hdr" data-s="What learning is"></div>
+<h2>Rules are learned from data</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 640" preserveAspectRatio="xMidYMid meet">
+<g class="an-fade">
+<text class="ttl" x="0" y="26">traditional programming</text>
+<rect class="box" x="0" y="48" width="280" height="80" rx="4"/><text class="tx" x="140" y="98" text-anchor="middle">Data</text>
+<rect class="box" x="0" y="152" width="280" height="80" rx="4"/><text class="tx" x="140" y="202" text-anchor="middle">Rules</text>
+<rect class="box" x="620" y="80" width="420" height="120" rx="4"/><text class="tx" x="830" y="132" text-anchor="middle" font-weight="600">Program</text><text class="txs" x="830" y="170" text-anchor="middle">written by a person</text>
+<rect class="box" x="1360" y="100" width="320" height="80" rx="4"/><text class="tx" x="1520" y="150" text-anchor="middle">Answers</text>
+<path class="wire" d="M280 88C450 88 450 125 612 125" marker-end="url(#ah)"/>
+<path class="wire" d="M280 192C450 192 450 155 612 155" marker-end="url(#ah)"/>
+<path class="wire" d="M1040 140H1352" marker-end="url(#ah)"/>
+<circle r="7" class="ink3"><animateMotion dur="2.2s" repeatCount="indefinite" path="M280 88C450 88 450 125 612 125H1040H1352"/></circle>
+<circle r="7" class="ink3"><animateMotion dur="2.2s" repeatCount="indefinite" path="M280 192C450 192 450 155 612 155H1040H1352"/></circle>
+</g>
+<g class="frag" data-step="ml">
+<text class="ttl" x="0" y="322">machine learning</text>
+<rect class="box" x="0" y="344" width="280" height="80" rx="4"/><text class="tx" x="140" y="394" text-anchor="middle">Data</text>
+<rect class="box" x="0" y="448" width="280" height="80" rx="4"/><text class="tx" x="140" y="498" text-anchor="middle">Answers</text>
+<rect class="box-a" x="620" y="376" width="420" height="120" rx="4"/><text class="tx" x="830" y="428" text-anchor="middle" font-weight="600">Learning algorithm</text><text class="txs" x="830" y="466" text-anchor="middle">fits parameters from examples</text>
+<rect class="box-a" x="1360" y="396" width="320" height="80" rx="4"/><text class="tx" x="1520" y="446" text-anchor="middle" font-weight="600">Model (rules)</text>
+<path class="wire-a" d="M280 384C450 384 450 421 612 421" marker-end="url(#ah-a)"/>
+<path class="wire-a" d="M280 488C450 488 450 451 612 451" marker-end="url(#ah-a)"/>
+<path class="wire-a" d="M1040 436H1352" marker-end="url(#ah-a)"/>
+<circle r="8" class="fa"><animateMotion dur="1.8s" repeatCount="indefinite" path="M280 384C450 384 450 421 612 421H1040H1352"/></circle>
+<circle r="8" class="fa"><animateMotion dur="1.8s" repeatCount="indefinite" path="M280 488C450 488 450 451 612 451H1040H1352"/></circle>
+</g>
+<g class="frag" data-step="use">
+<path class="wire" d="M1520 476V522H830V552" stroke-dasharray="8 8" marker-end="url(#ah)"/>
+<text class="txs" x="1175" y="512" text-anchor="middle">the trained model is reused</text>
+<rect class="box" x="0" y="560" width="280" height="72" rx="4"/><text class="tx" x="140" y="606" text-anchor="middle">New data</text>
+<rect class="box-a" x="620" y="560" width="420" height="72" rx="4"/><text class="tx" x="830" y="606" text-anchor="middle">Model</text>
+<rect class="box" x="1360" y="560" width="320" height="72" rx="4"/><text class="tx" x="1520" y="606" text-anchor="middle">Predictions</text>
+<path class="wire" d="M280 596H612" marker-end="url(#ah)"/><path class="wire" d="M1040 596H1352" marker-end="url(#ah)"/>
+</g>
+</svg>
+</div>
+<p class="cap" style="margin-top:20px"><b>Figure 1:</b>In traditional programming a person writes the rules. In machine learning the rules are inferred from (data, answer) pairs, and the resulting model is applied to new data.</p>
+</section>
+
+<section class="s ats-prose" data-label="Hand-written rule vs model" data-demo="spam">
+<div class="hdr" data-s="What learning is"></div>
+<h2>Hand-written rule vs learned rule</h2>
+<div class="fr">
+<div class="figbox"><svg id="spam-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side">
+<div class="ctl">
+<div class="small"><strong>Hand-written rule:</strong> spam if the number of links is greater than <span class="tex">t</span>.</div>
+<label><span>Threshold <span class="tex">t</span></span><b id="spam-t-val">4.0</b></label>
+<input type="range" id="spam-t" min="0" max="10" step="0.5" value="4">
+</div>
+<div class="ro"><span>Rule accuracy</span><b id="spam-rule-acc" class="bb">0%</b></div>
+<div class="btns"><button class="bt" id="spam-train">Train model</button><button class="bt chip" id="spam-reset">Reset</button></div>
+<div class="ro"><span>Model accuracy</span><b id="spam-model-acc" class="a">—</b></div>
+<div class="ro"><span>Training iteration</span><b id="spam-iter">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>80 synthetic emails. The rule uses only the links; logistic regression (blue) uses both features.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Definitions">
+<div class="hdr" data-s="What learning is"></div>
+<h2>Two classic definitions</h2>
+<div class="bm">
+<div>
+<figure class="bq an-fade"><blockquote>Field of study that gives computers the ability to learn without being explicitly programmed.</blockquote><figcaption>Attributed to Arthur Samuel, 1959</figcaption></figure>
+<aside class="prf p-def frag up" style="margin-top:40px"><div class="h">Definition 1 (Mitchell, 1997)</div><div class="b"><p>A computer program is said to learn from experience <span class="tex">E</span> with respect to some class of tasks <span class="tex">T</span> and performance measure <span class="tex">P</span> if its performance at tasks in <span class="tex">T</span>, as measured by <span class="tex">P</span>, improves with experience <span class="tex">E</span>.</p></div></aside>
+<p class="frag up" style="margin-top:32px">In engineering terms: we collect data, build a statistical model from it, and use that model to solve the problem.</p>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Arthur Samuel</div><p>IBM researcher. His checkers program improved by playing against itself; his 1959 paper popularized the term <em>machine learning</em>. He later worked on TeX at Stanford.</p></aside>
+<aside class="am"><div class="t">About the quote</div><p>The sentence circulates in this form, but it does not appear verbatim in Samuel's paper. The idea does.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Task, experience, performance">
+<div class="hdr" data-s="What learning is"></div>
+<h2>Task, experience and performance</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Five problems described with the elements of Definition 1.</p>
+<table class="tb" style="font-size:26px">
+<colgroup><col style="width:17%"><col style="width:27%"><col style="width:30%"><col style="width:26%"></colgroup>
+<thead><tr><th>Problem</th><th>Task <span class="tex">T</span></th><th>Experience <span class="tex">E</span></th><th>Performance <span class="tex">P</span></th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Spam filter</strong></td><td>Classify each email</td><td>Emails flagged by users</td><td>Percentage of emails classified correctly</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Checkers (Samuel)</strong></td><td>Play checkers</td><td>Games against itself</td><td>Percentage of games won</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Handwritten digits</strong></td><td>Recognize the digit in an image</td><td>Images labeled with the digit</td><td>Error rate on new images</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Driving</strong></td><td>Keep the vehicle in its lane</td><td>Video and maneuvers of a human driver</td><td>Average distance without error</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Recommendation</strong></td><td>Rank movies for each person</td><td>Rating history</td><td>Rating of what was recommended</td></tr>
+</tbody>
+</table>
+<aside class="adm k-tip sm frag up" style="margin-top:24px;max-width:1300px;font-size:26px"><div class="h"><i data-i="hint"></i><span>Hint</span></div><div class="b"><p>If you cannot name <span class="tex">P</span> yet, the learning problem is not well posed yet.</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Approximating a function" data-demo="shift">
+<div class="hdr" data-s="What learning is"></div>
+<h2>A model only knows what it has seen</h2>
+<div class="fr">
+<div class="figbox"><svg id="shift-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side">
+<p class="small" style="margin:0">Machines do not learn the way animals do: they fit a function that maps inputs to outputs. The fit is only reliable where there was training data.</p>
+<div class="ctl">
+<label><span>Position of production data</span><b id="shift-val">0.0</b></label>
+<input type="range" id="shift-s" min="0" max="8" step="0.1" value="0.5">
+</div>
+<div class="ro"><span>Error in production</span><b id="shift-err" class="bb">0</b></div>
+<aside class="adm k-warn sm"><div class="h"><i data-i="warning"></i><span>Distribution shift</span></div><div class="b"><p>If the input distribution changes, the output will most likely be wrong.</p></div></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>The model (blue) was trained on data between 0 and 4. The dotted curve is the true relationship; the gray band holds the production data.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="AI, ML and DL">
+<div class="hdr" data-s="What learning is"></div>
+<h2>AI, machine learning and deep learning</h2>
+<div class="fr">
+<div class="figbox">
+<svg viewBox="0 0 1160 700">
+<g class="an-pop" style="--d:0s"><rect class="box" x="10" y="10" width="1140" height="680" rx="56"/>
+<text class="tx" x="64" y="76" font-weight="700">Artificial intelligence</text><text class="txs" x="64" y="114">search, logic, planning, expert systems</text></g>
+<g class="an-pop" style="--d:.35s"><rect class="box-a" x="150" y="150" width="980" height="520" rx="48"/>
+<text class="tx" x="200" y="214" font-weight="700">Machine learning</text><text class="txs" x="200" y="252">k-NN, decision trees, SVM, k-means</text></g>
+<g class="an-pop" style="--d:.7s"><rect class="box-b" x="330" y="300" width="780" height="350" rx="40"/>
+<text class="tx" x="380" y="362" font-weight="700">Deep learning</text><text class="txs" x="380" y="400">convolutional networks, transformers</text>
+<g id="nested-net" transform="translate(720 430)"></g></g>
+</svg>
+</div>
+<div class="side" style="gap:14px">
+<aside class="am an-up" style="--d:.1s"><div class="t">Artificial intelligence</div><p>Systems that perform tasks we associate with intelligence.</p></aside>
+<aside class="am an-up" style="--d:.45s"><div class="t">Machine learning</div><p>Methods that infer their behavior from examples.</p></aside>
+<aside class="am an-up" style="--d:.8s"><div class="t">Deep learning</div><p>Many-layered networks that also learn the features.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>How the three fields nest.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="History">
+<div class="hdr" data-s="What learning is"></div>
+<h2>A brief history</h2>
+<div class="figbox"><svg id="timeline-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 5:</b>Selected milestones; the axis is not to scale. Gray bands mark the AI winters (roughly 1974 to 1980 and 1987 to 1993), periods of little funding.</p>
+</section>
+
+<section class="s ats-prose" data-label="Applications">
+<div class="hdr" data-s="What learning is"></div>
+<h2>Everyday applications</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Applications, with the shape of their input and output and the type of learning (Part 3).</p>
+<table class="tb">
+<thead><tr><th>Area</th><th>Task</th><th>Input → output</th><th>Type</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Email</strong></td><td>Filter spam</td><td>text → {spam, not spam}</td><td>Supervised, classification</td></tr>
+<tr class="an-up" style="--d:.13s"><td><strong>Health</strong></td><td>Detect diabetic retinopathy</td><td>retina photo → severity</td><td>Supervised, classification</td></tr>
+<tr class="an-up" style="--d:.21s"><td><strong>Agriculture</strong></td><td>Estimate the coffee harvest</td><td>satellite image and weather → tons</td><td>Supervised, regression</td></tr>
+<tr class="an-up" style="--d:.29s"><td><strong>Banking</strong></td><td>Detect card fraud</td><td>transaction → unusual?</td><td>Unsupervised</td></tr>
+<tr class="an-up" style="--d:.37s"><td><strong>Retail</strong></td><td>Recommend products</td><td>history → ranked list</td><td>Supervised and unsupervised</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Language</strong></td><td>Translate Spanish to English</td><td>text → text</td><td>Self-supervised and supervised</td></tr>
+<tr class="an-up" style="--d:.53s"><td><strong>Games and robotics</strong></td><td>Choose the next move</td><td>state → action</td><td>Reinforcement</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The pieces of a model</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Data, features and models: they appear in every method in the course.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Data table">
+<div class="hdr" data-s="Pieces of a model"></div>
+<h2>Data is a table</h2>
+<div class="fr">
+<div class="figbox"><svg id="matrix-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Each row is an email and each column is something we measured about it.</p>
+<p class="small frag up" data-step="row" style="margin:0"><strong>Example:</strong> a row; here, an email described by 4 numbers.</p>
+<p class="small frag up" data-step="col" style="margin:0"><strong>Feature:</strong> a column, such as the percentage of capital letters.</p>
+<p class="small frag up" data-step="lab" style="margin:0"><strong>Label:</strong> the known answer, spam or not spam. It is what the model must learn to predict.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Six of the 400 emails in the example, with four features and their label.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Features">
+<div class="hdr" data-s="Pieces of a model"></div>
+<h2>Everything becomes numbers</h2>
+<div class="figbox"><svg id="features-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>Three encodings. (a) An image is flattened row by row. (b) A text is summarized by the count of each vocabulary word. (c) A category is encoded with a 1 in its position. A color image is a tensor, an array with three axes: height, width and channel.</p>
+</section>
+
+<section class="s ats-prose" data-label="Model as a function">
+<div class="hdr" data-s="Pieces of a model"></div>
+<h2>A model is a function</h2>
+<div class="two">
+<div>
+<p class="lead" style="margin:0 0 24px">input <span style="color:var(--myst-color-text-tertiary)">→</span> <strong>model</strong> <span style="color:var(--myst-color-text-tertiary)">→</span> prediction</p>
+<ul>
+<li><strong>Model family:</strong> all the possible functions; in the figure, all straight lines.</li>
+<li><strong>Parameters:</strong> the numbers fitted from the data, such as the slope of the line.</li>
+<li><strong>Hyperparameters:</strong> set before training, such as the degree of a curve.</li>
+</ul>
+<aside class="adm k-note sm frag up"><div class="h"><i data-i="note"></i><span>Note</span></div><div class="b"><p>Choosing the family is already an assumption about the problem; Part 4 comes back to this.</p></div></aside>
+</div>
+<div class="col">
+<div class="figbox"><svg id="hyp-svg" viewBox="0 0 792 640"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>Some possible lines (gray). Press the arrow to show the one that best fits the data (blue).</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Types of learning</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">The difference is what information comes with the data.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Map of types">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>What information the model gets</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 600">
+<g class="an-fade"><rect class="box" x="620" y="0" width="440" height="84" rx="4"/><text class="tx" x="840" y="52" text-anchor="middle" font-weight="700">Machine learning</text></g>
+<path class="wire an-draw" style="--d:.2s" pathLength="1" d="M840 84C840 140 150 130 150 190"/>
+<path class="wire an-draw" style="--d:.3s" pathLength="1" d="M840 84C840 140 495 130 495 190"/>
+<path class="wire an-draw" style="--d:.4s" pathLength="1" d="M840 84V190"/>
+<path class="wire an-draw" style="--d:.5s" pathLength="1" d="M840 84C840 140 1185 130 1185 190"/>
+<path class="wire an-draw" style="--d:.6s" pathLength="1" d="M840 84C840 140 1530 130 1530 190"/>
+<g class="an-up" style="--d:.6s"><rect class="box-a" x="0" y="190" width="300" height="80" rx="4"/><text class="tx" x="150" y="240" text-anchor="middle" font-weight="600">Supervised</text>
+<text class="txs" x="150" y="318" text-anchor="middle">a label for</text><text class="txs" x="150" y="348" text-anchor="middle">every example</text></g>
+<g class="an-up" style="--d:.75s"><rect class="box" x="345" y="190" width="300" height="80" rx="4"/><text class="tx" x="495" y="240" text-anchor="middle" font-weight="600">Unsupervised</text>
+<text class="txs" x="495" y="318" text-anchor="middle">no labels;</text><text class="txs" x="495" y="348" text-anchor="middle">look for structure</text></g>
+<g class="an-up" style="--d:.9s"><rect class="box" x="690" y="190" width="300" height="80" rx="4"/><text class="tx" x="840" y="240" text-anchor="middle" font-weight="600">Semi-supervised</text>
+<text class="txs" x="840" y="318" text-anchor="middle">few labels and</text><text class="txs" x="840" y="348" text-anchor="middle">lots of unlabeled data</text></g>
+<g class="an-up" style="--d:1.05s"><rect class="box" x="1035" y="190" width="300" height="80" rx="4"/><text class="tx" x="1185" y="240" text-anchor="middle" font-weight="600">Self-supervised</text>
+<text class="txs" x="1185" y="318" text-anchor="middle">labels created from</text><text class="txs" x="1185" y="348" text-anchor="middle">the data itself</text></g>
+<g class="an-up" style="--d:1.2s"><rect class="box-b" x="1380" y="190" width="300" height="80" rx="4"/><text class="tx" x="1530" y="240" text-anchor="middle" font-weight="600">Reinforcement</text>
+<text class="txs" x="1530" y="318" text-anchor="middle">a reward after</text><text class="txs" x="1530" y="348" text-anchor="middle">each action</text></g>
+<g class="an-fade" style="--d:1.5s">
+<line class="gl" x1="0" y1="392" x2="1680" y2="392"/>
+<text class="ttl" x="0" y="432">examples</text>
+<text class="txs" x="150" y="476" text-anchor="middle">classify emails,</text><text class="txs" x="150" y="506" text-anchor="middle">predict prices</text>
+<text class="txs" x="495" y="476" text-anchor="middle">group customers,</text><text class="txs" x="495" y="506" text-anchor="middle">reduce dimensions</text>
+<text class="txs" x="840" y="476" text-anchor="middle">classify X-rays</text><text class="txs" x="840" y="506" text-anchor="middle">with few annotated</text>
+<text class="txs" x="1185" y="476" text-anchor="middle">pretrain language</text><text class="txs" x="1185" y="506" text-anchor="middle">models</text>
+<text class="txs" x="1530" y="476" text-anchor="middle">play Go,</text><text class="txs" x="1530" y="506" text-anchor="middle">control robots</text>
+<text class="txs" x="840" y="578" text-anchor="middle" font-style="italic">Variants: learning from few examples (few-shot, one-shot, zero-shot) and domain adaptation.</text>
+</g>
+</svg>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 9:</b>Five types of learning according to the available signal. The course has a chapter each on supervised, unsupervised and reinforcement learning.</p>
+</section>
+
+<section class="s ats-prose" data-label="Supervised">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>Supervised: with answers</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="sup-class-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="sup-reg-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Classification: the answer is a category</div>
+<div class="subcap">(b) Regression: the answer is a number</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 10:</b>What separates the two cases is the label: a class from a finite set, or a real number. The model learns a decision boundary in (a) and a curve in (b).</p>
+</section>
+
+<section class="s ats-prose" data-label="Unsupervised" data-demo="kmeans">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>Unsupervised: no answers</h2>
+<div class="fr">
+<div class="figbox"><svg id="km-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Typical tasks: <strong>clustering</strong>, <strong>dimensionality reduction</strong> and <strong>outlier</strong> detection.</p>
+<div class="btns"><button class="bt" id="km-step">Step</button><button class="bt chip" id="km-reset">Reset</button></div>
+<div class="ro"><span>Iteration</span><b id="km-iter">0</b></div>
+<div class="ro"><span>Phase</span><b id="km-phase" style="font-size:26px">start</b></div>
+<div class="ro"><span>Inertia</span><b id="km-inertia" class="a">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>k-means with three clusters: it alternates between assigning each point to the nearest centroid and moving each centroid to the average of its points.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Semi- and self-supervised" data-demo="lp">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>A few labels go a long way</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto auto;column-gap:96px;row-gap:12px">
+<div class="figbox"><svg id="lp-svg" viewBox="0 0 792 500"></svg></div>
+<div class="figbox"><svg id="mask-svg" viewBox="0 0 792 500"></svg></div>
+<div class="subcap" style="margin-top:0">(a) Semi-supervised: 4 labels and 56 unlabeled points</div>
+<div class="subcap" style="margin-top:0">(b) Self-supervised: the label comes from the text itself</div>
+<div style="display:flex;align-items:center;gap:16px;justify-content:center"><button class="bt" id="lp-step">Propagate</button><button class="bt chip" id="lp-reset">Reset</button><span class="label" style="margin-left:8px">Labeled: <b id="lp-count" style="color:var(--myst-color-text)">4 / 60</b></span></div>
+<div></div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 12:</b>(a) Each click spreads the labels to nearby neighbors, following the shape of the data. (b) A word is hidden and the model learns to predict it; this is how language models are pretrained.</p>
+</section>
+
+<section class="s ats-prose" data-label="Reinforcement" data-demo="rl">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>Reinforcement: learning from rewards</h2>
+<div class="two">
+<div class="col">
+<div class="figbox">
+<svg viewBox="0 0 792 500">
+<rect class="box-a" x="300" y="20" width="300" height="110" rx="4"/><text class="tx" x="450" y="86" text-anchor="middle" font-weight="700">Agent</text>
+<rect class="box" x="300" y="370" width="300" height="110" rx="4"/><text class="tx" x="450" y="436" text-anchor="middle" font-weight="700">Environment</text>
+<path class="wire-a" d="M600 75C770 75 770 425 608 425" marker-end="url(#ah-a)"/>
+<path class="wire" d="M300 410C140 410 140 60 292 60" marker-end="url(#ah)"/>
+<path class="curve-b" style="stroke-width:3" d="M300 450C40 450 40 100 292 100" marker-end="url(#ah)"/>
+<text class="tx" x="580" y="262" text-anchor="end" style="fill:var(--c-a)">action</text>
+<text class="tx" x="218" y="232">new situation</text>
+<text class="tx" x="218" y="300" style="fill:var(--c-b)">reward</text>
+<circle r="9" class="fa"><animateMotion dur="2.4s" repeatCount="indefinite" path="M600 75C770 75 770 425 608 425"/></circle>
+<circle r="9" class="ink3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M300 410C140 410 140 60 292 60"/></circle>
+<circle r="9" class="fb"><animateMotion dur="2.4s" repeatCount="indefinite" path="M300 450C40 450 40 100 292 100"/></circle>
+</svg>
+</div>
+<p class="small" style="margin:8px 0 0">Nobody tells the agent what to do. It tries actions and learns from the rewards: the goal is to collect the largest total reward.</p>
+</div>
+<div class="col" style="gap:14px">
+<div class="figbox"><svg id="grid-svg" viewBox="0 0 792 420"></svg></div>
+<div style="display:flex;gap:16px;align-items:center"><button class="bt" id="rl-run">Run episode</button><button class="bt chip" id="rl-reset">Reset</button></div>
+<div class="ro"><span>Episode · steps</span><b id="rl-ep">0 · 0</b></div>
+<div class="ro"><span>Total reward per episode</span><b id="rl-g" class="bb" style="font-size:30px">—</b></div>
+</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 13:</b>The agent and environment loop, and a grid world with a goal (+1), a trap (−1) and a small cost per step. The trajectories are illustrative: the agent makes better choices with experience.</p>
+</section>
+
+<section class="s ats-prose" data-label="Exercise: types">
+<div class="hdr" data-s="Types of learning"></div>
+<h2>Exercise: which type is it?</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Each arrow press reveals one answer.</p>
+<table class="tb">
+<thead><tr><th style="width:62%">Problem</th><th>Type</th></tr></thead>
+<tbody>
+<tr><td>1. Predict the price of a house from its area and location</td><td class="ans frag">Supervised (regression)</td></tr>
+<tr><td>2. Group supermarket customers by shopping habits</td><td class="ans frag">Unsupervised (clustering)</td></tr>
+<tr><td>3. Teach a robot to walk by measuring how far it gets</td><td class="ans frag">Reinforcement</td></tr>
+<tr><td>4. Classify X-rays with 200 annotated and 50,000 unannotated</td><td class="ans frag">Semi-supervised</td></tr>
+<tr><td>5. Flag bank transactions unlike any seen before</td><td class="ans frag">Unsupervised (outliers)</td></tr>
+<tr><td>6. Pretrain a network by predicting the next frame of a video</td><td class="ans frag">Self-supervised</td></tr>
+<tr><td>7. Decide whether an email is spam from a history of flagged emails</td><td class="ans frag">Supervised (classification)</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ═══════════ Part 4 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 4">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 4</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Generalization</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">What matters is performance on data the model has not seen.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Train and test" data-demo="split">
+<div class="hdr" data-s="Generalization"></div>
+<h2>Evaluate on new data</h2>
+<div class="bm">
+<div class="col" style="gap:20px">
+<div id="split-box" style="position:relative;height:150px;width:1160px"></div>
+<div style="display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end">
+<div class="ctl"><label><span>Test proportion</span><b id="split-p-val">20%</b></label><input type="range" id="split-p" min="10" max="50" step="5" value="20"></div>
+<button class="bt" id="split-shuffle">Shuffle and split</button>
+</div>
+<p class="small" style="margin:4px 0">The model learns from the blue group. The orange group is kept aside, like an exam with questions it has never seen.</p>
+<aside class="adm k-warn sm frag up"><div class="h"><i data-i="warning"></i><span>Warning</span></div><div class="b"><p>Evaluating on the training data rewards memorizing, not learning.</p></div></aside>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Assumption</div><p>Training and test data are alike: they come from the same kind of situation.</p></aside>
+<aside class="am"><div class="t">Usual splits</div><p>80/20 or 70/30. With little data, cross-validation is used (chapter 2).</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>20 examples shuffled at random and split into training (blue) and test (orange).</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Underfitting and overfitting" data-demo="poly">
+<div class="hdr" data-s="Generalization"></div>
+<h2>Not too simple, not too flexible</h2>
+<div class="fr">
+<div class="figbox"><svg id="poly-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<div class="ctl"><label><span>Polynomial degree</span><b id="poly-deg-val">3</b></label><input type="range" id="poly-deg" min="1" max="11" step="1" value="3"></div>
+<div class="ro"><span>Training error</span><b id="poly-tr" class="a">0</b></div>
+<div class="ro"><span>Test error</span><b id="poly-te" class="bb">0</b></div>
+<svg id="poly-bars" width="424" height="120" viewBox="0 0 424 120" style="flex:none"></svg>
+<div><span class="tag" id="poly-diag">Good fit</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 15:</b>12 training points (blue) and 40 test points (hollow), taken from a noisy curve. Raise the degree and watch the test error.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Error vs complexity">
+<div class="hdr" data-s="Generalization"></div>
+<h2>The right amount of complexity</h2>
+<div class="fr">
+<div class="col">
+<div class="figbox"><svg id="u-svg" viewBox="0 0 1160 560"></svg></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t" style="color:var(--c-b)">High bias</div><p>The model is too rigid for the shape of the data. It fails on both training and test.</p></aside>
+<aside class="am"><div class="t" style="color:var(--c-d)">High variance</div><p>The model changes a lot with the particular sample and memorizes the noise. Training goes well and test goes badly.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 16:</b>Error by degree for the models in Figure 15.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Inductive bias">
+<div class="hdr" data-s="Generalization"></div>
+<h2>Every model makes assumptions</h2>
+<div class="two">
+<div class="col">
+<div class="figbox"><svg id="induct-svg" viewBox="0 0 792 640"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 17:</b>Two models pass through every point, but predict very different values at a new point. The data alone cannot decide which is better.</p>
+</div>
+<div>
+<aside class="adm k-note"><div class="h"><i data-i="note"></i><span>Key idea</span></div><div class="b"><p>No method is best for every problem. Each one works well when its assumptions match the data.</p></div></aside>
+<p style="margin-top:32px">That preference is called <strong>inductive bias</strong>. Some examples:</p>
+<ul>
+<li class="frag up">k-NN assumes that neighbors are alike.</li>
+<li class="frag up">Linear regression assumes a linear relationship.</li>
+<li class="frag up">Convolutional networks assume a pattern means the same thing anywhere in the image.</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 5 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 5">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 5</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Workflow</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">From the question to a model in production, and back.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Project cycle">
+<div class="hdr" data-s="Workflow"></div>
+<h2>A project is a cycle</h2>
+<div class="figbox">
+<svg viewBox="0 0 1680 560">
+<g class="an-up" style="--d:.0s"><rect class="box" x="0" y="40" width="330" height="130" rx="4"/><text class="ttl" x="20" y="74">1</text><text class="tx" x="165" y="108" text-anchor="middle" font-weight="600">Define the problem</text><text class="txs" x="165" y="144" text-anchor="middle">task, experience, performance</text></g>
+<g class="an-up" style="--d:.12s"><rect class="box" x="450" y="40" width="330" height="130" rx="4"/><text class="ttl" x="470" y="74">2</text><text class="tx" x="615" y="108" text-anchor="middle" font-weight="600">Collect data</text><text class="txs" x="615" y="144" text-anchor="middle">sources and labels</text></g>
+<g class="an-up" style="--d:.24s"><rect class="box" x="900" y="40" width="330" height="130" rx="4"/><text class="ttl" x="920" y="74">3</text><text class="tx" x="1065" y="108" text-anchor="middle" font-weight="600">Clean and prepare</text><text class="txs" x="1065" y="144" text-anchor="middle">chapter 2</text></g>
+<g class="an-up" style="--d:.36s"><rect class="box" x="1350" y="40" width="330" height="130" rx="4"/><text class="ttl" x="1370" y="74">4</text><text class="tx" x="1515" y="108" text-anchor="middle" font-weight="600">Design features</text><text class="txs" x="1515" y="144" text-anchor="middle">chapter 2</text></g>
+<g class="an-up" style="--d:.48s"><rect class="box-a" x="1350" y="340" width="330" height="130" rx="4"/><text class="ttl" x="1370" y="374">5</text><text class="tx" x="1515" y="408" text-anchor="middle" font-weight="600">Train models</text><text class="txs" x="1515" y="444" text-anchor="middle">chapters 3 to 6</text></g>
+<g class="an-up" style="--d:.6s"><rect class="box" x="900" y="340" width="330" height="130" rx="4"/><text class="ttl" x="920" y="374">6</text><text class="tx" x="1065" y="408" text-anchor="middle" font-weight="600">Evaluate</text><text class="txs" x="1065" y="444" text-anchor="middle">test data, validation</text></g>
+<g class="an-up" style="--d:.72s"><rect class="box" x="450" y="340" width="330" height="130" rx="4"/><text class="ttl" x="470" y="374">7</text><text class="tx" x="615" y="408" text-anchor="middle" font-weight="600">Deploy</text><text class="txs" x="615" y="444" text-anchor="middle">service or application</text></g>
+<g class="an-up" style="--d:.84s"><rect class="box-b" x="0" y="340" width="330" height="130" rx="4"/><text class="ttl" x="20" y="374">8</text><text class="tx" x="165" y="408" text-anchor="middle" font-weight="600">Monitor</text><text class="txs" x="165" y="444" text-anchor="middle">distribution shift</text></g>
+<g class="an-fade" style="--d:1s">
+<path class="wire" d="M330 105H442" marker-end="url(#ah)"/><path class="wire" d="M780 105H892" marker-end="url(#ah)"/><path class="wire" d="M1230 105H1342" marker-end="url(#ah)"/>
+<path class="wire" d="M1515 170V332" marker-end="url(#ah)"/>
+<path class="wire" d="M1350 405H1238" marker-end="url(#ah)"/><path class="wire" d="M900 405H788" marker-end="url(#ah)"/><path class="wire" d="M450 405H338" marker-end="url(#ah)"/>
+<path class="curve-b" style="stroke-width:3" stroke-dasharray="10 8" d="M165 340V255H615V178" marker-end="url(#ah)"/>
+<text class="txs" x="390" y="244" text-anchor="middle" style="fill:var(--c-b)">retrain with new data</text>
+<path class="wire" stroke-dasharray="6 8" d="M1065 340V255H1180"/><text class="txs" x="1190" y="263">back to 4 or 5 if the error is high</text>
+<circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M330 105H442"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M780 105H892"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M1230 105H1342"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M1515 170V332"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M1350 405H1238"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M900 405H788"/></circle><circle r="8" class="fa"><animateMotion dur="1.4s" repeatCount="indefinite" path="M450 405H338"/></circle><circle r="8" class="fb"><animateMotion dur="2.4s" repeatCount="indefinite" path="M165 340V255H615V178"/></circle>
+</g>
+<text class="txs an-fade" style="--d:1.3s" x="840" y="540" text-anchor="middle" font-style="italic">Science: stages 1 to 6, focused on metrics. Engineering: stages 7 and 8, focused on cost and reliability.</text>
+</svg>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 18:</b>Stages of a project and the chapter of the course where each one is covered. Monitoring detects when the data changes and forces a new start.</p>
+</section>
+
+<section class="s ats-prose" data-label="Science and engineering">
+<div class="hdr" data-s="Workflow"></div>
+<h2>Science vs engineering</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 4:</b>Two ways of working with the same model.</p>
+<table class="tb">
+<thead><tr><th></th><th>Science</th><th>Engineering</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Goal</strong></td><td>Improve accuracy and metrics</td><td>Serve fast, reliable predictions</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Output</strong></td><td>Paper, weights and models</td><td>Service, API or application</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Tools</strong></td><td>Python and notebooks</td><td>C++, DevOps, containers</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>Format</strong></td><td>Training weights</td><td>ONNX, distilled models</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Question</strong></td><td>Which method generalizes best?</td><td>How much does each prediction cost?</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">ONNX</div><p>An open format for moving a trained model between platforms without the training code.</p></aside>
+<aside class="am"><div class="t">Distillation</div><p>Training a small model to imitate the outputs of a large one, so it is cheaper to run.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Risks">
+<div class="hdr" data-s="Workflow"></div>
+<h2>The risks are in the data</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px 64px;align-content:start">
+<aside class="adm k-warn an-up" style="--d:.05s"><div class="h"><i data-i="warning"></i><span>Biased data</span></div><div class="b"><p>If the data underrepresents a group, the model inherits that bias and fails more often for that group.</p></div></aside>
+<aside class="adm k-danger an-up" style="--d:.2s"><div class="h"><i data-i="danger"></i><span>Data leakage</span></div><div class="b"><p>Test information that slips into training inflates the metrics without improving the model.</p></div></aside>
+<aside class="adm k-warn an-up" style="--d:.35s"><div class="h"><i data-i="caution"></i><span>Distribution shift</span></div><div class="b"><p>The world changes after deployment, as in Figure 3. That is why models are monitored.</p></div></aside>
+<aside class="adm k-warn an-up" style="--d:.5s"><div class="h"><i data-i="attention"></i><span>Privacy</span></div><div class="b"><p>Personal data is used with consent and kept safe; a model can leak its training data.</p></div></aside>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A program learns if it gets better at a task with experience.</li>
+<li class="an-up" style="--d:.15s">A model is a function that turns data into predictions.</li>
+<li class="an-up" style="--d:.25s">Training means adjusting the model to reduce its error.</li>
+<li class="an-up" style="--d:.35s">The type of learning depends on the information available.</li>
+<li class="an-up" style="--d:.45s">A model is judged on data it has not seen.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Course map">
+<div class="hdr" data-s="Closing"></div>
+<h2>The rest of the course</h2>
+<div class="map">
+<div class="now an-up" style="--d:.0s"><div class="ch">chapter 1</div><h3>Introduction</h3><ul><li>What learning is</li><li>Pieces of a model</li><li>Types and generalization</li></ul></div>
+<div class="an-up" style="--d:.1s"><div class="ch">chapter 2</div><h3>Data preparation</h3><ul><li>Cleaning</li><li>Feature engineering</li><li>Normalization</li><li>Train-test split</li><li>Cross-validation</li></ul></div>
+<div class="an-up" style="--d:.2s"><div class="ch">chapter 3</div><h3>Supervised</h3><ul><li>Overview</li><li>k-NN</li><li>Regression</li><li>Decision trees</li><li>Logistic regression</li><li>SVM</li><li>Naive Bayes</li><li>Ensembles</li></ul></div>
+<div class="an-up" style="--d:.3s"><div class="ch">chapter 4</div><h3>Unsupervised</h3><ul><li>k-means</li><li>Hierarchical</li><li>PCA</li></ul></div>
+<div class="an-up" style="--d:.4s"><div class="ch">chapter 5</div><h3>Reinforcement</h3><ul><li>Markov decision processes</li><li>Q-learning</li></ul></div>
+<div class="an-up" style="--d:.5s"><div class="ch">chapter 6</div><h3>Deep learning</h3><ul><li>Neural networks</li><li>Automatic differentiation</li><li>CNN and RNN</li><li>Autoencoders</li><li>GAN</li><li>Transfer learning</li><li>Deep RL</li><li>Transformers</li></ul></div>
+</div>
+<p class="lead an-fade" style="--d:.8s;margin-top:40px">Each topic has slides and a theory page with the same examples.</p>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic expands each idea with more examples.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Samuel, A. L. (1959). Some studies in machine learning using the game of checkers. <em>IBM Journal of Research and Development</em>, 3(3), 210–229.</li>
+<li style="margin:.4em 0">Mitchell, T. M. (1997). <em>Machine Learning</em>. McGraw-Hill.</li>
+<li style="margin:.4em 0">Burkov, A. (2019). <em>The Hundred-Page Machine Learning Book</em>.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.). Springer.</li>
+<li style="margin:.4em 0">Wolpert, D. H. (1996). The lack of a priori distinctions between learning algorithms. <em>Neural Computation</em>, 8(7), 1341–1390.</li>
+<li style="margin:.4em 0">Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.). MIT Press.</li>
+<li style="margin:.4em 0">Géron, A. (2022). <em>Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow</em> (3rd ed.). O'Reilly.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Chapter 2: data cleaning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── static figures ───────── */
+function drawNestedNet() {
+  const g = document.getElementById('nested-net');
+  const layers = [3, 4, 4, 2], dx = 110, dy = 48;
+  const pos = layers.map((n, li) => Array.from({ length: n }, (_, k) => [li * dx, 100 + (k - (n - 1) / 2) * dy]));
+  for (let li = 0; li < layers.length - 1; li++)
+    pos[li].forEach(([x1, y1]) => pos[li + 1].forEach(([x2, y2]) => el('line', { x1, y1, x2, y2, style: 'stroke:var(--c-b);stroke-opacity:.35;stroke-width:1.5' }, g)));
+  pos.flat().forEach(([cx, cy], i) => el('circle', { cx, cy, r: 13, class: 'an-pop', style: `fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:3;--d:${0.9 + i * 0.04}s` }, g));
+}
+
+function drawTimeline() {
+  const svg = document.getElementById('timeline-svg');
+  const ev = [
+    ['1943', 'Artificial neuron', 'McCulloch and Pitts'], ['1950', 'Turing test', ''],
+    ['1957', 'Perceptron', 'by Rosenblatt'], ['1959', "Samuel's checkers;", 'the term is born'],
+    ['1969', 'Limits of the', 'perceptron'], ['1986', 'Backpropagation', 'Rumelhart et al.'],
+    ['1995', 'Support vector', 'machines'], ['1997', 'Deep Blue beats', 'Kasparov'],
+    ['2012', 'AlexNet wins', 'ImageNet'], ['2016', 'AlphaGo beats', 'Lee Sedol'],
+    ['2017', 'Transformer', '(attention)'], ['2022', 'ChatGPT and', 'language models'],
+  ];
+  const AX = 300, X = (i) => 90 + i * 136;
+  [[4, 5], [5, 6]].forEach(([a, b]) => el('rect', { x: X(a) + 18, y: AX - 16, width: X(b) - X(a) - 36, height: 32, rx: 4, style: 'fill:var(--myst-color-surface-hover)' }, svg));
+  el('path', { class: 'ax', d: `M10 ${AX}H1660`, 'marker-end': 'url(#ah)' }, svg);
+  ev.forEach(([year, l1, l2], i) => {
+    const up = i % 2 === 0, x = X(i);
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + i * 0.1}s` }, svg);
+    el('line', { class: 'gl', x1: x, x2: x, y1: AX, y2: up ? 206 : 394, style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+    el('circle', { class: 'fa', cx: x, cy: AX, r: 10 }, g);
+    const y0 = up ? 120 : 434;
+    el('text', { class: 'tx', x, y: y0, 'text-anchor': 'middle', 'font-weight': 700, text: year }, g);
+    el('text', { class: 'txs', x, y: y0 + 36, 'text-anchor': 'middle', text: l1 }, g);
+    if (l2) el('text', { class: 'txs', x, y: y0 + 66, 'text-anchor': 'middle', text: l2 }, g);
+  });
+}
+
+function drawMatrix() {
+  const svg = document.getElementById('matrix-svg');
+  const names = ['links', 'capitals (%)', 'words', 'hour'];
+  const rows = [
+    ['1', 7, 41, 120, 3, 1], ['2', 0, 4, 310, 14, 0], ['3', 2, 8, 95, 9, 0],
+    ['4', 12, 63, 60, 2, 1], ['5', 1, 6, 540, 16, 0], ['6', 5, 30, 80, 23, 1],
+    ['⋮', '⋮', '⋮', '⋮', '⋮', null], ['400', 3, 22, 140, 11, 0],
+  ];
+  const X0 = 130, CW = 180, Y0 = 100, RH = 64, YX = 890;
+  const colX = (j) => (j < 4 ? X0 + j * CW : YX);
+  names.forEach((n, j) => {
+    el('text', { class: 'lb', x: colX(j) + CW / 2, y: 70, 'text-anchor': 'middle', text: n }, svg);
+  });
+  el('text', { class: 'lb', x: YX + CW / 2, y: 70, 'text-anchor': 'middle', text: 'label' }, svg);
+  rows.forEach((r, i) => {
+    const y = Y0 + i * RH, g = el('g', { class: 'an-fade', style: `--d:${i * 0.08}s` }, svg);
+    el('text', { class: 'tx', x: 100, y: y + 42, 'text-anchor': 'end', text: r[0] }, g);
+    for (let j = 0; j < 5; j++) {
+      el('rect', { x: colX(j), y, width: CW, height: RH, style: 'fill:var(--myst-color-bg);stroke:var(--myst-color-border);stroke-width:1' }, g);
+      let v = r[j + 1], cls = 'tx';
+      if (j === 4) { cls = v === 1 ? 'tx fb' : v === 0 ? 'tx fa' : 'tx'; v = v === 1 ? 'spam' : v === 0 ? 'not spam' : '⋮'; }
+      el('text', { class: cls, x: colX(j) + CW / 2, y: y + 42, 'text-anchor': 'middle', text: v }, g);
+    }
+  });
+  const yEnd = Y0 + rows.length * RH;
+  el('text', { class: 'txs', x: X0, y: yEnd + 56, text: '400 emails, 4 features' }, svg);
+  const hl = (step, x, y, w, h, c) => el('rect', { class: 'frag', 'data-step': step, x, y, width: w, height: h, rx: 4, style: `fill:var(${c});fill-opacity:.13;stroke:var(${c});stroke-width:3` }, svg);
+  hl('row', 60, Y0 + RH + 3, 1020, RH - 6, '--c-a');
+  hl('col', X0 + CW + 3, 14, CW - 6, yEnd - 8, '--c-b');
+  hl('lab', YX + 3, 14, CW - 6, yEnd - 8, '--c-c');
+}
+
+function drawFeatures() {
+  const svg = document.getElementById('features-svg');
+  const arrow = (x, y1, y2) => el('path', { class: 'wire', d: `M${x} ${y1}V${y2}`, 'marker-end': 'url(#ah)' }, svg);
+  /* (a) image */
+  el('text', { class: 'ttl', x: 0, y: 30, text: '(a) image of a digit' }, svg);
+  const px = ['00000000', '01111110', '00000110', '00001100', '00011000', '00110000', '00110000', '00000000'];
+  const C = 34, gx = 124, gy = 56;
+  px.forEach((row, r) => [...row].forEach((v, c) => el('rect', {
+    class: 'an-fade', x: gx + c * C, y: gy + r * C, width: C, height: C,
+    style: `--d:${r * 0.07}s;fill:${v === '1' ? 'var(--myst-color-text)' : 'var(--myst-color-bg-secondary)'};stroke:var(--myst-color-border);stroke-width:1`,
+  }, svg)));
+  arrow(260, gy + 8 * C + 12, gy + 8 * C + 56);
+  const flat = (px[0] + px[1]).split('');
+  flat.forEach((v, i) => {
+    el('rect', { class: 'an-pop', x: 20 + i * 30, y: 400, width: 30, height: 30, style: `--d:${0.7 + i * 0.05}s;fill:${v === '1' ? 'var(--myst-color-text)' : 'var(--myst-color-bg-secondary)'};stroke:var(--myst-color-border-strong);stroke-width:1` }, svg);
+  });
+  el('text', { class: 'txs', x: 260, y: 470, 'text-anchor': 'middle', text: 'rows 1 and 2: 16 of the 64 values' }, svg);
+  el('text', { class: 'tx', x: 260, y: 524, 'text-anchor': 'middle', text: 'x ∈ ℝ⁶⁴' }, svg);
+  /* (b) bag of words */
+  const B0 = 580;
+  el('text', { class: 'ttl', x: B0, y: 30, text: '(b) text' }, svg);
+  el('rect', { class: 'box', x: B0 + 10, y: 56, width: 500, height: 64, rx: 4 }, svg);
+  el('text', { class: 'tx', x: B0 + 260, y: 98, 'text-anchor': 'middle', text: '“win free money, money now”' }, svg);
+  arrow(B0 + 260, 128, 172);
+  [['win', 1], ['money', 2], ['free', 1], ['hello', 0], ['meeting', 0], ['now', 1]].forEach(([w, n], i) => {
+    const y = 190 + i * 48;
+    el('text', { class: 'tx', x: B0 + 200, y: y + 25, 'text-anchor': 'end', text: w }, svg);
+    if (n) el('rect', { class: 'fa an-grow', x: B0 + 220, y, width: n * 110, height: 32, rx: 2, style: `--d:${0.6 + i * 0.1}s` }, svg);
+    el('text', { class: n ? 'tx' : 'tx ink3', x: B0 + 232 + n * 110, y: y + 25, text: n }, svg);
+  });
+  el('text', { class: 'tx', x: B0 + 260, y: 524, 'text-anchor': 'middle', text: 'x ∈ ℕ⁶, one entry per word' }, svg);
+  /* (c) one-hot */
+  const C0 = 1160;
+  el('text', { class: 'ttl', x: C0, y: 30, text: '(c) category' }, svg);
+  el('rect', { class: 'box', x: C0 + 10, y: 56, width: 500, height: 64, rx: 4 }, svg);
+  el('text', { class: 'tx', x: C0 + 260, y: 98, 'text-anchor': 'middle', text: 'province = Cartago' }, svg);
+  arrow(C0 + 260, 128, 166);
+  ['San José', 'Alajuela', 'Cartago', 'Heredia', 'Guanacaste', 'Puntarenas', 'Limón'].forEach((p, i) => {
+    const y = 180 + i * 40, on = p === 'Cartago';
+    el('text', { class: on ? 'tx' : 'txs', x: C0 + 260, y: y + 25, 'text-anchor': 'end', 'font-weight': on ? 700 : 400, text: p }, svg);
+    el('rect', { x: C0 + 280, y, width: 32, height: 32, rx: 2, class: 'an-pop', style: `--d:${0.6 + i * 0.08}s;${on ? 'fill:var(--c-a);stroke:var(--c-a)' : 'fill:var(--myst-color-bg-secondary);stroke:var(--myst-color-border-strong)'};stroke-width:1` }, svg);
+    el('text', { x: C0 + 296, y: y + 24, 'text-anchor': 'middle', style: `font-size:22px;fill:${on ? '#fff' : 'var(--myst-color-text-tertiary)'}`, text: on ? 1 : 0 }, svg);
+  });
+  el('text', { class: 'tx', x: C0 + 260, y: 524, 'text-anchor': 'middle', text: 'x ∈ {0, 1}⁷, one 1 per category' }, svg);
+}
+
+function drawHypotheses() {
+  const svg = document.getElementById('hyp-svg');
+  const F = frame(svg, { W: 792, H: 640, l: 80, x: [0, 10], y: [0, 10], xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'x', yl: 'y' });
+  const pts = [[1, 2.1], [2, 2.6], [3, 3.9], [4, 4.1], [5, 5.4], [6, 5.6], [7, 6.8], [8, 7.1], [9, 8.3]];
+  const cands = [[0.2, 4], [1.3, -1], [0.5, 3], [1.0, 0.5], [-0.1, 6], [0.9, -0.4], [0.6, 2.6], [1.6, -2.5], [0.3, 1.5], [0.05, 7.5]];
+  cands.forEach(([w, b], i) => el('line', { class: 'an-fade', x1: F.sx(0), y1: F.sy(b), x2: F.sx(10), y2: F.sy(b + 10 * w), style: `--d:${0.3 + i * 0.12}s;stroke:var(--myst-color-border-strong);stroke-width:2.5` }, F.plot));
+  const xm = mean(pts.map((p) => p[0])), ym = mean(pts.map((p) => p[1]));
+  const w = pts.reduce((s, [x, y]) => s + (x - xm) * (y - ym), 0) / pts.reduce((s, [x]) => s + (x - xm) ** 2, 0);
+  const b = ym - w * xm;
+  el('line', { class: 'curve-a frag', x1: F.sx(0), y1: F.sy(b), x2: F.sx(10), y2: F.sy(b + 10 * w) }, F.plot);
+  pts.forEach(([x, y]) => el('circle', { class: 'pt fb', cx: F.sx(x), cy: F.sy(y), r: 10 }, F.plot));
+}
+
+function drawSupervised() {
+  const r = rng(31);
+  const svgC = document.getElementById('sup-class-svg');
+  const FC = frame(svgC, { W: 792, H: 560, l: 80, t: 60, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'feature 1', yl: 'feature 2' });
+  const bound = (x) => 2 + 0.55 * x + 0.9 * Math.sin(0.9 * x);
+  el('path', { d: curvePath(bound, 0, 10, FC.sx, FC.sy) + `L${FC.sx(10)} ${FC.sy(10)}L${FC.sx(0)} ${FC.sy(10)}Z`, style: 'fill:var(--c-b);fill-opacity:.07' }, FC.plot);
+  let nA = 0, nB = 0, k = 0;
+  while (nA < 30 || nB < 30) {
+    const x = r() * 10, y = r() * 10, gap = y - bound(x);
+    if (Math.abs(gap) < 0.45) continue;
+    if (gap < 0 && nA < 30) { nA++; el('circle', { class: 'pt fa an-pop', cx: FC.sx(x), cy: FC.sy(y), r: 9, style: `--d:${(k++) * 0.015}s` }, FC.plot); }
+    if (gap > 0 && nB < 30) { nB++; el('circle', { class: 'pt fb an-pop', cx: FC.sx(x), cy: FC.sy(y), r: 9, style: `--d:${(k++) * 0.015}s` }, FC.plot); }
+  }
+  el('path', { class: 'curve-t an-fade', style: 'stroke:var(--myst-color-text);stroke-dasharray:none;stroke-width:4;--d:1.1s', d: curvePath(bound, 0, 10, FC.sx, FC.sy) }, FC.plot);
+  legend(svgC, 90, 22, [['dot', 'fb', 'spam']]);
+  legend(svgC, 230, 22, [['dot', 'fa', 'not spam']]);
+  legend(svgC, 420, 22, [['line', 'curve-a', 'boundary']]).querySelector('line').setAttribute('style', 'stroke:var(--myst-color-text);stroke-width:4');
+
+  const svgR = document.getElementById('sup-reg-svg');
+  const FR = frame(svgR, { W: 792, H: 560, l: 80, t: 60, b: 70, x: [0, 10], y: [0, 12], xt: [0, 5, 10], yt: [0, 4, 8, 12], xl: 'x', yl: 'y' });
+  const f = (x) => 2 + 0.8 * x + 1.2 * Math.sin(0.8 * x);
+  for (let i = 0; i < 40; i++) {
+    const x = r() * 10, y = f(x) + 0.7 * gauss(r);
+    el('circle', { class: 'pt fb an-pop', cx: FR.sx(x), cy: FR.sy(y), r: 9, style: `--d:${i * 0.015}s` }, FR.plot);
+  }
+  el('path', { class: 'curve-a an-draw', pathLength: 1, style: '--d:.8s', d: curvePath(f, 0, 10, FR.sx, FR.sy) }, FR.plot);
+}
+
+function drawMask() {
+  const svg = document.getElementById('mask-svg');
+  const CH = 15.5, PAD = 28, GAP = 12;
+  const line = (words, y) => {
+    const widths = words.map((w) => (w === '?' ? 96 : w.length * CH + PAD));
+    let x = 396 - (widths.reduce((s, v) => s + v, 0) + GAP * (words.length - 1)) / 2;
+    words.forEach((w, i) => {
+      const mask = w === '?';
+      el('rect', { x, y, width: widths[i], height: 52, rx: 4, class: mask ? 'box-b' : 'box', style: mask ? 'stroke-dasharray:8 6' : '' }, svg);
+      el('text', { class: 'tx', x: x + widths[i] / 2, y: y + 36, 'text-anchor': 'middle', 'font-weight': mask ? 700 : 400, text: mask ? '[ ? ]' : w }, svg);
+      x += widths[i] + GAP;
+    });
+  };
+  line(['The', 'Arenal', 'volcano', 'is', 'in', 'the'], 20);
+  line(['province', 'of', '?'], 88);
+  el('path', { class: 'wire', d: 'M396 148V186', 'marker-end': 'url(#ah)' }, svg);
+  el('rect', { class: 'box-a', x: 236, y: 192, width: 320, height: 60, rx: 4 }, svg);
+  el('text', { class: 'tx', x: 396, y: 232, 'text-anchor': 'middle', 'font-weight': 600, text: 'language model' }, svg);
+  el('path', { class: 'wire', d: 'M396 252V284', 'marker-end': 'url(#ah)' }, svg);
+  [['Alajuela', 0.81], ['Guanacaste', 0.09], ['San José', 0.05], ['Heredia', 0.03]].forEach(([w, p], i) => {
+    const y = 298 + i * 48;
+    el('text', { class: 'tx', x: 230, y: y + 27, 'text-anchor': 'end', text: w }, svg);
+    el('rect', { class: `an-grow ${i === 0 ? 'fa' : ''}`, x: 246, y, width: Math.max(4, p * 460), height: 34, rx: 2, style: `--d:${0.5 + i * 0.15}s;${i ? 'fill:var(--myst-color-border-strong)' : ''}` }, svg);
+    el('text', { class: 'txs', x: 258 + p * 460, y: y + 26, text: p.toFixed(2) }, svg);
+  });
+}
+
+function drawInduct() {
+  const svg = document.getElementById('induct-svg');
+  const F = frame(svg, { W: 792, H: 640, l: 80, x: [0.8, 6.2], y: [-0.5, 7.5], xt: [1, 2, 3, 4, 5, 6], yt: [0, 2, 4, 6], xl: 'x', yl: 'y' });
+  const h1 = (x) => 0.5 * x + 1;
+  const h2 = (x) => h1(x) + 0.1 * (x - 1) * (x - 2) * (x - 3) * (x - 4) * (x - 5);
+  const XS = 5.5;
+  el('line', { x1: F.sx(XS), x2: F.sx(XS), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:8 8' }, F.plot);
+  el('text', { class: 'txs', x: F.sx(XS) - 10, y: F.T + 30, 'text-anchor': 'end', text: 'new point' }, svg);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath(h1, 0.8, 6.2, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.8s', d: curvePath(h2, 0.8, 6.2, F.sx, F.sy, 400) }, F.plot);
+  [1, 2, 3, 4, 5].forEach((x) => el('circle', { class: 'ink', cx: F.sx(x), cy: F.sy(h1(x)), r: 10, style: 'stroke:var(--myst-color-bg);stroke-width:3' }, F.plot));
+  [[h1, 'fa', 'line: ', 1.0, '--c-a'], [h2, 'fb', 'curve: ', h2(XS), '--c-b']].forEach(([h, cls, lab, ty, col], i) => {
+    const g = el('g', { class: 'an-pop', style: `--d:${1.6 + i * 0.3}s` }, svg);
+    el('circle', { class: `${cls} pt`, cx: F.sx(XS), cy: F.sy(h(XS)), r: 12 }, g);
+    el('text', { class: 'tx', x: F.sx(XS) - 22, y: F.sy(ty) + 10, 'text-anchor': 'end', style: `fill:var(${col});font-weight:600`, text: lab + h(XS).toFixed(2) }, g);
+  });
+  legend(svg, 112, 52, [['line', 'curve-a', 'straight line'], ['line', 'curve-b', 'curve through every point']]);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.spam = (() => {
+  const svg = document.getElementById('spam-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [0, 10], y: [0, 1], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.25, 0.5, 0.75, 1], fy: (v) => Math.round(v * 100) + '%', xl: 'number of links', yl: 'share of capital letters' });
+  const r = rng(11), data = [];
+  for (let i = 0; i < 80; i++) {
+    const spam = i % 2;
+    data.push({
+      x1: clamp(Math.round((spam ? 6 : 3) + 1.7 * gauss(r)), 0, 10) + (r() - 0.5) * 0.3,
+      x2: clamp((spam ? 0.6 : 0.3) + 0.12 * gauss(r), 0.02, 0.98),
+      y: spam,
+    });
+  }
+  const m1 = mean(data.map((d) => d.x1)), m2 = mean(data.map((d) => d.x2));
+  const s1 = Math.sqrt(mean(data.map((d) => (d.x1 - m1) ** 2))), s2 = Math.sqrt(mean(data.map((d) => (d.x2 - m2) ** 2)));
+  const ruleZone = el('rect', { y: F.T, height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.07' }, F.plot);
+  const ruleLine = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8' }, F.plot);
+  const modelLine = el('line', { class: 'curve-a', style: 'display:none' }, F.plot);
+  data.forEach((d) => el('circle', { class: `pt ${d.y ? 'fb' : 'fa'}`, cx: F.sx(d.x1), cy: F.sy(d.x2), r: 10 }, F.plot));
+  legend(svg, F.L + 24, F.T + 30, [['dot', 'fb', 'spam'], ['dot', 'fa', 'not spam']]);
+  const lg = legend(svg, F.L + 220, F.T + 30, [['line', '', 'hand-written rule'], ['line', 'curve-a', 'learned model']]);
+  lg.querySelector('line').setAttribute('style', 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6');
+  const slider = document.getElementById('spam-t');
+  let w = [0, 0, 0], iter = 0, timer = null;
+  const prob = (d) => 1 / (1 + Math.exp(-(w[0] + w[1] * (d.x1 - m1) / s1 + w[2] * (d.x2 - m2) / s2)));
+  const acc = (pred) => data.filter((d) => pred(d) === d.y).length / data.length;
+  function drawRule() {
+    const t = +slider.value;
+    document.getElementById('spam-t-val').textContent = t.toFixed(1);
+    ruleZone.setAttribute('x', F.sx(t)); ruleZone.setAttribute('width', Math.max(0, F.W - F.R - F.sx(t)));
+    ruleLine.setAttribute('x1', F.sx(t)); ruleLine.setAttribute('x2', F.sx(t));
+    document.getElementById('spam-rule-acc').textContent = Math.round(acc((d) => (d.x1 > t ? 1 : 0)) * 100) + '%';
+  }
+  function drawModel() {
+    document.getElementById('spam-iter').textContent = iter;
+    if (!iter || Math.abs(w[2]) < 1e-9) { modelLine.style.display = 'none'; document.getElementById('spam-model-acc').textContent = '—'; return; }
+    const x2At = (x1) => m2 + s2 * (-(w[0] + w[1] * (x1 - m1) / s1) / w[2]);
+    modelLine.style.display = '';
+    modelLine.setAttribute('x1', F.sx(-1)); modelLine.setAttribute('y1', F.sy(x2At(-1)));
+    modelLine.setAttribute('x2', F.sx(11)); modelLine.setAttribute('y2', F.sy(x2At(11)));
+    document.getElementById('spam-model-acc').textContent = Math.round(acc((d) => (prob(d) > 0.5 ? 1 : 0)) * 100) + '%';
+  }
+  function gradientStep(rate) {
+    const g = [0, 0, 0];
+    data.forEach((d) => {
+      const e = prob(d) - d.y;
+      g[0] += e; g[1] += e * (d.x1 - m1) / s1; g[2] += e * (d.x2 - m2) / s2;
+    });
+    w = w.map((v, k) => v - rate * g[k] / data.length);
+    iter++;
+  }
+  function reset() { clearInterval(timer); timer = null; w = [0, 0, 0]; iter = 0; drawModel(); }
+  slider.addEventListener('input', drawRule);
+  document.getElementById('spam-train').addEventListener('click', () => {
+    if (timer) return;
+    if (iter >= 150) reset();
+    timer = setInterval(() => {
+      gradientStep(0.5); drawModel();
+      if (iter >= 150) { clearInterval(timer); timer = null; }
+    }, 25);
+  });
+  document.getElementById('spam-reset').addEventListener('click', reset);
+  drawRule(); drawModel();
+  return {};
+})();
+
+DEMOS.shift = (() => {
+  const svg = document.getElementById('shift-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [0, 10], y: [-3, 4], xt: [0, 2, 4, 6, 8, 10], yt: [-2, 0, 2, 4], xl: 'x (input)', yl: 'y (output)' });
+  const f = (x) => Math.sin(1.1 * x) + 0.2 * x;
+  const r = rng(5);
+  const tx = Array.from({ length: 25 }, () => r() * 4), ty = tx.map((x) => f(x) + 0.15 * gauss(r));
+  const u = (x) => (x - 2) / 2;
+  const coef = polyfit(tx.map(u), ty, 5);
+  const model = (x) => polyval(coef, u(x));
+  const prod = Array.from({ length: 14 }, () => ({ o: r() * 2, n: 0.15 * gauss(r) }));
+  el('rect', { x: F.sx(0), y: F.T, width: F.sx(4) - F.sx(0), height: 44, style: 'fill:var(--c-a);fill-opacity:.1' }, F.plot);
+  el('text', { class: 'txs', x: F.sx(2), y: F.T + 31, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'training' }, svg);
+  const win = el('rect', { class: 'zone', y: F.T, height: F.H - F.B - F.T, style: 'fill-opacity:.9' }, F.plot);
+  F.plot.insertBefore(win, F.plot.firstChild);
+  const winLabel = el('text', { class: 'txs', y: F.H - F.B - 16, 'text-anchor': 'middle', text: 'production' }, svg);
+  el('path', { class: 'curve-t', d: curvePath(f, 0, 10, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath(model, 0, 10, F.sx, F.sy, 400) }, F.plot);
+  tx.forEach((x, i) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(ty[i]), r: 9 }, F.plot));
+  const prodDots = prod.map(() => el('circle', { r: 9, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:3.5' }, F.plot));
+  legend(svg, F.L + 560, F.T + 84, [['line', 'curve-a', 'model'], ['line', 'curve-t', 'true function'], ['ring', '', 'production data']]);
+  const slider = document.getElementById('shift-s');
+  function draw() {
+    const s = +slider.value;
+    document.getElementById('shift-val').textContent = s.toFixed(1);
+    win.setAttribute('x', F.sx(s)); win.setAttribute('width', F.sx(s + 2) - F.sx(s));
+    winLabel.setAttribute('x', F.sx(s + 1));
+    const errs = prod.map((p, i) => {
+      const x = s + p.o, y = f(x) + p.n;
+      prodDots[i].setAttribute('cx', F.sx(x)); prodDots[i].setAttribute('cy', F.sy(y));
+      return (model(x) - y) ** 2;
+    });
+    document.getElementById('shift-err').textContent = fmt(mean(errs));
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.kmeans = (() => {
+  const svg = document.getElementById('km-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 80, x: [0, 10], y: [0, 7], xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6], xl: 'feature 1', yl: 'feature 2' });
+  const r = rng(8), CLS = ['fa', 'fb', 'fc'];
+  const pts = [];
+  [[2.5, 5], [7.5, 5.2], [5, 1.8]].forEach(([cx, cy]) => {
+    for (let i = 0; i < 25; i++) pts.push({ x: cx + 0.85 * gauss(r), y: cy + 0.7 * gauss(r), k: -1 });
+  });
+  const START = [[1.2, 1.0], [2.0, 1.5], [8.8, 6.4]];
+  const links = el('g', {}, F.plot);
+  const dotEls = pts.map((p) => el('circle', { cx: F.sx(p.x), cy: F.sy(p.y), r: 10, class: 'pt ink3' }, F.plot));
+  const trails = START.map((_, j) => el('polyline', { style: `fill:none;stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:6 6` }, F.plot));
+  const cEls = START.map((_, j) => el('rect', { width: 30, height: 30, rx: 3, class: CLS[j], style: 'stroke:var(--myst-color-text);stroke-width:3.5' }, F.plot));
+  let cents, hist, phase, iter;
+  const setPhase = (t) => { document.getElementById('km-phase').textContent = t; };
+  function placeCentroids() {
+    cents.forEach(([x, y], j) => { cEls[j].setAttribute('x', F.sx(x) - 15); cEls[j].setAttribute('y', F.sy(y) - 15); });
+    trails.forEach((t, j) => t.setAttribute('points', hist[j].map(([x, y]) => `${F.sx(x)},${F.sy(y)}`).join(' ')));
+  }
+  function inertia() {
+    return pts.reduce((s, p) => s + (p.k < 0 ? 0 : (p.x - cents[p.k][0]) ** 2 + (p.y - cents[p.k][1]) ** 2), 0);
+  }
+  function reset() {
+    cents = START.map((c) => c.slice()); hist = START.map((c) => [c.slice()]); phase = 'assign'; iter = 0;
+    pts.forEach((p, i) => { p.k = -1; dotEls[i].setAttribute('class', 'pt ink3'); });
+    while (links.firstChild) links.firstChild.remove();
+    placeCentroids(); setPhase('start');
+    document.getElementById('km-iter').textContent = 0;
+    document.getElementById('km-inertia').textContent = '—';
+  }
+  function assign() {
+    let changed = 0;
+    while (links.firstChild) links.firstChild.remove();
+    pts.forEach((p, i) => {
+      let best = 0;
+      cents.forEach(([x, y], j) => { if ((p.x - x) ** 2 + (p.y - y) ** 2 < (p.x - cents[best][0]) ** 2 + (p.y - cents[best][1]) ** 2) best = j; });
+      if (best !== p.k) changed++;
+      p.k = best;
+      dotEls[i].setAttribute('class', 'pt ' + CLS[best]);
+      el('line', { x1: F.sx(p.x), y1: F.sy(p.y), x2: F.sx(cents[best][0]), y2: F.sy(cents[best][1]), style: `stroke:var(--c-${'abc'[best]});stroke-opacity:.35;stroke-width:1.5` }, links);
+    });
+    return changed;
+  }
+  function update() {
+    while (links.firstChild) links.firstChild.remove();
+    const from = cents.map((c) => c.slice());
+    const to = cents.map((c, j) => {
+      const mine = pts.filter((p) => p.k === j);
+      return mine.length ? [mean(mine.map((p) => p.x)), mean(mine.map((p) => p.y))] : c;
+    });
+    to.forEach((c, j) => hist[j].push(c.slice()));
+    let k = 0;
+    const FR = REDUCED ? 1 : 24;
+    const tick = () => {
+      k++;
+      const e = 1 - (1 - k / FR) ** 2;
+      cents = from.map(([x, y], j) => [x + (to[j][0] - x) * e, y + (to[j][1] - y) * e]);
+      cents.forEach(([x, y], j) => { cEls[j].setAttribute('x', F.sx(x) - 15); cEls[j].setAttribute('y', F.sy(y) - 15); });
+      if (k < FR) requestAnimationFrame(tick); else { cents = to; placeCentroids(); document.getElementById('km-inertia').textContent = fmt(inertia(), 1); }
+    };
+    tick();
+  }
+  document.getElementById('km-step').addEventListener('click', () => {
+    if (phase === 'done') return;
+    if (phase === 'assign') {
+      const changed = assign();
+      document.getElementById('km-inertia').textContent = fmt(inertia(), 1);
+      if (!changed && iter > 0) { phase = 'done'; setPhase('converged'); return; }
+      iter++; document.getElementById('km-iter').textContent = iter;
+      phase = 'update'; setPhase('assign');
+    } else { update(); phase = 'assign'; setPhase('update'); }
+  });
+  document.getElementById('km-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.lp = (() => {
+  const svg = document.getElementById('lp-svg');
+  const sx = lin(-1.4, 2.4, 20, 772), sy = lin(-0.9, 1.3, 480, 20);
+  const r = rng(4), N = 30, pts = [];
+  for (let i = 0; i < N; i++) {
+    const t = (Math.PI * i) / (N - 1);
+    pts.push({ x: Math.cos(t) + 0.045 * gauss(r), y: Math.sin(t) + 0.045 * gauss(r) });
+  }
+  for (let i = 0; i < N; i++) {
+    const t = (Math.PI * i) / (N - 1);
+    pts.push({ x: 1 - Math.cos(t) + 0.045 * gauss(r), y: 0.5 - Math.sin(t) + 0.045 * gauss(r) });
+  }
+  const SEEDS = { 15: 0, 2: 0, 45: 1, 57: 1 };
+  const RADIUS = 0.26;
+  const els = pts.map((p, i) => el('circle', { cx: sx(p.x), cy: sy(p.y), r: i in SEEDS ? 14 : 10 }, svg));
+  let lab;
+  function paint(fresh = new Set()) {
+    pts.forEach((p, i) => {
+      const k = lab[i], seed = i in SEEDS;
+      els[i].setAttribute('class', k < 0 ? 'pt ink3' : `pt ${k ? 'fb' : 'fa'}${fresh.has(i) ? ' an-pop' : ''}`);
+      els[i].setAttribute('style', (seed ? 'stroke:var(--myst-color-text);stroke-width:3.5;' : '') + (k < 0 ? 'opacity:.55' : ''));
+    });
+    document.getElementById('lp-count').textContent = `${lab.filter((k) => k >= 0).length} / ${pts.length}`;
+  }
+  function reset() { lab = pts.map((_, i) => (i in SEEDS ? SEEDS[i] : -1)); paint(); }
+  document.getElementById('lp-step').addEventListener('click', () => {
+    const prev = lab.slice(), fresh = new Set();
+    pts.forEach((p, i) => {
+      if (prev[i] >= 0) return;
+      let best = -1, bd = RADIUS;
+      pts.forEach((q, j) => { const d = Math.hypot(p.x - q.x, p.y - q.y); if (prev[j] >= 0 && d < bd) { bd = d; best = j; } });
+      if (best >= 0) { lab[i] = prev[best]; fresh.add(i); }
+    });
+    paint(fresh);
+  });
+  document.getElementById('lp-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.rl = (() => {
+  const svg = document.getElementById('grid-svg');
+  const CELL = 90, OX = 171, OY = 20, COLS = 5, ROWS = 4;
+  const WALLS = ['1,1', '2,1'], GOAL = '4,0', TRAP = '4,1';
+  const cx = (c) => OX + c * CELL + CELL / 2, cy = (rw) => OY + rw * CELL + CELL / 2;
+  for (let rw = 0; rw < ROWS; rw++) for (let c = 0; c < COLS; c++) {
+    const key = `${c},${rw}`;
+    const fill = WALLS.includes(key) ? 'var(--myst-color-surface-hover)' : key === GOAL ? 'var(--c-c-soft)' : key === TRAP ? 'var(--c-b-soft)' : 'var(--myst-color-bg)';
+    el('rect', { x: OX + c * CELL, y: OY + rw * CELL, width: CELL, height: CELL, style: `fill:${fill};stroke:var(--myst-color-border-strong);stroke-width:1.5` }, svg);
+  }
+  el('text', { class: 'tx', x: cx(4), y: cy(0) + 10, 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-c)', text: '+1' }, svg);
+  el('text', { class: 'tx', x: cx(4), y: cy(1) + 10, 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-b)', text: '−1' }, svg);
+  el('text', { class: 'ttl', x: OX + 8, y: cy(3) + 38, text: 'start' }, svg);
+  el('text', { class: 'txs', x: OX + COLS * CELL + 24, y: cy(0) + 8, text: 'goal' }, svg);
+  el('text', { class: 'txs', x: OX + COLS * CELL + 24, y: cy(1) + 8, text: 'trap' }, svg);
+  el('text', { class: 'txs', x: OX - 24, y: cy(1) + 8, 'text-anchor': 'end', text: 'wall' }, svg);
+  const trail = el('polyline', { style: 'fill:none;stroke:var(--c-a);stroke-width:4;stroke-opacity:.5;stroke-linecap:round;stroke-linejoin:round' }, svg);
+  const agent = el('g', { style: 'transition:transform .3s ease-out' }, svg);
+  el('circle', { r: 24, class: 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:3' }, agent);
+  const EPISODES = [
+    [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [4, 2], [4, 1]],
+    [[0, 3], [1, 3], [1, 2], [0, 2], [0, 1], [0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+    [[0, 3], [0, 2], [0, 1], [0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+  ];
+  const STEP_COST = 0.04;
+  let ep = 0, returns = [], timer = null;
+  const put = ([c, rw]) => { agent.style.transform = `translate(${cx(c)}px, ${cy(rw)}px)`; };
+  function reset() { clearInterval(timer); timer = null; ep = 0; returns = []; trail.setAttribute('points', ''); put([0, 3]); show(0); }
+  function show(steps) {
+    document.getElementById('rl-ep').textContent = `${ep} · ${steps}`;
+    document.getElementById('rl-g').textContent = returns.length ? returns.map((g) => fmt(g).replace('-', '−')).join(', ') : '—';
+  }
+  document.getElementById('rl-run').addEventListener('click', () => {
+    if (timer) return;
+    const path = EPISODES[Math.min(ep, EPISODES.length - 1)];
+    ep++;
+    let k = 0;
+    trail.setAttribute('points', '');
+    put(path[0]);
+    timer = setInterval(() => {
+      k++;
+      put(path[k]);
+      trail.setAttribute('points', path.slice(0, k + 1).map(([c, rw]) => `${cx(c)},${cy(rw)}`).join(' '));
+      show(k);
+      if (k === path.length - 1) {
+        clearInterval(timer); timer = null;
+        const end = path[k].join(',');
+        returns.push((end === GOAL ? 1 : -1) - STEP_COST * k);
+        show(k);
+      }
+    }, 340);
+  });
+  document.getElementById('rl-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.split = (() => {
+  const box = document.getElementById('split-box');
+  const N = 20, SLOT = 52, GAP = 60;
+  const squares = Array.from({ length: N }, (_, i) => {
+    const d = document.createElement('div');
+    d.textContent = i + 1;
+    d.style.cssText = 'position:absolute;top:66px;width:44px;height:44px;border-radius:4px;color:#fff;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;transition:left .6s var(--ease-out),background-color .4s;';
+    box.appendChild(d);
+    return d;
+  });
+  const lab = (txt) => { const d = document.createElement('div'); d.className = 'label'; d.style.cssText = 'position:absolute;top:10px;transition:left .6s var(--ease-out)'; box.appendChild(d); return d; };
+  const trainLab = lab(), testLab = lab();
+  const slider = document.getElementById('split-p');
+  let order = [...Array(N).keys()];
+  function draw() {
+    const p = +slider.value, nTest = Math.round((N * p) / 100), nTrain = N - nTest;
+    document.getElementById('split-p-val').textContent = p + '%';
+    order.forEach((id, slot) => {
+      const test = slot >= nTrain;
+      squares[id].style.left = slot * SLOT + (test ? GAP : 0) + 'px';
+      squares[id].style.background = test ? 'var(--c-b)' : 'var(--c-a)';
+    });
+    trainLab.style.left = '0px'; trainLab.innerHTML = `<b style="color:var(--c-a)">Training</b> (${nTrain})`;
+    testLab.style.left = nTrain * SLOT + GAP + 'px'; testLab.innerHTML = `<b style="color:var(--c-b)">Test</b> (${nTest})`;
+  }
+  slider.addEventListener('input', draw);
+  document.getElementById('split-shuffle').addEventListener('click', () => {
+    for (let i = N - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    draw();
+  });
+  draw();
+  return {};
+})();
+
+const POLY = (() => {
+  const r = rng(3), f = (x) => Math.sin(2 * Math.PI * x);
+  const train = Array.from({ length: 12 }, (_, i) => (i + 0.2 + 0.6 * r()) / 12).map((x) => [x, f(x) + 0.25 * gauss(r)]);
+  const test = Array.from({ length: 40 }, () => r()).map((x) => [x, f(x) + 0.25 * gauss(r)]);
+  const u = (x) => 2 * x - 1;
+  const fits = {}, err = {};
+  for (let d = 1; d <= 11; d++) {
+    const c = polyfit(train.map((p) => u(p[0])), train.map((p) => p[1]), d);
+    fits[d] = (x) => polyval(c, u(x));
+    const mse = (set) => mean(set.map(([x, y]) => (fits[d](x) - y) ** 2));
+    err[d] = { train: Math.max(mse(train), 1e-4), test: mse(test) };
+  }
+  const best = +Object.keys(err).reduce((a, b) => (err[b].test < err[a].test ? b : a));
+  return { f, train, test, fits, err, best };
+})();
+
+DEMOS.poly = (() => {
+  const svg = document.getElementById('poly-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [0, 1], y: [-2, 2], xt: [0, 0.25, 0.5, 0.75, 1], yt: [-2, -1, 0, 1, 2], xl: 'x', yl: 'y' });
+  el('path', { class: 'curve-t', d: curvePath(POLY.f, 0, 1, F.sx, F.sy) }, F.plot);
+  const fitPath = el('path', { class: 'curve-a' }, F.plot);
+  POLY.test.forEach(([x, y]) => el('circle', { cx: F.sx(x), cy: F.sy(y), r: 8, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:3' }, F.plot));
+  POLY.train.forEach(([x, y]) => el('circle', { class: 'pt fa', cx: F.sx(x), cy: F.sy(y), r: 11 }, F.plot));
+  legend(svg, F.L + 24, F.T + 30, [['line', 'curve-a', 'fitted polynomial'], ['line', 'curve-t', 'true curve']]);
+  const bars = document.getElementById('poly-bars');
+  const bx = lin(-4, 2, 0, 330);
+  const barTr = el('rect', { x: 94, y: 14, height: 36, class: 'fa', rx: 2 }, bars);
+  const barTe = el('rect', { x: 94, y: 68, height: 36, class: 'fb', rx: 2 }, bars);
+  el('text', { class: 'tk', x: 84, y: 40, 'text-anchor': 'end', text: 'train' }, bars);
+  el('text', { class: 'tk', x: 84, y: 94, 'text-anchor': 'end', text: 'test' }, bars);
+  const slider = document.getElementById('poly-deg');
+  const diag = document.getElementById('poly-diag');
+  function draw() {
+    const d = +slider.value, e = POLY.err[d], minTest = POLY.err[POLY.best].test;
+    document.getElementById('poly-deg-val').textContent = d;
+    fitPath.setAttribute('d', curvePath(POLY.fits[d], 0, 1, F.sx, F.sy, 500));
+    document.getElementById('poly-tr').textContent = fmt(e.train, 3);
+    document.getElementById('poly-te').textContent = fmt(e.test, 3);
+    barTr.setAttribute('width', clamp(bx(Math.log10(e.train)), 4, 330));
+    barTe.setAttribute('width', clamp(bx(Math.log10(e.test)), 4, 330));
+    let label = 'Good fit', col = 'var(--c-c)';
+    if (e.test > 1.6 * minTest && d < POLY.best) { label = 'Underfitting'; col = 'var(--c-b)'; }
+    if (e.test > 1.6 * minTest && d > POLY.best) { label = 'Overfitting'; col = 'var(--c-d)'; }
+    diag.textContent = label; diag.style.color = col;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+function drawUCurve() {
+  const svg = document.getElementById('u-svg');
+  const ds = Object.keys(POLY.err).map(Number);
+  const lg = (v) => Math.log10(Math.min(v, 1e2));
+  const F = frame(svg, { W: 1160, H: 560, l: 100, b: 84, x: [0.5, 11.5], y: [-4, 2], xt: ds, yt: [-4, -3, -2, -1, 0, 1, 2], fy: (v) => (v === 2 ? 'high' : v === -4 ? 'low' : ''), xl: 'model complexity (degree)', yl: 'error', grid: true });
+  const b = POLY.best;
+  el('rect', { x: F.sx(0.5), y: F.T, width: F.sx(b - 0.5) - F.sx(0.5), height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.07' }, F.plot);
+  el('rect', { x: F.sx(b + 0.5), y: F.T, width: F.sx(11.5) - F.sx(b + 0.5), height: F.H - F.B - F.T, style: 'fill:var(--c-d);fill-opacity:.07' }, F.plot);
+  el('text', { class: 'txs', x: F.sx(0.5) + 16, y: F.T + 34, style: 'fill:var(--c-b)', text: 'high bias' }, svg);
+  el('text', { class: 'txs', x: F.sx(11.5) - 16, y: F.T + 34, 'text-anchor': 'end', style: 'fill:var(--c-d)', text: 'high variance' }, svg);
+  ['train', 'test'].forEach((k, i) => {
+    const d = ds.map((g, j) => (j ? 'L' : 'M') + F.sx(g) + ' ' + F.sy(lg(POLY.err[g][k]))).join('');
+    el('path', { d, pathLength: 1, class: `${i ? 'curve-b' : 'curve-a'} an-draw`, style: `--d:${i * 0.5}s` }, F.plot);
+    ds.forEach((g, j) => el('circle', { cx: F.sx(g), cy: F.sy(lg(POLY.err[g][k])), r: 7, class: `${i ? 'fb' : 'fa'} an-pop`, style: `--d:${i * 0.5 + j * 0.1}s` }, F.plot));
+  });
+  const yb = F.sy(lg(POLY.err[b].test));
+  const g = el('g', { class: 'an-fade', style: '--d:1.8s' }, svg);
+  el('circle', { cx: F.sx(b), cy: yb, r: 16, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, g);
+  el('text', { class: 'txs', x: F.sx(b), y: yb - 30, 'text-anchor': 'middle', text: `lowest test error: degree ${b}` }, g);
+  legend(svg, F.L + 380, F.T + 30, [['line', 'curve-a', 'training'], ['line', 'curve-b', 'test']]);
+}
+
+drawNestedNet(); drawTimeline(); drawMatrix(); drawFeatures(); drawHypotheses();
+drawSupervised(); drawMask(); drawInduct(); drawUCurve();
+})();
+</script>
+</body>
+</html>

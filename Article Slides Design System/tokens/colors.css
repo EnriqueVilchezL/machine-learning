@@ -1,0 +1,48 @@
+/* Colors — lifted verbatim from jupyter-book/myst-theme styles/theme-colors.css */
+:root{
+--myst-color-link:#1d4ed8;--myst-color-link-hover:#3b82f6;--myst-color-link-underline:#60a5fa;
+--myst-color-active:#2563eb;--myst-color-active-bg:rgba(147,197,253,0.3);--myst-color-active-surface:#eff6ff;
+--myst-color-primary:#3b82f6;--myst-color-primary-hover:#1d4ed8;
+--myst-color-focus-ring:#3b82f6;--myst-color-focus-outline:#bfdbfe;
+--myst-color-accent-text:#1e3a8a;--myst-color-accent-surface:#eff6ff;--myst-color-accent-surface-border:#bfdbfe;--myst-color-accent-surface-text:#1e3a8a;
+--myst-color-bg:#ffffff;--myst-color-bg-secondary:#f9fafb;--myst-color-surface:#f3f4f6;--myst-color-surface-hover:#e5e7eb;
+--myst-color-text:#111827;--myst-color-text-secondary:#4b5563;--myst-color-text-tertiary:#6b7280;--myst-color-prose-body:#44403c;
+--myst-color-border:#e5e7eb;--myst-color-border-strong:#d1d5db;
+--myst-color-inverse-bg:#1e3a8a;--myst-color-inverse-text:#ffffff;
+--myst-color-code:#be185d;--myst-color-kbd-shadow:rgb(28 25 23 / 10%);
+--myst-color-info:#3b82f6;--myst-color-info-bg:#eff6ff;--myst-color-info-text:#2563eb;
+--myst-color-success:#16a34a;--myst-color-success-bg:#f0fdf4;--myst-color-success-text:#16a34a;
+--myst-color-tip:var(--myst-color-success);--myst-color-tip-bg:var(--myst-color-success-bg);--myst-color-tip-text:var(--myst-color-success-text);
+--myst-color-warning:#d97706;--myst-color-warning-bg:#fffbeb;--myst-color-warning-text:#d97706;
+--myst-color-danger:#dc2626;--myst-color-danger-bg:#fef2f2;--myst-color-danger-text:#dc2626;
+--myst-color-error:#ef4444;--myst-color-error-bg:#fee2e2;--myst-color-error-text:#b91c1c;
+--myst-color-theorem:#a855f7;--myst-color-theorem-bg:#faf5ff;--myst-color-theorem-text:#9333ea;
+--myst-color-example:#f97316;--myst-color-example-bg:#fff7ed;--myst-color-example-text:#ea580c;
+--myst-color-proof:#6b7280;--myst-color-proof-bg:#f9fafb;--myst-color-proof-text:#4b5563;
+/* Slide-specific: back-to-article bar (slate) from ArticlePage.tsx */
+--ats-color-bar-bg:#f8fafc;--ats-color-bar-border:#cbd5e1;--ats-color-chip-bg:#e2e8f0;--ats-color-chip-border:#475569;--ats-color-chip-hover:#1e293b;
+/* Semantic aliases */
+--surface-slide:var(--myst-color-bg);--surface-card:var(--myst-color-bg-secondary);--surface-muted:var(--myst-color-surface);
+--text-heading:var(--myst-color-text);--text-body:var(--myst-color-prose-body);--text-lead:var(--myst-color-text-secondary);--text-caption:var(--myst-color-text-tertiary);
+--rule:var(--myst-color-border);--rule-strong:var(--myst-color-border-strong);
+}
+.dark{
+--myst-color-link:#60a5fa;--myst-color-link-hover:#93c5fd;--myst-color-link-underline:#3b82f6;
+--myst-color-active:#60a5fa;--myst-color-active-bg:rgba(59,130,246,0.2);--myst-color-active-surface:#1e293b;
+--myst-color-focus-ring:#60a5fa;--myst-color-focus-outline:#60a5fa;
+--myst-color-accent-text:#dbeafe;--myst-color-accent-surface:#1e3a8a4d;--myst-color-accent-surface-border:#1e40af;--myst-color-accent-surface-text:#eff6ff;
+--myst-color-bg:#1c1917;--myst-color-bg-secondary:#292524;--myst-color-surface:#1e293b;--myst-color-surface-hover:#334155;
+--myst-color-text:#ffffff;--myst-color-text-secondary:#d1d5db;--myst-color-text-tertiary:#d1d5db;--myst-color-prose-body:#d6d3d1;
+--myst-color-border:#4b5563;--myst-color-border-strong:#6b7280;
+--myst-color-inverse-bg:#ffffff;--myst-color-inverse-text:#000000;
+--myst-color-code:#f472b6;--myst-color-kbd-shadow:rgb(255 255 255 / 10%);
+--myst-color-info-bg:#0f172a;--myst-color-info-text:#60a5fa;
+--myst-color-success:#22c55e;--myst-color-success-bg:#0f172a;--myst-color-success-text:#4ade80;
+--myst-color-warning:#f59e0b;--myst-color-warning-bg:#0f172a;--myst-color-warning-text:#fbbf24;
+--myst-color-danger:#ef4444;--myst-color-danger-bg:#0f172a;--myst-color-danger-text:#f87171;
+--myst-color-error:#f87171;--myst-color-error-bg:#0f172a;--myst-color-error-text:#fca5a5;
+--myst-color-theorem-bg:#0f172a;--myst-color-theorem-text:#c084fc;
+--myst-color-example-bg:#0f172a;--myst-color-example-text:#fb923c;
+--myst-color-proof-bg:#0f172a;--myst-color-proof-text:#9ca3af;
+--ats-color-bar-bg:#475569;--ats-color-bar-border:#cbd5e1;--ats-color-chip-bg:#334155;--ats-color-chip-border:#94a3b8;
+}

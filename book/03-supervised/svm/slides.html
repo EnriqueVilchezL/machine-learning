@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support vector machines</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.street{fill:var(--c-c);fill-opacity:.16}
+.street.best{fill-opacity:.32}
+.bnd{stroke:var(--myst-color-text);stroke-width:4;fill:none}
+.edge{stroke:var(--myst-color-text-tertiary);stroke-width:2.5;stroke-dasharray:10 8;fill:none}
+.sv{fill:none;stroke:var(--myst-color-text);stroke-width:3}
+.drag{cursor:grab}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 12</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Support vector machines</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Separating two classes with the widest possible street, and bending that street with kernels</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 12 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">The widest street</li>
+<li class="an-up" style="--d:.15s">Support vectors and soft margins</li>
+<li class="an-up" style="--d:.25s">Kernels and settings</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, drags and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i \in \{-1, +1\}</span></td><td>Its label: <span class="tex">+1</span> for spam, <span class="tex">-1</span> for normal</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\mathbf{w}, \ b</span></td><td>Weights and offset that place the line</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\xi_i, \ C</span></td><td>Slack of example <span class="tex">i</span> and the price of slack</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">K(\mathbf{x}, \mathbf{x}')</span></td><td>Kernel: similarity of two examples</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, subscript <span class="tex">j</span> picks a feature.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The widest street</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Many lines separate the classes. A support vector machine picks the one with the most room on both sides.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Many lines">
+<div class="hdr" data-s="Maximum margin"></div>
+<h2>Many possible lines</h2>
+<div class="fr">
+<div class="figbox"><svg id="many-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Each email is a point. A straight line, the <strong>decision boundary</strong>, puts spam on one side.</p>
+<p class="small frag up" style="margin:0">The line holds the points where a weighted sum of the features minus a threshold is zero. In more dimensions: a <strong>hyperplane</strong>.</p>
+<p class="small frag up" style="margin:0">A, B and C make no mistakes. Which would you trust with new mail?</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>22 emails, normal (blue) and spam (orange), and three lines that separate them.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Line formula">
+<div class="hdr" data-s="Maximum margin"></div>
+<h2>The line as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Give each feature a weight <span class="tex">w_j</span>. The boundary holds the points where the weighted sum plus an offset <span class="tex">b</span> is zero:</p>
+<div class="eq"><div class="m tex-d">\mathbf{w}^\top \mathbf{x} + b = w_1 x_1 + w_2 x_2 + \cdots + w_d x_d + b = 0</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">Points on one side give a positive value, points on the other side a negative one. The sign is the prediction:</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">\hat{y} = \operatorname{sign}(\mathbf{w}^\top \mathbf{x} + b)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="l2" style="margin:0"><span class="tex">\mathbf{w}</span> sets the tilt of the line and <span class="tex">b</span> slides it. Training means choosing both.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Take <span class="tex">\mathbf{w} = (2, 1)</span>, <span class="tex">b = -4</span> and an email with <span class="tex">\mathbf{x} = (3, 1)</span>.</p><p><span class="tex">2 \cdot 3 + 1 \cdot 1 - 4 = 3 > 0</span></p><p><span class="tex">\Rightarrow \ \hat{y} = +1</span>: spam.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Find the widest street" data-demo="street">
+<div class="hdr" data-s="Maximum margin"></div>
+<h2>Find the widest street</h2>
+<div class="fr">
+<div class="figbox"><svg id="st-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<div class="ctl"><label><span>Tilt of the line</span><b id="st-tv">0°</b></label><input type="range" id="st-tilt" min="-85" max="85" step="1" value="-30"></div>
+<div class="ctl"><label><span>Position</span><b id="st-pv">0.0</b></label><input type="range" id="st-pos" min="-2" max="2" step="0.02" value="-0.2"></div>
+<div class="ro"><span>Street width</span><b id="st-w" class="a">—</b></div>
+<div class="ro"><span>Widest possible</span><b id="st-best">—</b></div>
+<div class="btns"><button class="bt chip" id="st-go">Show the widest</button></div>
+<div><span class="tag" id="st-tag">—</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>The street grows until it touches the first point. The SVM keeps the line whose street is widest.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Margin formula">
+<div class="hdr" data-s="Maximum margin"></div>
+<h2>The street in formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Distance from a point to the line: the value of the formula divided by the length of <span class="tex">\mathbf{w}</span>.</p>
+<div class="eq"><div class="m tex-d">\text{dist}(\mathbf{x}) = \frac{|\mathbf{w}^\top \mathbf{x} + b|}{\lVert \mathbf{w} \rVert}, \qquad \lVert \mathbf{w} \rVert = \sqrt{w_1^2 + \cdots + w_d^2}</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="m1" style="margin:0">Scale <span class="tex">\mathbf{w}</span> and <span class="tex">b</span> so the edges of the street are <span class="tex">\mathbf{w}^\top \mathbf{x} + b = \pm 1</span>. The width is then</p>
+<div class="eq frag up" data-step="m1"><div class="m tex-d">\text{margin} = \frac{2}{\lVert \mathbf{w} \rVert}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="m2" style="margin:0">A small <span class="tex">\lVert \mathbf{w} \rVert</span> means a wide street. Keep every point on its side and outside the street:</p>
+<div class="eq frag up" data-step="m2"><div class="m tex-d">\min_{\mathbf{w}, b} \ \tfrac{1}{2} \lVert \mathbf{w} \rVert^2 \quad \text{subject to} \quad y_i (\mathbf{w}^\top \mathbf{x}_i + b) \ge 1 \ \text{ for all } i</div><div class="n">(5)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Take <span class="tex">\mathbf{w} = (3, 4)</span> and <span class="tex">b = -5</span>.</p><p><span class="tex">\lVert \mathbf{w} \rVert = \sqrt{9 + 16} = 5</span></p><p>Margin: <span class="tex">2/5 = 0.4</span></p><p>Point <span class="tex">(2, 1)</span>: <span class="tex">6 + 4 - 5 = 5</span></p><p>Distance: <span class="tex">5/5 = 1</span></p><p>With <span class="tex">y = +1</span>: <span class="tex">5 \ge 1</span>, so the point is outside the street.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why the widest">
+<div class="hdr" data-s="Maximum margin"></div>
+<h2>Why the widest street</h2>
+<div class="two" style="flex:none;height:400px">
+<div class="col"><div class="figbox"><svg id="why-a" viewBox="0 0 792 400"></svg></div></div>
+<div class="col"><div class="figbox"><svg id="why-b" viewBox="0 0 792 400"></svg></div></div>
+</div>
+<div class="two" style="flex:none;margin-top:20px">
+<aside class="adm k-note sm frag up"><div class="h"><i data-i="note"></i><span>Drive in the middle of the road</span></div><div class="b"><p>A driver who hugs one curb hits it at the first small swerve. In the middle there is room for error on both sides.</p></div></aside>
+<p class="frag up" style="margin:0">New points are never exactly like the training points. The widest street, the <strong>maximum margin</strong>, leaves the most room for that variation, so it tends to <strong>generalize</strong> better.</p>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 3:</b>Three new normal emails (diamonds) arrive. The narrow street misclassifies two of them, the widest street none.</p>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Support vectors and soft margins</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Only a few points decide the street. Real data overlaps, so the street must allow some mistakes.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Support vectors" data-demo="sv">
+<div class="hdr" data-s="Support vectors"></div>
+<h2>Only the closest points matter</h2>
+<div class="fr">
+<div class="figbox"><svg id="sv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">The points on the edges of the street are the <strong>support vectors</strong>. They hold the street in place.</p>
+<p class="small" style="margin:0">Drag a far point: nothing changes. Drag a ringed point: the line moves.</p>
+<div class="ro"><span>Support vectors</span><b id="sv-n" class="a">—</b></div>
+<div class="ro"><span>Street width</span><b id="sv-w">—</b></div>
+<div><span class="tag" id="sv-tag">Drag a point</span></div>
+<div class="btns"><button class="bt chip" id="sv-rm">Remove far points</button><button class="bt chip" id="sv-reset">Reset</button></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Ringed points are the support vectors. Removing all others leaves the same street.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Soft margin" data-demo="soft">
+<div class="hdr" data-s="Soft margin"></div>
+<h2>Soft margin</h2>
+<div class="fr">
+<div class="figbox"><svg id="soft-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">When classes overlap, no street is empty. The <strong>soft margin</strong> lets points enter the street or cross it, at a price set by <strong>C</strong>.</p>
+<div class="ctl"><label><span>Setting C</span><b id="soft-cv">1</b></label><input type="range" id="soft-c" min="0" max="16" step="1" value="8"></div>
+<div class="ro"><span>Street width</span><b id="soft-w" class="a">—</b></div>
+<div class="ro"><span>Points inside or across</span><b id="soft-v" class="bb">—</b></div>
+<div class="ro"><span>Training mistakes</span><b id="soft-e">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Small C: wide street, many violations (ringed). Large C: narrow street, few violations.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Soft margin formula">
+<div class="hdr" data-s="Soft margin"></div>
+<h2>Paying for violations</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Give each point a <strong>slack</strong> <span class="tex">\xi_i \ge 0</span>: how far it may enter the street. Each unit of slack costs <span class="tex">C</span>.</p>
+<div class="eq"><div class="m tex-d">\min_{\mathbf{w}, b, \xi} \ \tfrac{1}{2} \lVert \mathbf{w} \rVert^2 + C \sum_{i=1}^{n} \xi_i \quad \text{subject to} \quad y_i (\mathbf{w}^\top \mathbf{x}_i + b) \ge 1 - \xi_i</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="s1" style="margin:0">Write <span class="tex">f(\mathbf{x}) = \mathbf{w}^\top \mathbf{x} + b</span>. The smallest slack that works is the <strong>hinge loss</strong>:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">\xi_i = \max\big(0, \ 1 - y_i f(\mathbf{x}_i)\big)</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="s2" style="margin:0">Large <span class="tex">C</span>: slack is expensive, so the street narrows. Small <span class="tex">C</span>: slack is cheap, so the street widens.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Three spam emails, <span class="tex">y = +1</span>:</p><p><span class="tex">f = 2</span>: outside the street, <span class="tex">\xi = 0</span>.</p><p><span class="tex">f = 0.4</span>: inside the street, <span class="tex">\xi = 0.6</span>.</p><p><span class="tex">f = -0.5</span>: wrong side, <span class="tex">\xi = 1.5</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Kernels and settings</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">When no straight line works, add a feature so that one does.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Add a feature" data-demo="lift">
+<div class="hdr" data-s="Kernel trick"></div>
+<h2>Add a feature</h2>
+<div class="fr">
+<div class="figbox"><svg id="lift-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Normal values sit in the middle, unusual ones at both ends. No single cut point separates them.</p>
+<p class="small" style="margin:0">Add a second feature, the value squared. The points rise onto a parabola and a flat line now works.</p>
+<div class="btns"><button class="bt" id="lift-0">One feature</button><button class="bt chip" id="lift-1">Add x squared</button></div>
+<div><span class="tag" id="lift-tag">No line separates them</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>14 points on one feature. Lifted, the blue points stay low and the orange ones rise.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Ring to bowl">
+<div class="hdr" data-s="Kernel trick"></div>
+<h2>From a ring to a bowl</h2>
+<div class="figbox"><svg id="bowl-svg" viewBox="0 0 1680 600"></svg></div>
+<div class="two" style="flex:none;margin-top:16px">
+<p class="small frag up" style="margin:0">A <strong>kernel</strong> computes how similar two points are as if the extra features were there, without building them. This shortcut is the <strong>kernel trick</strong>.</p>
+<p class="small frag up" style="margin:0">A flat cut in the bigger space becomes a curved boundary back in the original space: here, the dashed circle.</p>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 7:</b>Left: a ring of orange points around a blue cluster. Right: the same points lifted by their squared distance to the center; a flat plane splits them.</p>
+</section>
+
+<section class="s ats-prose" data-label="Curved boundaries" data-demo="rbf">
+<div class="hdr" data-s="Kernel trick"></div>
+<h2>Curved boundaries</h2>
+<div class="fr">
+<div class="figbox"><svg id="rbf-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">The <strong>RBF kernel</strong> (radial basis function) measures similarity by closeness. Its <strong>width</strong> sets how far each point reaches.</p>
+<div class="btns"><button class="bt chip" id="rbf-0">Wide</button><button class="bt" id="rbf-1">Medium</button><button class="bt chip" id="rbf-2">Narrow</button></div>
+<div class="ro"><span>Training mistakes</span><b id="rbf-e" class="a">—</b></div>
+<div class="ro"><span>Support vectors</span><b id="rbf-n">—</b></div>
+<div><span class="tag" id="rbf-tag">—</span></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Two half-moons. A wide kernel underfits; a narrow one wraps tightly around the points.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Kernel formulas">
+<div class="hdr" data-s="Kernel trick"></div>
+<h2>Kernel formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Let <span class="tex">\varphi(\mathbf{x})</span> add the extra features. A kernel gives their dot product directly, without building them:</p>
+<div class="eq"><div class="m tex-d">K(\mathbf{x}, \mathbf{x}') = \varphi(\mathbf{x})^\top \varphi(\mathbf{x}')</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="k1" style="margin:0">The RBF kernel is 1 for identical points and drops toward 0 as they move apart. A large <span class="tex">\gamma</span> means a narrow kernel.</p>
+<div class="eq frag up" data-step="k1"><div class="m tex-d">K(\mathbf{x}, \mathbf{x}') = \exp\big(-\gamma \lVert \mathbf{x} - \mathbf{x}' \rVert^2\big)</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="k2" style="margin:0">The prediction is a weighted sum of similarities to the support vectors (SV), with weights <span class="tex">\alpha_i \ge 0</span> found in training:</p>
+<div class="eq frag up" data-step="k2"><div class="m tex-d">\hat{y} = \operatorname{sign}\Big(\sum_{i \in \text{SV}} \alpha_i \, y_i \, K(\mathbf{x}_i, \mathbf{x}) + b\Big)</div><div class="n">(10)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>RBF with <span class="tex">\gamma = 0.5</span> for two points:</p><p><span class="tex">\mathbf{x} = (1, 2), \ \mathbf{x}' = (2, 3)</span></p><p><span class="tex">\lVert \mathbf{x} - \mathbf{x}' \rVert^2 = 1 + 1 = 2</span></p><p><span class="tex">K = e^{-0.5 \cdot 2} = e^{-1} \approx 0.37</span></p><p>For the same point twice, <span class="tex">K = e^{0} = 1</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Settings">
+<div class="hdr" data-s="In practice"></div>
+<h2>Settings and scaling</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>The three main settings of an SVM and what happens at each extreme.</p>
+<table class="tb">
+<colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup>
+<thead><tr><th>Setting</th><th>Small or simple</th><th>Large or complex</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>C</strong></td><td>Wide street, many violations allowed, risk of underfitting</td><td>Narrow street, few violations, risk of overfitting</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>Kernel</strong></td><td>Linear: a straight boundary</td><td>Polynomial or RBF: curved boundaries</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>Kernel width</strong></td><td>Wide: smooth boundary, close to a line</td><td>Narrow: wiggly boundary that follows single points</td></tr>
+</tbody>
+</table>
+<p class="frag up" style="margin-top:32px">Choose C and the kernel width with cross-validation (Topic 6): try a grid of values and keep the pair with the best validation score.</p>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Scale first</div><p>The street width is a distance. A feature measured in colones would swamp one measured in years, so scale the features first (Topic 4).</p></aside>
+<aside class="am"><div class="t">Start simple</div><p>Try a linear kernel first. Move to RBF only if the straight line underfits.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="In practice"></div>
+<h2>Strengths and weaknesses</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>When an SVM is a good choice and when it is not.</p>
+<table class="tb">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>The maximum margin tends to generalize well</td><td>Slow to train with hundreds of thousands of rows</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Works with many features, even more features than rows</td><td>Needs scaled features</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Kernels give curved boundaries</td><td>C and the kernel width must be tuned</td></tr>
+<tr class="an-up" style="--d:.35s"><td>The model depends only on the support vectors</td><td>No direct probability for each prediction</td></tr>
+<tr class="an-up" style="--d:.45s"><td>One clear answer: the widest street is unique</td><td>A kernel model is hard to explain</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Good fit</div><p>Text classification, such as spam filtering, with many word features and a few thousand examples.</p></aside>
+<aside class="am"><div class="t">Compared with logistic regression</div><p>Both draw a line. Logistic regression listens to every point; the SVM only to the points near the boundary (Topic 11).</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An SVM separates two classes with the line that leaves the widest street.</li>
+<li class="an-up" style="--d:.15s">A wide margin leaves room for new points, so it tends to generalize better.</li>
+<li class="an-up" style="--d:.25s">Only the support vectors, the points on the edges of the street, define the model.</li>
+<li class="an-up" style="--d:.35s">The soft margin allows some violations; C trades street width against mistakes.</li>
+<li class="an-up" style="--d:.45s">Kernels add features implicitly, so a flat cut becomes a curved boundary.</li>
+<li class="an-up" style="--d:.55s">Scale the features and tune C and the kernel width with cross-validation.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic works through the margin, the soft margin and kernels with more examples.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Cortes, C., &amp; Vapnik, V. (1995). Support-vector networks. <em>Machine Learning</em>, 20(3), 273–297.</li>
+<li style="margin:.4em 0">Boser, B. E., Guyon, I. M., &amp; Vapnik, V. N. (1992). A training algorithm for optimal margin classifiers. In <em>Proceedings of the Fifth Annual Workshop on Computational Learning Theory (COLT)</em> (pp. 144–152). ACM.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), chapter 9. Springer.</li>
+<li style="margin:.4em 0">Burkov, A. (2019). <em>The Hundred-Page Machine Learning Book</em>, chapter 3.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 13: naive Bayes.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+const $ = (id) => document.getElementById(id);
+
+/* ───────── helpers ───────── */
+function tween(state, ms, step) {
+  const token = (state.token = (state.token || 0) + 1);
+  if (REDUCED) { step(1); return; }
+  const t0 = performance.now();
+  const tick = (now) => {
+    if (token !== state.token) return;
+    const k = clamp((now - t0) / ms, 0, 1);
+    step(1 - (1 - k) ** 3);
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+const mix = (a, b, e) => a + (b - a) * e;
+function segmented(ids, onPick) {
+  ids.forEach((id, i) => $(id).addEventListener('click', () => {
+    ids.forEach((j, k) => { $(j).className = k === i ? 'bt' : 'bt chip'; });
+    onPick(i);
+  }));
+}
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+const DEG = Math.PI / 180;
+
+/* The 2D plane used by most figures: equal units on both axes, so streets look perpendicular */
+const XMAX = 10.54, YMAX = 6;
+const plane = (svg, o = {}) => frame(svg, { W: 1160, H: 700, x: [0, XMAX], y: [0, YMAX], xt: [], yt: [], grid: false, xl: 'feature 1', yl: 'feature 2', ...o });
+
+/* Emails: normal (blue, label −1) and spam (orange, label +1) */
+const BLUE = [[1.0, 1.2], [1.8, 2.4], [2.6, 1.0], [3.2, 2.8], [1.4, 3.6], [4.0, 1.6], [2.6, 3.9], [4.6, 0.6], [2.0, 0.5], [5.0, 1.9], [3.6, 0.4], [0.8, 2.2]];
+const ORANGE = [[6.2, 4.4], [7.2, 3.4], [8.3, 4.3], [7.4, 5.3], [5.4, 5.2], [8.9, 2.8], [9.5, 4.8], [6.6, 2.6], [9.8, 3.6], [8.0, 1.6]];
+
+/* Hard-margin SVM in 2D: sweep the direction of the normal and keep the largest gap */
+function maxMargin(B, O) {
+  let best = { gap: -Infinity };
+  const test = (th) => {
+    const n = [Math.cos(th), Math.sin(th)];
+    let mb = -Infinity, mo = Infinity;
+    B.forEach((p) => { mb = Math.max(mb, dot(n, p)); });
+    O.forEach((p) => { mo = Math.min(mo, dot(n, p)); });
+    if (mo - mb > best.gap) best = { gap: mo - mb, th, n, c: (mo + mb) / 2, h: (mo - mb) / 2 };
+  };
+  for (let i = 0; i < 720; i++) test((i / 720) * 2 * Math.PI);
+  const th0 = best.th, step = (2 * Math.PI) / 720;
+  for (let j = -60; j <= 60; j++) test(th0 + (j / 60) * step);
+  return best;
+}
+const BEST = maxMargin(BLUE, ORANGE);
+
+/* A street: shaded band, two dashed edges and the boundary line, for the line n·p = c with half-width h */
+function makeStreet(F, parent) {
+  const g = el('g', {}, parent);
+  const poly = el('polygon', { class: 'street' }, g);
+  const e1 = el('line', { class: 'edge' }, g), e2 = el('line', { class: 'edge' }, g);
+  const mid = el('line', { class: 'bnd' }, g);
+  const P = (n, c, off, s) => { const d = [-n[1], n[0]]; return [F.sx(n[0] * (c + off) + d[0] * s), F.sy(n[1] * (c + off) + d[1] * s)]; };
+  const setLine = (ln, a, b) => { ln.setAttribute('x1', a[0]); ln.setAttribute('y1', a[1]); ln.setAttribute('x2', b[0]); ln.setAttribute('y2', b[1]); };
+  return {
+    g, poly,
+    set(n, c, h) {
+      const S = 40;
+      setLine(mid, P(n, c, 0, -S), P(n, c, 0, S));
+      const show = h > 0;
+      [poly, e1, e2].forEach((x) => { x.style.display = show ? '' : 'none'; });
+      if (!show) return;
+      setLine(e1, P(n, c, -h, -S), P(n, c, -h, S));
+      setLine(e2, P(n, c, h, -S), P(n, c, h, S));
+      poly.setAttribute('points', [P(n, c, -h, -S), P(n, c, -h, S), P(n, c, h, S), P(n, c, h, -S)].map((q) => q.join(',')).join(' '));
+    },
+  };
+}
+function pts(F, parent, list, cls, r = 12) {
+  return list.map((p) => el('circle', { class: `pt ${cls}`, cx: F.sx(p[0]), cy: F.sy(p[1]), r }, parent));
+}
+/* For a candidate line, count mistakes with the better of the two orientations and the distance to the closest point */
+function judge(n, c, B, O) {
+  const sb = B.map((p) => dot(n, p) - c), so = O.map((p) => dot(n, p) - c);
+  const m1 = sb.filter((s) => s > 0).length + so.filter((s) => s < 0).length;
+  const m2 = B.length + O.length - m1;
+  const mistakes = Math.min(m1, m2);
+  const h = mistakes ? 0 : Math.min(...sb.map(Math.abs), ...so.map(Math.abs));
+  return { mistakes, h, sb, so };
+}
+/* Diamond marker for new points */
+function diamond(parent, x, y, cls, r = 14) {
+  return el('path', { class: `pt ${cls}`, d: `M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z`, style: 'stroke-width:2.5' }, parent);
+}
+
+/* ───────── static figures ───────── */
+function drawMany() {
+  const svg = $('many-svg');
+  const F = plane(svg);
+  const lines = [
+    { th: BEST.th + 24 * DEG, lab: 'A' },
+    { th: BEST.th, lab: 'B' },
+    { th: BEST.th - 22 * DEG, lab: 'C' },
+  ];
+  lines.forEach((L, i) => {
+    const n = [Math.cos(L.th), Math.sin(L.th)];
+    const mb = Math.max(...BLUE.map((p) => dot(n, p))), mo = Math.min(...ORANGE.map((p) => dot(n, p)));
+    const c = (mb + mo) / 2, d = [-n[1], n[0]];
+    const a = [n[0] * c - d[0] * 20, n[1] * c - d[1] * 20], b = [n[0] * c + d[0] * 20, n[1] * c + d[1] * 20];
+    el('line', { class: i === 1 ? 'curve-a an-draw' : 'curve-t an-draw', pathLength: 1, style: `--d:${0.4 + i * 0.35}s`, x1: F.sx(a[0]), y1: F.sy(a[1]), x2: F.sx(b[0]), y2: F.sy(b[1]) }, F.plot);
+    // label where the line meets the top edge of the plot
+    const s = (YMAX - 0.35 - n[1] * c) / d[1];
+    const lx = n[0] * c + d[0] * s;
+    el('text', { class: 'tx an-fade', style: `--d:${0.9 + i * 0.35}s`, x: F.sx(lx) + 16, y: F.sy(YMAX - 0.35) + 8, 'font-weight': 700, text: L.lab }, F.plot);
+  });
+  pts(F, F.plot, BLUE, 'fa an-pop').forEach((c, i) => c.style.setProperty('--d', `${i * 0.03}s`));
+  pts(F, F.plot, ORANGE, 'fb an-pop').forEach((c, i) => c.style.setProperty('--d', `${i * 0.03}s`));
+  legend(svg, F.W - 250, F.H - F.B - 70, [['dot', 'fa', 'normal'], ['dot', 'fb', 'spam']]);
+}
+
+function drawWhy() {
+  const mk = (id, title, n, c, h) => {
+    const svg = $(id);
+    const F = frame(svg, { W: 792, H: 400, l: 102, r: 103, t: 58, b: 8, x: [0, XMAX], y: [0, YMAX], xt: [], yt: [], grid: false });
+    const st = makeStreet(F, F.plot);
+    st.set(n, c, h);
+    pts(F, F.plot, BLUE, 'fa', 9); pts(F, F.plot, ORANGE, 'fb', 9);
+    el('text', { class: 'ttl', x: 24, y: 40, text: title }, svg);
+    return { F, n, c };
+  };
+  // narrow: a tilted line that hugs the normal emails
+  const th = BEST.th + 26 * DEG, nn = [Math.cos(th), Math.sin(th)];
+  const mb = Math.max(...BLUE.map((p) => dot(nn, p)));
+  const narrow = mk('why-a', 'narrow street', nn, mb + 0.16, 0.16);
+  const wide = mk('why-b', 'widest street', BEST.n, BEST.c, BEST.h);
+  // new normal emails: just outside the blue cloud, toward the boundary
+  const NEW = [[4.9, 2.9], [3.9, 3.7], [5.7, 1.5]];
+  [narrow, wide].forEach((P, k) => {
+    const g = el('g', {}, P.F.plot);
+    NEW.forEach((p, i) => {
+      const x = P.F.sx(p[0]), y = P.F.sy(p[1]);
+      const wrong = dot(P.n, p) - P.c > 0;
+      const d = diamond(g, x, y, 'fa an-pop', 13);
+      d.style.setProperty('--d', `${0.6 + i * 0.25}s`);
+      if (wrong) {
+        el('circle', { class: 'an-pop', cx: x, cy: y, r: 24, style: `fill:none;stroke:var(--c-b);stroke-width:3.5;--d:${1.4 + i * 0.25}s` }, g);
+      }
+    });
+    const nWrong = NEW.filter((p) => dot(P.n, p) - P.c > 0).length;
+    el('text', { class: 'txs an-fade', style: `--d:1.8s;fill:${nWrong ? 'var(--c-b)' : 'var(--c-c)'}`, x: P.F.W - 24, y: 40, 'text-anchor': 'end', text: nWrong ? `${nWrong} new emails on the wrong side` : 'all new emails classified correctly' }, $(k ? 'why-b' : 'why-a'));
+  });
+}
+
+function drawBowl() {
+  const svg = $('bowl-svg');
+  const r = rng(5);
+  const P = [];
+  for (let i = 0; i < 26; i++) { const a = r() * 2 * Math.PI, d = Math.sqrt(r()) * 0.95; P.push({ x: d * Math.cos(a), y: d * Math.sin(a), k: 0 }); }
+  for (let i = 0; i < 34; i++) { const a = r() * 2 * Math.PI, d = 1.65 + r() * 0.55; P.push({ x: d * Math.cos(a), y: d * Math.sin(a), k: 1 }); }
+  // left: the original plane
+  const cx = 300, cy = 300, s = 112;
+  el('text', { class: 'ttl', x: 60, y: 30, text: 'two features: no line works' }, svg);
+  el('line', { class: 'gl', x1: cx - 270, x2: cx + 270, y1: cy, y2: cy }, svg);
+  el('line', { class: 'gl', x1: cx, x2: cx, y1: cy - 250, y2: cy + 270 }, svg);
+  P.forEach((p, i) => el('circle', { class: `pt ${p.k ? 'fb' : 'fa'} an-pop`, cx: cx + p.x * s, cy: cy - p.y * s, r: 10, style: `--d:${i * 0.015}s` }, svg));
+  el('circle', { class: 'curve-t an-draw', pathLength: 1, cx, cy, r: 1.3 * s, style: '--d:2.6s;stroke-width:3.5' }, svg);
+  // arrow
+  el('path', { class: 'wire an-draw', pathLength: 1, d: 'M640 300H860', 'marker-end': 'url(#ah)', style: '--d:.8s' }, svg);
+  el('text', { class: 'txs an-fade', style: '--d:1s', x: 750, y: 262, 'text-anchor': 'middle', text: 'add a third feature:' }, svg);
+  el('text', { class: 'txs an-fade', style: '--d:1s', x: 750, y: 350, 'text-anchor': 'middle', text: 'distance² to the center' }, svg);
+  // right: lifted into a bowl, oblique view
+  const ox = 1290, oy = 470, k = 82, kz = 46;
+  const pr = (x, y, z) => [ox + (x - y) * k * 0.87, oy + (x + y) * k * 0.5 - z * kz];
+  el('text', { class: 'ttl', x: 960, y: 30, text: 'three features: a flat plane works' }, svg);
+  const g3 = el('g', { class: 'an-fade', style: '--d:1.1s' }, svg);
+  [0.5, 1, 1.5, 2, 2.35].forEach((rr, i) => {
+    let d = '';
+    for (let j = 0; j <= 72; j++) { const a = (j / 72) * 2 * Math.PI, q = pr(rr * Math.cos(a), rr * Math.sin(a), rr * rr); d += (j ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }
+    el('path', { class: i === 4 ? 'ax' : 'gl', d, style: i === 4 ? '' : 'stroke-width:1.5' }, g3);
+  });
+  [0, 1, 2, 3].forEach((j) => {
+    const a = (j / 4) * 2 * Math.PI + Math.PI / 4;
+    let d = '';
+    for (let t = 0; t <= 24; t++) { const rr = (t / 24) * 2.35, q = pr(rr * Math.cos(a), rr * Math.sin(a), rr * rr); d += (t ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }
+    el('path', { class: 'gl', d, style: 'stroke-width:1.5' }, g3);
+  });
+  const zc = 1.69, E = 2.5;
+  const corner = [[-E, -E], [E, -E], [E, E], [-E, E]].map(([x, y]) => pr(x, y, zc).map((v) => v.toFixed(1)).join(','));
+  const lifted = P.map((p) => ({ ...p, z: p.x * p.x + p.y * p.y })).sort((a, b) => (a.x + a.y) - (b.x + b.y));
+  const below = el('g', {}, svg);
+  el('polygon', { class: 'an-fade', points: corner.join(' '), style: '--d:2.6s;fill:var(--c-c);fill-opacity:.22;stroke:var(--c-c);stroke-width:2.5' }, svg);
+  const above = el('g', {}, svg);
+  lifted.forEach((p, i) => {
+    const q = pr(p.x, p.y, p.z);
+    el('circle', { class: `pt ${p.k ? 'fb' : 'fa'} an-pop`, cx: q[0], cy: q[1], r: 9, style: `--d:${1.4 + i * 0.015}s` }, p.z > zc ? above : below);
+  });
+  const lab = pr(E, -E, zc);
+  el('text', { class: 'txs an-fade', style: '--d:2.8s;fill:var(--c-c)', x: lab[0] + 18, y: lab[1] + 8, text: 'flat plane' }, svg);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.street = (() => {
+  const svg = $('st-svg');
+  const F = plane(svg);
+  const st = makeStreet(F, F.plot);
+  const rings = el('g', {}, F.plot);
+  pts(F, F.plot, BLUE, 'fa'); pts(F, F.plot, ORANGE, 'fb');
+  legend(svg, F.W - 200, F.T + 30, [['dot', 'fa', 'normal'], ['dot', 'fb', 'spam']]);
+  const P0 = [XMAX / 2, YMAX / 2];
+  const tilt = $('st-tilt'), pos = $('st-pos');
+  $('st-best').textContent = fmt(2 * BEST.h, 2);
+  function draw(n, c) {
+    const J = judge(n, c, BLUE, ORANGE);
+    st.set(n, c, J.h);
+    const best = J.h > 0 && 2 * J.h >= 0.97 * 2 * BEST.h;
+    st.poly.setAttribute('class', best ? 'street best' : 'street');
+    rings.replaceChildren();
+    if (J.h > 0) {
+      [...BLUE.map((p, i) => [p, J.sb[i]]), ...ORANGE.map((p, i) => [p, J.so[i]])].forEach(([p, s]) => {
+        if (Math.abs(s) - J.h < 0.03) el('circle', { class: 'sv', cx: F.sx(p[0]), cy: F.sy(p[1]), r: 21 }, rings);
+      });
+    }
+    $('st-w').textContent = J.h > 0 ? fmt(2 * J.h, 2) : '0';
+    const tag = $('st-tag');
+    if (J.mistakes) { tag.textContent = `${J.mistakes} point${J.mistakes > 1 ? 's' : ''} on the wrong side`; tag.style.color = 'var(--c-b)'; }
+    else if (best) { tag.textContent = 'Widest street'; tag.style.color = 'var(--c-c)'; }
+    else { tag.textContent = 'Separates, but narrower'; tag.style.color = ''; }
+  }
+  function fromSliders() {
+    const t = +tilt.value, th = (t + 90) * DEG, n = [Math.cos(th), Math.sin(th)];
+    $('st-tv').textContent = (t < 0 ? '−' : '') + Math.abs(t) + '°';
+    $('st-pv').textContent = (+pos.value < 0 ? '−' : '') + Math.abs(+pos.value).toFixed(2);
+    draw(n, dot(n, P0) + +pos.value);
+  }
+  tilt.addEventListener('input', fromSliders);
+  pos.addEventListener('input', fromSliders);
+  $('st-go').addEventListener('click', () => {
+    let n = BEST.n, c = BEST.c, th = Math.atan2(n[1], n[0]) / DEG;
+    if (th < 5 || th > 175) { n = [-n[0], -n[1]]; c = -c; th = Math.atan2(n[1], n[0]) / DEG; }
+    const t = th - 90;
+    const from = { t: +tilt.value, p: +pos.value }, to = { t, p: c - dot(n, P0) };
+    tween(anim, 900, (e) => {
+      const tt = mix(from.t, to.t, e), pp = mix(from.p, to.p, e), nn = [Math.cos((tt + 90) * DEG), Math.sin((tt + 90) * DEG)];
+      tilt.value = Math.round(tt); pos.value = pp.toFixed(2);
+      $('st-tv').textContent = (tt < 0 ? '−' : '') + Math.abs(Math.round(tt)) + '°';
+      $('st-pv').textContent = (pp < 0 ? '−' : '') + Math.abs(pp).toFixed(2);
+      draw(nn, dot(nn, P0) + pp);
+    });
+  });
+  const anim = {};
+  fromSliders();
+  return {};
+})();
+
+DEMOS.sv = (() => {
+  const svg = $('sv-svg');
+  const F = plane(svg);
+  const st = makeStreet(F, F.plot);
+  const ringG = el('g', {}, F.plot);
+  const dotG = el('g', {}, F.plot);
+  legend(svg, F.W - 300, F.H - F.B - 106, [['dot', 'fa', 'normal'], ['dot', 'fb', 'spam'], ['ring', '', 'support vector']]);
+  let P = [];
+  let model = null;
+  function reset() { P = [...BLUE.map((p) => ({ x: p[0], y: p[1], k: 0 })), ...ORANGE.map((p) => ({ x: p[0], y: p[1], k: 1 }))]; }
+  const isSV = (p, m) => Math.abs(Math.abs(dot(m.n, [p.x, p.y]) - m.c) - m.h) < 0.02;
+  function solve() {
+    const B = P.filter((p) => !p.k).map((p) => [p.x, p.y]), O = P.filter((p) => p.k).map((p) => [p.x, p.y]);
+    model = maxMargin(B, O);
+  }
+  function draw() {
+    solve();
+    const ok = model.gap > 0;
+    st.set(model.n, model.c, ok ? model.h : 0);
+    st.g.style.display = ok ? '' : 'none';
+    ringG.replaceChildren(); dotG.replaceChildren();
+    let nsv = 0;
+    P.forEach((p) => {
+      if (ok && isSV(p, model)) { nsv++; el('circle', { class: 'sv', cx: F.sx(p.x), cy: F.sy(p.y), r: 22, style: `stroke:var(${p.k ? '--c-b' : '--c-a'})` }, ringG); }
+      const c = el('circle', { class: `pt drag ${p.k ? 'fb' : 'fa'}`, cx: F.sx(p.x), cy: F.sy(p.y), r: 13 }, dotG);
+      c.__p = p;
+    });
+    $('sv-n').textContent = ok ? nsv : '—';
+    $('sv-w').textContent = ok ? fmt(2 * model.h, 2) : '—';
+    return ok;
+  }
+  let drag = null;
+  svg.addEventListener('pointerdown', (ev) => {
+    const t = ev.target;
+    if (!t.__p) return;
+    ev.preventDefault();
+    drag = { p: t.__p, n0: model.n, c0: model.c, sv: isSV(t.__p, model) };
+    svg.setPointerCapture(ev.pointerId);
+  });
+  svg.addEventListener('pointermove', (ev) => {
+    if (!drag) return;
+    const q = toSvgPoint(svg, ev);
+    drag.p.x = clamp(F.ix(q.x), 0.2, XMAX - 0.2); drag.p.y = clamp(F.iy(q.y), 0.2, YMAX - 0.2);
+    const ok = draw();
+    const tag = $('sv-tag');
+    if (!ok) { tag.textContent = 'Classes overlap: no empty street'; tag.style.color = 'var(--c-b)'; return; }
+    const moved = Math.abs(dot(model.n, drag.n0) - 1) > 1e-6 || Math.abs(model.c - drag.c0) > 0.005;
+    tag.textContent = moved ? 'Line moved' : 'Line unchanged';
+    tag.style.color = moved ? 'var(--c-b)' : 'var(--c-c)';
+  });
+  const end = () => { drag = null; };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+  $('sv-rm').addEventListener('click', () => {
+    if (model.gap <= 0) return;
+    const before = { n: model.n, c: model.c };
+    P = P.filter((p) => isSV(p, model));
+    draw();
+    const same = Math.abs(dot(model.n, before.n) - 1) < 1e-6 && Math.abs(model.c - before.c) < 0.005;
+    $('sv-tag').textContent = same ? 'Far points removed: line unchanged' : 'Line moved';
+    $('sv-tag').style.color = same ? 'var(--c-c)' : 'var(--c-b)';
+  });
+  $('sv-reset').addEventListener('click', () => { reset(); draw(); $('sv-tag').textContent = 'Drag a point'; $('sv-tag').style.color = ''; });
+  reset(); draw();
+  return {};
+})();
+
+DEMOS.soft = (() => {
+  const svg = $('soft-svg');
+  const F = plane(svg);
+  const r = rng(31);
+  const D = [];
+  for (let i = 0; i < 25; i++) D.push({ p: [clamp(4.0 + 1.05 * gauss(r), 0.4, XMAX - 0.4), clamp(2.4 + 0.95 * gauss(r), 0.4, YMAX - 0.4)], y: -1 });
+  for (let i = 0; i < 25; i++) D.push({ p: [clamp(6.5 + 1.05 * gauss(r), 0.4, XMAX - 0.4), clamp(3.7 + 0.95 * gauss(r), 0.4, YMAX - 0.4)], y: 1 });
+  const ctr = [XMAX / 2, YMAX / 2];
+  const X = D.map((d) => [d.p[0] - ctr[0], d.p[1] - ctr[1], 1]);
+  /* Linear soft-margin SVM by dual coordinate descent (bias as a constant feature) */
+  function train(C) {
+    const w = [0, 0, 0], a = new Array(D.length).fill(0);
+    for (let ep = 0; ep < 1500; ep++) {
+      for (let i = 0; i < D.length; i++) {
+        const x = X[i], y = D[i].y, q = x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
+        const G = y * (w[0] * x[0] + w[1] * x[1] + w[2] * x[2]) - 1;
+        const na = clamp(a[i] - G / q, 0, C), dlt = (na - a[i]) * y;
+        if (dlt) { w[0] += dlt * x[0]; w[1] += dlt * x[1]; w[2] += dlt * x[2]; a[i] = na; }
+      }
+    }
+    const nr = Math.hypot(w[0], w[1]), n = [w[0] / nr, w[1] / nr];
+    const f = X.map((x, i) => D[i].y * (w[0] * x[0] + w[1] * x[1] + w[2]));
+    return { n, c: dot(n, ctr) - w[2] / nr, h: 1 / nr, viol: f.map((v) => v < 1 - 1e-3), err: f.filter((v) => v < 0).length };
+  }
+  const CS = Array.from({ length: 17 }, (_, k) => 10 ** (-2 + k * 0.25));
+  const MODELS = CS.map(train);
+  const st = makeStreet(F, F.plot);
+  const ringG = el('g', {}, F.plot);
+  D.forEach((d) => el('circle', { class: `pt ${d.y > 0 ? 'fb' : 'fa'}`, cx: F.sx(d.p[0]), cy: F.sy(d.p[1]), r: 12 }, F.plot));
+  legend(svg, F.W - 300, F.H - F.B - 106, [['dot', 'fa', 'normal'], ['dot', 'fb', 'spam'], ['dot', 'sv', 'violation']]);
+  const slider = $('soft-c');
+  let cur = null;
+  const anim = {};
+  function show(m) {
+    st.set(m.n, m.c, m.h);
+    ringG.replaceChildren();
+    D.forEach((d, i) => { if (m.viol[i]) el('circle', { class: 'sv', cx: F.sx(d.p[0]), cy: F.sy(d.p[1]), r: 21, style: 'stroke-width:2.5' }, ringG); });
+  }
+  function update() {
+    const k = +slider.value, m = MODELS[k], C = CS[k];
+    $('soft-cv').textContent = C >= 1 ? fmt(C, C >= 10 ? 0 : 1) : fmt(C, C >= 0.1 ? 2 : 3);
+    $('soft-w').textContent = fmt(2 * m.h, 2);
+    $('soft-v').textContent = m.viol.filter(Boolean).length;
+    $('soft-e').textContent = m.err;
+    const from = cur || m;
+    const th0 = Math.atan2(from.n[1], from.n[0]), th1 = Math.atan2(m.n[1], m.n[0]);
+    tween(anim, 450, (e) => {
+      const th = mix(th0, th1, e), n = [Math.cos(th), Math.sin(th)];
+      show({ n, c: mix(from.c, m.c, e), h: mix(from.h, m.h, e), viol: m.viol });
+    });
+    cur = m;
+  }
+  slider.addEventListener('input', update);
+  update();
+  return {};
+})();
+
+DEMOS.lift = (() => {
+  const svg = $('lift-svg');
+  const F = frame(svg, { W: 1160, H: 700, x: [-3, 3], y: [-0.6, 9], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [0, 2, 4, 6, 8], fx: (v) => (v < 0 ? '−' + -v : String(v)), xl: 'feature x', yl: 'added feature: x squared' });
+  const X = [-2.75, -2.5, -2.2, -1.9, -1.1, -0.75, -0.4, 0.05, 0.45, 0.8, 1.2, 1.95, 2.3, 2.65];
+  const K = X.map((x) => (Math.abs(x) > 1.6 ? 1 : 0));
+  const par = el('path', { class: 'curve-t', d: curvePath((x) => x * x, -3, 3, F.sx, F.sy) }, F.plot);
+  const band = el('rect', { class: 'street', x: F.L, width: F.W - F.R - F.L, y: F.sy(3.0), height: F.sy(1.5) - F.sy(3.0) }, F.plot);
+  const cut = el('line', { class: 'bnd', x1: F.L, x2: F.W - F.R, y1: F.sy(2.25), y2: F.sy(2.25) }, F.plot);
+  const lab = el('text', { class: 'txs', x: F.sx(0), y: F.sy(3.0) - 14, 'text-anchor': 'middle', text: 'a flat line now separates them' }, F.plot);
+  const dots = X.map((x, i) => el('circle', { class: `pt ${K[i] ? 'fb' : 'fa'}`, cx: F.sx(x), cy: F.sy(0), r: 14 }, F.plot));
+  legend(svg, F.sx(-0.55), F.T + 30, [['dot', 'fa', 'normal'], ['dot', 'fb', 'unusual']]);
+  let e0 = 0;
+  const anim = {};
+  function draw(e) {
+    dots.forEach((d, i) => d.setAttribute('cy', F.sy(e * X[i] * X[i])));
+    par.style.opacity = e;
+    [band, cut, lab].forEach((x) => { x.style.opacity = clamp((e - 0.6) / 0.4, 0, 1); });
+  }
+  segmented(['lift-0', 'lift-1'], (k) => {
+    const from = e0;
+    $('lift-tag').textContent = k ? 'A flat line separates them' : 'No line separates them';
+    $('lift-tag').style.color = k ? 'var(--c-c)' : 'var(--c-b)';
+    tween(anim, 1200, (e) => { e0 = mix(from, k, e); draw(e0); });
+  });
+  $('lift-tag').style.color = 'var(--c-b)';
+  draw(0);
+  return {};
+})();
+
+DEMOS.rbf = (() => {
+  const svg = $('rbf-svg');
+  const X0 = -1.55, X1 = 2.55, Y1 = 1.34, Y0 = Y1 - (X1 - X0) * 592 / 1040;
+  const F = frame(svg, { W: 1160, H: 700, x: [X0, X1], y: [Y0, Y1], xt: [], yt: [], grid: false, xl: 'feature 1', yl: 'feature 2' });
+  const r = rng(11);
+  const D = [];
+  for (let i = 0; i < 32; i++) { const t = (i / 31) * Math.PI; D.push({ p: [Math.cos(t) + 0.16 * gauss(r), Math.sin(t) + 0.16 * gauss(r)], y: -1 }); }
+  for (let i = 0; i < 32; i++) { const t = (i / 31) * Math.PI; D.push({ p: [1 - Math.cos(t) + 0.16 * gauss(r), 0.45 - Math.sin(t) + 0.16 * gauss(r)], y: 1 }); }
+  const N = D.length, C = 10;
+  const GAMMA = [0.25, 2.5, 60];
+  function train(g) {
+    const K = D.map((a) => D.map((b) => Math.exp(-g * ((a.p[0] - b.p[0]) ** 2 + (a.p[1] - b.p[1]) ** 2)) + 1));
+    const al = new Array(N).fill(0);
+    for (let ep = 0; ep < 600; ep++) {
+      for (let i = 0; i < N; i++) {
+        let s = 0;
+        for (let j = 0; j < N; j++) if (al[j]) s += al[j] * D[j].y * K[i][j];
+        const G = D[i].y * s - 1;
+        al[i] = clamp(al[i] - G / K[i][i], 0, C);
+      }
+    }
+    const f = (x, y) => { let s = 0; for (let j = 0; j < N; j++) if (al[j] > 1e-8) s += al[j] * D[j].y * (Math.exp(-g * ((x - D[j].p[0]) ** 2 + (y - D[j].p[1]) ** 2)) + 1); return s; };
+    const err = D.filter((d) => d.y * f(d.p[0], d.p[1]) < 0).length;
+    return { f, err, nsv: al.filter((a) => a > 1e-6).length };
+  }
+  const shade = el('g', {}, F.plot);
+  const line = el('path', { class: 'bnd', style: 'stroke-linejoin:round' }, F.plot);
+  D.forEach((d) => el('circle', { class: `pt ${d.y > 0 ? 'fb' : 'fa'}`, cx: F.sx(d.p[0]), cy: F.sy(d.p[1]), r: 11 }, F.plot));
+  const cache = {};
+  const CELL = 8;
+  function render(k) {
+    if (!cache[k]) cache[k] = train(GAMMA[k]);
+    const M = cache[k];
+    const nx = Math.ceil((F.W - F.R - F.L) / CELL), ny = Math.ceil((F.H - F.B - F.T) / CELL);
+    const V = [];
+    for (let j = 0; j <= ny; j++) { V.push([]); for (let i = 0; i <= nx; i++) V[j].push(M.f(F.ix(F.L + i * CELL), F.iy(F.T + j * CELL))); }
+    shade.replaceChildren();
+    for (let j = 0; j < ny; j++) {
+      let start = 0;
+      for (let i = 1; i <= nx; i++) {
+        const sg = (q) => (V[j][q] + V[j + 1][q] > 0 ? 1 : 0);
+        if (i === nx || sg(i) !== sg(start)) {
+          el('rect', { class: sg(start) ? 'fb' : 'fa', x: F.L + start * CELL, y: F.T + j * CELL, width: (i - start) * CELL, height: CELL, 'shape-rendering': 'crispEdges', style: 'fill-opacity:.13' }, shade);
+          start = i;
+        }
+      }
+    }
+    // marching squares on the zero level
+    let d = '';
+    const P = (i, j) => [F.L + i * CELL, F.T + j * CELL];
+    const itp = (a, b, va, vb) => { const t = va / (va - vb); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const c = [[P(i, j), V[j][i]], [P(i + 1, j), V[j][i + 1]], [P(i + 1, j + 1), V[j + 1][i + 1]], [P(i, j + 1), V[j + 1][i]]];
+      const cr = [];
+      for (let e = 0; e < 4; e++) { const [a, va] = c[e], [b, vb] = c[(e + 1) % 4]; if ((va > 0) !== (vb > 0)) cr.push(itp(a, b, va, vb)); }
+      for (let q = 0; q + 1 < cr.length; q += 2) d += `M${cr[q][0].toFixed(1)} ${cr[q][1].toFixed(1)}L${cr[q + 1][0].toFixed(1)} ${cr[q + 1][1].toFixed(1)}`;
+    }
+    line.setAttribute('d', d);
+    $('rbf-e').textContent = M.err;
+    $('rbf-n').textContent = M.nsv;
+    const TAGS = [['Too smooth: underfits', 'var(--c-b)'], ['Follows the moons', 'var(--c-c)'], ['Hugs single points: overfits', 'var(--c-b)']];
+    $('rbf-tag').textContent = TAGS[k][0]; $('rbf-tag').style.color = TAGS[k][1];
+  }
+  segmented(['rbf-0', 'rbf-1', 'rbf-2'], render);
+  render(1);
+  return {};
+})();
+
+drawMany();
+drawWhy();
+drawBowl();
+})();
+</script>
+</body>
+</html>

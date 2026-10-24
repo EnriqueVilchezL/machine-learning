@@ -1,0 +1,9 @@
+/* Slide decks are 16:9; MyST's iframe box defaults to a 60% padding ratio. */
+div.relative.inline-block:has(> iframe) {
+  padding-bottom: 56.25% !important;
+}
+
+/* Topic pages: the deck spans the text column and the empty right margin. */
+div.col-page-right:has(iframe) {
+  padding-top: 1.5rem !important;
+}

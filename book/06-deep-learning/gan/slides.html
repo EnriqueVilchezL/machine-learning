@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generative adversarial networks</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0d9488}
+.dark{--c-e:#2dd4bf}
+.tk{font-size:24px}
+.bt:disabled{opacity:.45;cursor:default}
+.sel{font-family:var(--font-sans);font-size:28px;padding:4px 12px;border-radius:var(--radius);border:1px solid var(--myst-color-border-strong);background:var(--myst-color-bg);color:var(--myst-color-text);cursor:pointer}
+.ah-b{fill:var(--c-b)}
+.wire-b{fill:none;stroke:var(--c-b);stroke-width:3}
+.curve-d{fill:none;stroke:var(--c-d);stroke-width:5;stroke-linecap:round}
+.fill-a{fill:var(--c-a);fill-opacity:.28;stroke:var(--c-a);stroke-width:3}
+.fill-b{fill:var(--c-b);fill-opacity:.28;stroke:var(--c-b);stroke-width:3}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-b" d="M0 0L10 5L0 10z"/></marker>
+<filter id="blur-s" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4"/></filter>
+<filter id="blur-m" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 28</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Generative adversarial networks</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Two networks play a game: one makes fake examples, the other learns to spot them</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 28 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Models that generate new examples</li>
+<li class="an-up" style="--d:.15s">A generator and a discriminator</li>
+<li class="an-up" style="--d:.25s">The adversarial game and its losses</li>
+<li class="an-up" style="--d:.35s">Training in turns, and where it ends</li>
+<li class="an-up" style="--d:.45s">Mode collapse, instability and evaluation</li>
+<li class="an-up" style="--d:.55s">Conditional GANs, progress, uses and risks</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to buttons, menus and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:40%"><col style="width:60%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x} \sim p_{\text{data}}</span></td><td>A real example, drawn from the data distribution</td></tr>
+<tr class="an-up" style="--d:.11s"><td><span class="tex">\mathbf{z} \sim p_{\mathbf{z}} = \mathcal{N}(\mathbf{0}, \mathbf{I})</span></td><td>Random noise, the input of the generator</td></tr>
+<tr class="an-up" style="--d:.17s"><td><span class="tex">G(\mathbf{z}; \boldsymbol{\theta}_G)</span></td><td>Generator: turns noise into a fake example</td></tr>
+<tr class="an-up" style="--d:.23s"><td><span class="tex">D(\mathbf{x}; \boldsymbol{\theta}_D) \in (0, 1)</span></td><td>Discriminator: probability that <span class="tex">\mathbf{x}</span> is real</td></tr>
+<tr class="an-up" style="--d:.29s"><td><span class="tex">p_G</span></td><td>Distribution of the generated examples</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">V(D, G)</span></td><td>Value function of the game</td></tr>
+<tr class="an-up" style="--d:.41s"><td><span class="tex">L_D, \ L_G</span></td><td>Losses of the discriminator and the generator</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">\mathbb{E}, \ \alpha</span></td><td>Expectation (an average); learning rate</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p><span class="tex">\sim</span> reads “is drawn from”.</p><p><span class="tex">\boldsymbol{\theta}_G</span> and <span class="tex">\boldsymbol{\theta}_D</span> hold all the weights <span class="tex">\mathbf{W}, \mathbf{b}</span> of each network (Topic 23).</p><p><span class="tex">\mathbb{E}_{\mathbf{x}}[\cdot]</span> is the average over real examples; <span class="tex">\mathbb{E}_{\mathbf{z}}[\cdot]</span> the average over noise.</p><p><span class="tex">\log</span> is the natural log.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Learning to generate</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Turn random noise into new examples that look like the data.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Discriminative or generative">
+<div class="hdr" data-s="Learning to generate"></div>
+<h2>Discriminative or generative</h2>
+<div class="fr">
+<div class="figbox"><svg id="gd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A <strong>discriminative</strong> model learns <span class="tex">P(y \mid \mathbf{x})</span>: on which side of a border a point falls.</p>
+<p class="small frag up" data-step="g1" style="margin:0">A <strong>generative</strong> model learns the data itself, so it can draw new points from it.</p>
+<p class="small frag up" data-step="g2" style="margin:0">Recall Topic 27: a VAE decoder turns a code <span class="tex">\mathbf{z}</span> into an example. A GAN also maps noise to data, and learns that map with a second network as judge.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) Two classes and a border. (b) One cloud of data; stars are new samples.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="What generating means" data-demo="map">
+<div class="hdr" data-s="Learning to generate"></div>
+<h2>What generating means</h2>
+<div class="fr">
+<div class="figbox"><svg id="map-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Draw a noise vector <span class="tex">\mathbf{z}</span>, pass it through <span class="tex">G</span>, get a new example. New noise gives a new example.</p>
+<div class="btns"><button class="bt" id="map-one">Sample one</button><button class="bt chip" id="map-many">Sample 50</button><button class="bt chip" id="map-reset">Reset</button></div>
+<div class="ro"><span>Noise <span class="tex">\mathbf{z}</span></span><b id="map-z" class="a" style="font-size:28px">—</b></div>
+<div class="ro"><span>Sample <span class="tex">G(\mathbf{z})</span></span><b id="map-x" class="bb" style="font-size:28px">—</b></div>
+<div class="ro"><span>Samples drawn</span><b id="map-n">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Gray: real data. A fixed map plays the role of a trained generator: it bends the round noise cloud into an arc.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Counterfeiter and detective">
+<div class="hdr" data-s="Learning to generate"></div>
+<h2>Counterfeiter and detective</h2>
+<div class="fr">
+<div class="figbox"><svg id="cd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A counterfeiter prints fake bills. A detective checks bills and says “real” or “fake”.</p>
+<p class="small frag up" data-step="c1" style="margin:0">Each one improves against the other. The detective learns which details give a fake away; the counterfeiter fixes those details.</p>
+<p class="small frag up" data-step="c2" style="margin:0">The game ends when the detective can only guess: the fakes look like real bills.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>The analogy from the original GAN paper. G is the counterfeiter, D the detective.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two networks">
+<div class="hdr" data-s="Learning to generate"></div>
+<h2>Two networks</h2>
+<p class="small" style="margin:-8px 0 8px">Both <span class="tex">G</span> and <span class="tex">D</span> are neural networks (Topic 23). <span class="tex">G</span> outputs an example; <span class="tex">D</span> ends in a sigmoid and outputs one probability.</p>
+<div class="figbox"><svg id="net-svg" viewBox="0 0 1680 560"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 4:</b>Noise goes through G to give a fake sample. D receives real and fake samples and outputs the probability that its input is real. Its answer flows back to train both networks.</p>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The adversarial game</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">One value, two players: D pushes it up, G pushes it down.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Discriminator loss">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>The discriminator’s loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">D is a yes/no classifier: label 1 for real, 0 for fake. Its loss is the log-loss of Topic 11 for one example:</p>
+<div class="eq"><div class="m tex-d">L = -\big[\, y \log p + (1 - y) \log (1 - p) \,\big]</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">A real example has <span class="tex">y = 1</span> and a fake one has <span class="tex">y = 0</span>. One of each gives</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">L_D = -\log D(\mathbf{x}) \; - \; \log\big(1 - D(G(\mathbf{z}))\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="l2" style="margin:0">The loss is small when D says “real” to real data and “fake” to fakes. A confident mistake costs a lot.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">D(\mathbf{x}) = 0.9</span> on a real bill:</p><p><span class="tex">-\log 0.9 \approx 0.105</span></p><p><span class="tex">D(G(\mathbf{z})) = 0.2</span> on a fake:</p><p><span class="tex">-\log 0.8 \approx 0.223</span></p><p><span class="tex">L_D \approx 0.33</span></p></aside>
+<aside class="am frag up" data-step="l2"><div class="t">Fooled</div><p>If D said 0.7 to the fake: <span class="tex">-\log 0.3 \approx 1.20</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="How G learns">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>How the generator learns</h2>
+<div class="fr">
+<div class="figbox"><svg id="push-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">G wants D to say “real” to its fakes, so it wants <span class="tex">D(G(\mathbf{z}))</span> close to 1.</p>
+<p class="small frag up" data-step="p1" style="margin:0">G never sees a real example. Its only signal is the slope of D at each fake: backpropagation runs through D into G, and only <span class="tex">\boldsymbol{\theta}_G</span> changes.</p>
+<p class="small frag up" data-step="p2" style="margin:0">Each fake moves uphill on D, toward the real data.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>One feature <span class="tex">x</span>. Blue: real data. Orange: fakes. Purple: <span class="tex">D(x)</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Minimax objective">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>The minimax game</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Averaging the log-loss over all data and all noise gives one value, <span class="tex">V(D, G)</span>. D wants it large, G wants it small:</p>
+<div class="eq"><div class="m tex-d">\min_{G} \max_{D} \; V(D, G) = \mathbb{E}_{\mathbf{x}}\big[\log D(\mathbf{x})\big] + \mathbb{E}_{\mathbf{z}}\big[\log\big(1 - D(G(\mathbf{z}))\big)\big]</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="v1" style="margin:0"><span class="tex">V = -L_D</span> on average, so D raising <span class="tex">V</span> is the same as D lowering its loss.</p>
+<p class="small frag up" data-step="v2" style="margin:12px 0 0">G only appears in the second term. It lowers <span class="tex">V</span> by making <span class="tex">D(G(\mathbf{z}))</span> large.</p>
+<p class="small frag up" data-step="v3" style="margin:12px 0 0">Both logs are at most 0, so <span class="tex">V \le 0</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>With <span class="tex">D(\mathbf{x}) = 0.9</span> and <span class="tex">D(G(\mathbf{z})) = 0.2</span>:</p><p><span class="tex">V = \log 0.9 + \log 0.8 \approx -0.33</span></p><p>G improves and D now gives its fake 0.6:</p><p><span class="tex">V = \log 0.9 + \log 0.4 \approx -1.02</span></p><p>G pushed <span class="tex">V</span> down.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Weak signal" data-demo="sat">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>A weak signal at the start</h2>
+<div class="fr">
+<div class="figbox"><svg id="sat-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Early on the fakes are bad, D rejects them, and <span class="tex">D(G(\mathbf{z}))</span> is near 0. There <span class="tex">\log(1 - D)</span> is almost flat.</p>
+<div class="ctl"><label><span><span class="tex">D(G(\mathbf{z}))</span></span><b id="sat-d-val">0.05</b></label><input type="range" id="sat-d" min="0.01" max="0.99" step="0.01" value="0.05"></div>
+<div class="ro"><span>Slope of <span class="tex">\log(1 - D)</span></span><b id="sat-s1" class="bb">0</b></div>
+<div class="ro"><span>Slope of <span class="tex">-\log D</span></span><b id="sat-s2" class="a">0</b></div>
+<p class="small" style="margin:0">A flat loss gives G almost no push.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Two losses G can minimize. Both fall as D is fooled. Dashed: tangents at the slider.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Non-saturating loss">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>The non-saturating loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">In practice G minimizes a different loss with the same goal, make D say “real”:</p>
+<div class="eq"><div class="m tex-d">L_G = -\log D(G(\mathbf{z}))</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="n1" style="margin:0">It is the log-loss of the fake with the label flipped to 1: G is trained as if its fakes were real.</p>
+<p class="small frag up" data-step="n2" style="margin:12px 0 0">When <span class="tex">D(G(\mathbf{z}))</span> is small this loss is steep, so G gets a strong signal exactly when it is bad. It reaches its lowest value at the same place as <span class="tex">\log(1 - D)</span>: <span class="tex">D(G(\mathbf{z})) = 1</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>At <span class="tex">D(G(\mathbf{z})) = 0.2</span>:</p><p><span class="tex">-\log 0.2 \approx 1.61</span>, slope <span class="tex">-1/0.2 = -5</span></p><p><span class="tex">\log 0.8 \approx -0.22</span>, slope <span class="tex">-1/0.8 = -1.25</span></p><p>At 0.01 the slopes are <span class="tex">-100</span> and about <span class="tex">-1.01</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Training loop">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>Training in turns</h2>
+<p class="small" style="margin:-8px 0 8px">Gradient descent (Topic 23) on two networks that take turns. While one learns, the other stays fixed.</p>
+<div class="figbox"><svg id="loop-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 7:</b>One training round on mini-batches of <span class="tex">m</span> examples: <span class="tex">k</span> steps for D, then one step for G. The original paper used <span class="tex">k = 1</span>.</p>
+</section>
+
+<section class="s ats-prose" data-label="Best discriminator" data-demo="opt">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>The best discriminator</h2>
+<div class="fr">
+<div class="figbox"><svg id="opt-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">For a fixed G, the best D compares how likely <span class="tex">x</span> is under the real and the fake data. Move the fakes onto the real data.</p>
+<div class="ctl"><label><span>Center of the fakes</span><b id="opt-m-val">3.0</b></label><input type="range" id="opt-m" min="1" max="9" step="0.1" value="3"></div>
+<div class="ctl"><label><span>Spread of the fakes</span><b id="opt-s-val">1.2</b></label><input type="range" id="opt-s" min="0.4" max="2" step="0.05" value="1.2"></div>
+<div class="ro"><span><span class="tex">D^*</span> at <span class="tex">x = 6</span></span><b id="opt-d" class="a">0</b></div>
+<div class="ro"><span><span class="tex">V(D^*, G)</span></span><b id="opt-v" class="bb">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Purple: the best <span class="tex">D^*</span>. When the curves match, <span class="tex">D^* = 0.5</span> and <span class="tex">V</span> reaches its lowest value, <span class="tex">-\log 4 \approx -1.39</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Equilibrium">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>Where the game ends</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">For a fixed G, the discriminator that maximizes <span class="tex">V</span> is</p>
+<div class="eq"><div class="m tex-d">D^*(\mathbf{x}) = \frac{p_{\text{data}}(\mathbf{x})}{p_{\text{data}}(\mathbf{x}) + p_G(\mathbf{x})}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="e1" style="margin:0">G does best when its samples follow the data, <span class="tex">p_G = p_{\text{data}}</span>. Then D can only guess:</p>
+<div class="eq frag up" data-step="e1"><div class="m tex-d">D^*(\mathbf{x}) = \tfrac{1}{2} \ \text{ for every } \mathbf{x}, \qquad V = \log \tfrac{1}{2} + \log \tfrac{1}{2} = -\log 4</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="e2" style="margin:0">At that point <span class="tex">L_D = \log 4 \approx 1.39</span> and <span class="tex">L_G = \log 2 \approx 0.69</span>: the values the demo on the next slide settles at.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>At some <span class="tex">\mathbf{x}</span>, <span class="tex">p_{\text{data}} = 0.3</span> and <span class="tex">p_G = 0.1</span>:</p><p><span class="tex">D^* = \tfrac{0.3}{0.3 + 0.1} = 0.75</span></p><p>Swap them: <span class="tex">D^* = 0.25</span>.</p><p>Equal values, <span class="tex">0.2</span> and <span class="tex">0.2</span>: <span class="tex">D^* = 0.5</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A tiny GAN" data-demo="toy">
+<div class="hdr" data-s="The adversarial game"></div>
+<h2>A tiny GAN in one dimension</h2>
+<div class="fr">
+<div class="figbox"><svg id="toy-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Each step: three updates of D, then one update of G with loss (4).</p>
+<div class="btns"><button class="bt" id="toy-step">▶ Train step</button><button class="bt chip" id="toy-run">Train 200 steps</button><button class="bt chip" id="toy-reset">Reset</button></div>
+<div class="ro"><span>Step</span><b id="toy-it">0</b></div>
+<div class="ro"><span>Fakes: center, spread</span><b id="toy-g" class="bb" style="font-size:28px">—</b></div>
+<div class="ro"><span>Real: center, spread</span><b class="a" style="font-size:28px">5.50, 0.70</b></div>
+<div class="ro"><span><span class="tex">L_D</span>, <span class="tex">L_G</span></span><b id="toy-l" style="font-size:28px">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>A tiny 1-D version. <span class="tex">G(z) = az + b</span>; D is a sigmoid of <span class="tex">x</span> and <span class="tex">x^2</span>. Batches of 128.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Problems and progress</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">What goes wrong in training, how to judge the results, and what GANs became.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Mode collapse">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Mode collapse</h2>
+<p class="small" style="margin:-8px 0 8px">G only has to fool D. Making one kind of example very well can be enough, so G may ignore the rest of the data.</p>
+<div class="figbox"><svg id="mc-svg" viewBox="0 0 1680 560"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 10:</b>Real data with two bumps. (a) The goal. (b) G covers only the left bump; D learns that the left side is suspicious. (c) G hops to the right bump, and the chase can repeat. In the demo of Figure 9 the spread also fell near 0 for a while.</p>
+</section>
+
+<section class="s ats-prose" data-label="Unstable training">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Unstable training</h2>
+<p class="small" style="margin:-8px 0 8px">The losses of a GAN track the game between D and G. They can swing forever, or look settled while the samples are still poor.</p>
+<div class="figbox"><svg id="ins-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 11:</b>The GAN of Figure 9, run twice. (a) Small learning rates, the same run as the demo: the losses look settled by step 50, while every sample is almost the same number until about step 200. (b) Large learning rates: the G loss jumps from step to step and the spread keeps swinging. Variants such as the Wasserstein GAN change the loss to make training steadier.</p>
+</section>
+
+<section class="s ats-prose" data-label="Judging the samples">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Judging the samples</h2>
+<div class="fr">
+<div class="figbox"><svg id="ev-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Good samples need two things: each one looks real (<strong>quality</strong>), and together they cover the data (<strong>variety</strong>).</p>
+<p class="small frag up" data-step="j1" style="margin:0">People look at grids of samples. A common number is the <strong>FID</strong>: it compares the average and spread of image features of real and generated sets. Lower is better.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>Three sets of nine generated faces, drawn by hand.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Conditional GANs" data-demo="cond">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Conditional GANs</h2>
+<div class="fr">
+<div class="figbox"><svg id="cond-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Give both networks a label <span class="tex">y</span>: <span class="tex">G(\mathbf{z}, y)</span> and <span class="tex">D(\mathbf{x}, y)</span>. D checks that the sample is real <em>and</em> matches the label.</p>
+<div class="ctl"><label for="cond-y"><span>Label <span class="tex">y</span></span></label>
+<select class="sel" id="cond-y"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option selected>7</option><option>8</option><option>9</option></select></div>
+<div class="btns"><button class="bt" id="cond-new">New noise</button></div>
+<p class="small" style="margin:0">The label picks the digit; the noise picks the style.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 13:</b>A hand-made stand-in for a trained conditional generator on handwritten digits.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="From blurry to realistic">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>From blurry to realistic</h2>
+<p class="small" style="margin:-8px 0 8px">In five years GAN samples went from small, blurry digits to large faces that are hard to tell from photos.</p>
+<div class="figbox"><svg id="tl-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 14:</b>Simple drawings of the kind of result at each step, not real samples. DCGAN brought convolutional layers (Topic 25); StyleGAN feeds the noise in at every layer to control style.</p>
+</section>
+
+<section class="s ats-prose" data-label="Uses and risks">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Uses and risks</h2>
+<div class="figbox"><svg id="use-svg" viewBox="0 0 1680 640"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 15:</b>Generated examples can add training data, help artists and sharpen images. The same skill makes fake video of real people: use it only with consent, and support tools that detect fakes.</p>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Problems and progress"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>GANs at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Sharp, realistic samples, especially images</td><td>Training is unstable and needs careful tuning</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Sampling is fast: one pass through G</td><td>Mode collapse: samples may lack variety</td></tr>
+<tr class="an-up" style="--d:.25s"><td>No need to write down a formula for the data</td><td>The losses do not tell how good the samples are</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Labels can steer the output (conditional GAN)</td><td>No encoder: G cannot map an example back to <span class="tex">\mathbf{z}</span></td></tr>
+<tr class="an-up" style="--d:.45s"><td>D learns a useful sense of what looks real</td><td>Realistic fakes can be misused</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>When sharp, realistic samples matter most, mainly images, and you can afford to watch and tune training.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A GAN generates new examples by passing random noise through a generator G.</li>
+<li class="an-up" style="--d:.15s">A discriminator D, trained with the log-loss, tells real examples from fakes.</li>
+<li class="an-up" style="--d:.25s">The two play a minimax game and train in turns; G uses the non-saturating loss.</li>
+<li class="an-up" style="--d:.35s">At the ideal end, <span class="tex">p_G = p_{\text{data}}</span> and D outputs <span class="tex">\tfrac12</span> everywhere.</li>
+<li class="an-up" style="--d:.45s">Watch for mode collapse and unstable training; judge the samples, not the losses.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The original paper, its main variants, and a tutorial by its first author.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Goodfellow, I., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., Courville, A., &amp; Bengio, Y. (2014). Generative adversarial nets. <em>Advances in Neural Information Processing Systems</em>, 27, 2672–2680.</li>
+<li style="margin:.4em 0">Mirza, M., &amp; Osindero, S. (2014). Conditional generative adversarial nets. <em>arXiv preprint</em> arXiv:1411.1784.</li>
+<li style="margin:.4em 0">Radford, A., Metz, L., &amp; Chintala, S. (2016). Unsupervised representation learning with deep convolutional generative adversarial networks. <em>International Conference on Learning Representations</em>.</li>
+<li style="margin:.4em 0">Goodfellow, I. (2016). NIPS 2016 tutorial: Generative adversarial networks. <em>arXiv preprint</em> arXiv:1701.00160.</li>
+<li style="margin:.4em 0">Arjovsky, M., Chintala, S., &amp; Bottou, L. (2017). Wasserstein generative adversarial networks. <em>Proceedings of the 34th International Conference on Machine Learning</em>, 214–223.</li>
+<li style="margin:.4em 0">Karras, T., Laine, S., &amp; Aila, T. (2019). A style-based generator architecture for generative adversarial networks. <em>Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition</em>, 4401–4410.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 29: transfer learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, lin, clamp, fmt, curvePath, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const sig = (z) => 1 / (1 + Math.exp(-z));
+const npdf = (x, m, s) => Math.exp(-0.5 * ((x - m) / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+const lg = (v) => Math.log(Math.max(v, 1e-12));
+function erf(x) { /* Abramowitz and Stegun 7.1.26 */
+  const s = Math.sign(x), a = Math.abs(x), t = 1 / (1 + 0.3275911 * a);
+  return s * (1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-a * a));
+}
+const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+const txt = (g, x, y, s, cls = 'txs', anchor = 'middle', extra = {}) => el('text', { class: cls, x, y, 'text-anchor': anchor, text: s, ...extra }, g);
+const arrow = (g, d, cls = 'wire', mk = 'ah', extra = {}) => el('path', { class: cls, d, 'marker-end': `url(#${mk})`, ...extra }, g);
+function panel(svg, x0, y0, w, h, dom, title) {
+  el('rect', { class: 'box', x: x0, y: y0, width: w, height: h, rx: 6 }, svg);
+  if (title) el('text', { class: 'ttl', x: x0, y: y0 - 16, text: title }, svg);
+  return { sx: lin(dom.x[0], dom.x[1], x0, x0 + w), sy: lin(dom.y[0], dom.y[1], y0 + h, y0) };
+}
+/* A box with centered lines of text */
+function tbox(g, x, y, w, h, cls, lines, size = 28) {
+  el('rect', { class: cls, x, y, width: w, height: h, rx: 10 }, g);
+  const y0 = y + h / 2 - ((lines.length - 1) * size * 1.25) / 2 + size * 0.35;
+  lines.forEach((s, i) => txt(g, x + w / 2, y0 + i * size * 1.25, s, 'tx', 'middle', { style: `font-size:${size}px` }));
+}
+function star(g, x, y, r, style) {
+  let d = '';
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.45 : r;
+    d += (i ? 'L' : 'M') + (x + rr * Math.cos(a)).toFixed(1) + ' ' + (y + rr * Math.sin(a)).toFixed(1);
+  }
+  return el('path', { d: d + 'Z', style }, g);
+}
+/* Area under a density curve, as a closed path */
+function areaPath(f, x0, x1, sx, sy, n = 200) {
+  return curvePath(f, x0, x1, sx, sy, n) + `L${sx(x1)} ${sy(0)}L${sx(x0)} ${sy(0)}Z`;
+}
+
+/* ───────── the tiny 1-D GAN (Figure 9 and Figure 11) ───────── */
+const TOY = { MU: 5.5, SD: 0.7, C: 4, S: 2, N: 128 };
+function makeGAN(seed, lrD, lrG, k) {
+  const r = rng(seed);
+  const st = { w: [0, 0, 0], a: 0.4, b: 1.5, it: 0, LD: NaN, LG: NaN };
+  const feat = (x) => { const t = (x - TOY.C) / TOY.S; return [1, t, t * t]; };
+  const D = (x) => { const f = feat(x); return sig(st.w[0] + st.w[1] * f[1] + st.w[2] * f[2]); };
+  function step() {
+    for (let s = 0; s < k; s++) {
+      const g = [0, 0, 0];
+      let L = 0;
+      for (let i = 0; i < TOY.N; i++) {
+        const xr = TOY.MU + TOY.SD * gauss(r), xf = st.a * gauss(r) + st.b;
+        const fr = feat(xr), ff = feat(xf), dr = D(xr), df = D(xf);
+        L += -lg(dr) - lg(1 - df);
+        for (let j = 0; j < 3; j++) g[j] += -(1 - dr) * fr[j] + df * ff[j];
+      }
+      st.LD = L / TOY.N;
+      for (let j = 0; j < 3; j++) st.w[j] -= lrD * (g[j] / TOY.N + 0.01 * st.w[j]);
+    }
+    let ga = 0, gb = 0, L = 0;
+    for (let i = 0; i < TOY.N; i++) {
+      const z = gauss(r), x = st.a * z + st.b, d = D(x), t = (x - TOY.C) / TOY.S;
+      const dLdx = -(1 - d) * (st.w[1] + 2 * st.w[2] * t) / TOY.S;
+      L += -lg(d); ga += dLdx * z; gb += dLdx;
+    }
+    st.a -= lrG * ga / TOY.N; st.b -= lrG * gb / TOY.N; st.LG = L / TOY.N; st.it++;
+  }
+  return { st, D, step };
+}
+
+/* ───────── static figures ───────── */
+function drawGenDisc() {
+  const svg = $('gd-svg'), dom = { x: [0, 10], y: [0, 8.85] }, W = 520, H = 460, Y0 = 110;
+  const r = rng(4);
+  /* (a) discriminative */
+  const ga = el('g', { class: 'an-fade' }, svg);
+  const A = panel(ga, 0, Y0, W, H, dom, '(a) discriminative');
+  for (let i = 0; i < 22; i++) el('circle', { class: 'pt fa', cx: A.sx(3 + 0.9 * gauss(r)), cy: A.sy(6 + 0.9 * gauss(r)), r: 9 }, ga);
+  for (let i = 0; i < 22; i++) el('circle', { class: 'pt fb', cx: A.sx(7 + 0.9 * gauss(r)), cy: A.sy(3 + 0.9 * gauss(r)), r: 9 }, ga);
+  el('path', { class: 'curve-t', style: 'stroke-dasharray:none;stroke:var(--myst-color-text);stroke-width:4', d: `M${A.sx(1.7)} ${A.sy(0.2)}L${A.sx(8.1)} ${A.sy(8.7)}` }, ga);
+  txt(ga, A.sx(7.0) + 16, A.sy(7.0), 'border', 'txs', 'start');
+  txt(ga, W / 2, Y0 + H + 56, 'learns where the border is');
+  /* (b) generative */
+  const gb = el('g', { class: 'frag', 'data-step': 'g1' }, svg);
+  const B = panel(gb, 640, Y0, W, H, dom, '(b) generative');
+  const phi = Math.PI / 6, cx = 5, cy = 4.4;
+  const pt = (u, v) => [cx + u * Math.cos(phi) - v * Math.sin(phi), cy + u * Math.sin(phi) + v * Math.cos(phi)];
+  const ux = B.sx(1) - B.sx(0);
+  [1, 2].forEach((k) => el('ellipse', { cx: B.sx(cx), cy: B.sy(cy), rx: 1.8 * k * ux, ry: 0.8 * k * ux, transform: `rotate(-30 ${B.sx(cx)} ${B.sy(cy)})`, style: 'fill:var(--c-a);fill-opacity:.08;stroke:var(--c-a);stroke-width:2;stroke-dasharray:8 6' }, gb));
+  for (let i = 0; i < 44; i++) { const [x, y] = pt(clamp(1.6 * gauss(r), -3.4, 3.4), clamp(0.7 * gauss(r), -1.4, 1.4)); el('circle', { class: 'pt', cx: B.sx(x), cy: B.sy(y), r: 8, style: 'fill:var(--myst-color-border-strong)' }, gb); }
+  [[1.2, 0.6], [-2.2, -0.4], [2.8, -0.5], [-0.6, 1.0], [0.3, -1.1]].forEach(([u, v]) => { const [x, y] = pt(u, v); star(gb, B.sx(x), B.sy(y), 20, 'fill:var(--c-b);stroke:var(--myst-color-text);stroke-width:2'); });
+  txt(gb, 640 + W / 2, Y0 + H + 56, 'learns the cloud; can sample from it');
+}
+
+function drawCounterfeit() {
+  const svg = $('cd-svg');
+  const person = (x, y, cls) => {
+    const g = el('g', {}, svg);
+    el('path', { class: cls, d: `M${x - 70} ${y + 160}Q${x - 70} ${y + 52} ${x} ${y + 50}Q${x + 70} ${y + 52} ${x + 70} ${y + 160}Z` }, g);
+    el('circle', { class: cls, cx: x, cy: y, r: 40 }, g);
+    return g;
+  };
+  const bill = (x, y, color, label) => {
+    const g = el('g', {}, svg);
+    el('rect', { x: x - 70, y: y - 38, width: 140, height: 76, rx: 6, style: `fill:var(--myst-color-bg);stroke:${color};stroke-width:4` }, g);
+    el('circle', { cx: x, cy: y, r: 22, style: `fill:none;stroke:${color};stroke-width:3` }, g);
+    txt(g, x, y + 10, '$', 'tx', 'middle', { style: `fill:${color};font-weight:700` });
+    txt(g, x + 90, y + 9, label, 'txs', 'start', { style: `fill:${color}` });
+    return g;
+  };
+  /* counterfeiter with a hat */
+  const cf = person(160, 300, 'box-b');
+  el('rect', { x: 110, y: 246, width: 100, height: 14, rx: 4, style: 'fill:var(--myst-color-text)' }, cf);
+  el('rect', { x: 128, y: 210, width: 64, height: 40, rx: 4, style: 'fill:var(--myst-color-text)' }, cf);
+  txt(svg, 160, 520, 'counterfeiter = G', 'tx');
+  /* bank */
+  const bk = el('g', {}, svg);
+  el('path', { class: 'box', d: 'M470 120L560 60L650 120Z' }, bk);
+  [490, 530, 570, 610].forEach((x) => el('rect', { class: 'box', x, y: 128, width: 20, height: 70 }, bk));
+  el('rect', { class: 'box', x: 470, y: 198, width: 180, height: 14 }, bk);
+  txt(svg, 680, 150, 'bank', 'txs', 'start');
+  bill(560, 290, 'var(--c-a)', 'real');
+  bill(560, 430, 'var(--c-b)', 'fake');
+  /* detective with a magnifying glass */
+  const dt = person(960, 300, 'box-a');
+  el('rect', { x: 905, y: 252, width: 110, height: 12, rx: 4, style: 'fill:var(--myst-color-text)' }, dt);
+  el('path', { d: 'M925 254Q960 200 995 254Z', style: 'fill:var(--myst-color-text)' }, dt);
+  el('line', { x1: 870, y1: 420, x2: 835, y2: 455, style: 'stroke:var(--myst-color-text);stroke-width:10;stroke-linecap:round' }, dt);
+  el('circle', { cx: 895, cy: 392, r: 36, style: 'fill:var(--myst-color-bg);fill-opacity:.7;stroke:var(--myst-color-text);stroke-width:6' }, dt);
+  txt(svg, 960, 520, 'detective = D', 'tx');
+  txt(svg, 960, 205, 'real or fake?', 'txs', 'middle', { style: 'font-style:italic' });
+  /* arrows */
+  arrow(svg, 'M560 216V244');
+  arrow(svg, 'M240 400Q380 430 476 430', 'wire-b', 'ah-b');
+  arrow(svg, 'M712 290Q790 290 860 330');
+  arrow(svg, 'M712 430Q790 430 850 400', 'wire-b', 'ah-b');
+  const fb = el('g', { class: 'frag', 'data-step': 'c1' }, svg);
+  arrow(fb, 'M960 560Q560 700 170 560', 'wire-a', 'ah-a', { style: 'stroke-dasharray:10 8' });
+  txt(fb, 565, 676, 'feedback: what gave the fake away', 'txs', 'middle', { style: 'fill:var(--c-a)' });
+}
+
+function drawNets() {
+  const svg = $('net-svg');
+  const g1 = el('g', { class: 'an-fade' }, svg);
+  /* noise vector */
+  for (let i = 0; i < 5; i++) el('rect', { x: 40, y: 250 + i * 44, width: 40, height: 40, rx: 4, style: `fill:var(--c-a);fill-opacity:${0.15 + 0.15 * ((i * 3) % 5)};stroke:var(--c-a);stroke-width:2` }, g1);
+  txt(g1, 60, 230, 'noise z', 'tx');
+  txt(g1, 60, 510, 'z ~ N(0, I)', 'txs');
+  arrow(g1, 'M100 360H170');
+  el('path', { class: 'box-b', d: 'M180 300L420 230L420 490L180 420Z' }, g1);
+  txt(g1, 300, 372, 'G', 'tx', 'middle', { style: 'font-size:48px;font-weight:700' });
+  arrow(g1, 'M430 360H520');
+  /* fake sample: a small pixel image */
+  const pix = [[0, 1, 1, 0], [1, 0, 0, 1], [1, 1, 1, 1], [1, 0, 0, 1]];
+  pix.forEach((row, i) => row.forEach((v, j) => el('rect', { x: 540 + j * 34, y: 296 + i * 34, width: 34, height: 34, style: `fill:${v ? 'var(--c-b)' : 'var(--c-b-soft)'};stroke:var(--myst-color-bg);stroke-width:2` }, g1)));
+  txt(g1, 608, 466, 'fake G(z)', 'tx');
+  /* real samples and the discriminator */
+  const g2 = el('g', { class: 'frag', 'data-step': 'nd' }, svg);
+  pix.forEach((row, i) => row.forEach((v, j) => el('rect', { x: 540 + j * 34, y: 40 + i * 34, width: 34, height: 34, style: `fill:${(i + j) % 3 ? 'var(--c-a)' : 'var(--c-a-soft)'};stroke:var(--myst-color-bg);stroke-width:2` }, g2)));
+  txt(g2, 608, 212, 'real x ~ p_data', 'tx');
+  arrow(g2, 'M690 108Q800 108 870 250');
+  arrow(g2, 'M690 364H860');
+  el('path', { class: 'box-a', d: 'M870 230L1110 300L1110 420L870 490Z' }, g2);
+  txt(g2, 990, 372, 'D', 'tx', 'middle', { style: 'font-size:48px;font-weight:700' });
+  arrow(g2, 'M1120 360H1200');
+  el('rect', { class: 'box', x: 1210, y: 310, width: 150, height: 100, rx: 10 }, g2);
+  txt(g2, 1285, 372, 'D(x)', 'tx', 'middle', { style: 'font-weight:700' });
+  txt(g2, 1285, 294, 'in (0, 1)', 'txs');
+  arrow(g2, 'M1370 340L1440 280');
+  arrow(g2, 'M1370 380L1440 440');
+  txt(g2, 1452, 278, 'near 1: “real”', 'tx', 'start', { style: 'fill:var(--c-a)' });
+  txt(g2, 1452, 458, 'near 0: “fake”', 'tx', 'start', { style: 'fill:var(--c-b)' });
+  /* feedback */
+  const g3 = el('g', { class: 'frag', 'data-step': 'nf' }, svg);
+  arrow(g3, 'M1285 410V530H300V500', 'wire-a', 'ah-a', { style: 'stroke-dasharray:10 8' });
+  txt(g3, 800, 520, 'gradients flow back through D into G', 'txs', 'middle', { style: 'fill:var(--c-a)' });
+}
+
+function drawPush() {
+  const svg = $('push-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 90, t: 60, x: [0, 10], y: [0, 1.05], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.5, 1], fy: (v) => fmt(v, 1), xl: 'feature x', yl: 'density and D(x)' });
+  const pr = (x) => npdf(x, 7, 0.7), pf = (x) => npdf(x, 2.8, 0.6);
+  el('path', { class: 'fill-a an-fade', d: areaPath(pr, 4, 10, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'fill-b an-fade', d: areaPath(pf, 0.2, 5.5, F.sx, F.sy) }, F.plot);
+  const D = (x) => sig(1.4 * (x - 4.8));
+  el('path', { class: 'curve-d an-draw', pathLength: 1, d: curvePath(D, 0, 10, F.sx, F.sy) }, F.plot);
+  txt(svg, F.sx(9.6), F.sy(D(9.6)) - 18, 'D(x)', 'tx', 'end', { style: 'fill:var(--c-d);font-weight:700' });
+  txt(svg, F.sx(7), F.sy(pr(7)) - 16, 'real', 'txs', 'middle', { style: 'fill:var(--c-a)' });
+  txt(svg, F.sx(2.8), F.sy(pf(2.8)) - 16, 'fakes', 'txs', 'middle', { style: 'fill:var(--c-b)' });
+  const g = el('g', { class: 'frag', 'data-step': 'p2' }, svg);
+  [2.6, 3.4, 4.2].forEach((x) => {
+    const y = F.sy(D(x)), x2 = x + 0.7, y2 = F.sy(D(x2));
+    el('circle', { class: 'pt fb', cx: F.sx(x), cy: y, r: 12 }, g);
+    const dx = F.sx(x2) - F.sx(x), dy = y2 - y, n = Math.hypot(dx, dy);
+    arrow(g, `M${F.sx(x) - 22 * dy / n + 16 * dx / n} ${y + 22 * dx / n + 16 * dy / n}L${F.sx(x2) - 22 * dy / n} ${y2 + 22 * dx / n}`, 'wire-b', 'ah-b', { style: 'stroke-width:4' });
+  });
+  txt(g, F.sx(0.3), F.sy(0.93), 'fakes move uphill on D', 'tx', 'start', { style: 'fill:var(--c-b);font-weight:700' });
+}
+
+function drawLoop() {
+  const svg = $('loop-svg');
+  const W = 360, H = 230, Y = 90, XS = [0, 440, 880, 1320];
+  const g = el('g', {}, svg);
+  tbox(g, XS[0], Y, W, H, 'box', ['Sample m real', 'examples x and', 'm noise vectors z']);
+  tbox(g, XS[1], Y, W, H, 'box-a', ['Update D', 'raise V', 'θ_D ← θ_D + α ∇V']);
+  tbox(g, XS[2], Y, W, H, 'box', ['Sample m new', 'noise vectors z']);
+  tbox(g, XS[3], Y, W, H, 'box-b', ['Update G', 'lower L_G', 'θ_G ← θ_G − α ∇L_G']);
+  for (let i = 0; i < 3; i++) arrow(g, `M${XS[i] + W + 8} ${Y + H / 2}H${XS[i + 1] - 10}`);
+  /* inner loop on D */
+  arrow(g, `M${XS[1] + W - 40} ${Y - 6}C${XS[1] + W - 40} ${Y - 70} ${XS[0] + W - 60} ${Y - 70} ${XS[0] + W - 60} ${Y - 8}`, 'wire-a', 'ah-a');
+  txt(g, XS[1] - 40, Y - 66, 'repeat k times', 'txs', 'middle', { style: 'fill:var(--c-a)' });
+  txt(g, XS[1] + W / 2, Y + H + 44, 'G fixed', 'txs');
+  txt(g, XS[3] + W / 2, Y + H + 44, 'D fixed', 'txs');
+  /* outer loop */
+  const out = el('g', { class: 'frag', 'data-step': 'lp' }, svg);
+  arrow(out, `M${XS[3] + W / 2} ${Y + H + 70}V${Y + H + 140}H${XS[0] + W / 2}V${Y + H + 12}`, 'wire', 'ah', { style: 'stroke-width:3' });
+  txt(out, 840, Y + H + 180, 'next round, until the samples look right', 'tx');
+}
+
+function drawModeCollapse() {
+  const svg = $('mc-svg'), W = 500, H = 360, Y0 = 70, XS = [0, 590, 1180];
+  const pr = (x) => 0.5 * npdf(x, 3, 0.6) + 0.5 * npdf(x, 7, 0.6);
+  const cases = [
+    { t: '(a) goal: both bumps', pg: pr },
+    { t: '(b) G covers only the left bump', pg: (x) => npdf(x, 3, 0.45), to: [3.6, 6.4] },
+    { t: '(c) then it hops to the right', pg: (x) => npdf(x, 7, 0.45), to: [6.4, 3.6] },
+  ];
+  cases.forEach((c, j) => {
+    const x0 = XS[j], g = el('g', { class: 'an-fade', style: `--d:${j * 0.5}s` }, svg);
+    const S = panel(g, x0, Y0, W, H, { x: [0, 10], y: [0, 1.05] }, c.t);
+    el('path', { class: 'fill-a', d: areaPath(pr, 0, 10, S.sx, S.sy) }, g);
+    el('path', { class: 'curve-b', style: 'stroke-dasharray:12 8', d: curvePath(c.pg, 0, 10, S.sx, S.sy) }, g);
+    if (j) {
+      const D = (x) => pr(x) / (pr(x) + c.pg(x) + 1e-9);
+      el('path', { class: 'curve-d', d: curvePath(D, 0.1, 9.9, S.sx, S.sy) }, g);
+      arrow(g, `M${S.sx(c.to[0])} ${S.sy(0.62)}H${S.sx(c.to[1])}`, 'wire-b', 'ah-b', { style: 'stroke-width:4' });
+    }
+    if (j < 2) arrow(svg, `M${x0 + W + 14} ${Y0 + H / 2}H${XS[j + 1] - 14}`);
+  });
+  legend(svg, 40, Y0 + H + 60, [['dot', 'fa', 'real data, p_data'], ['line', 'curve-b', 'generated, p_G']]);
+  legend(svg, 640, Y0 + H + 60, [['line', 'curve-d', 'best discriminator D*']]);
+  txt(svg, 1180, Y0 + H + 68, 'D* low where G sits, so G moves away', 'txs', 'start');
+}
+
+function drawUnstable() {
+  const svg = $('ins-svg');
+  const runs = [makeGAN(1, 0.5, 0.1, 3), makeGAN(2, 2, 1, 1)].map((m) => {
+    const L = [];
+    for (let i = 0; i < 800; i++) { m.step(); L.push([m.st.LD, m.st.LG, Math.abs(m.st.a)]); }
+    return L;
+  });
+  const titles = ['(a) small learning rates', '(b) large learning rates'];
+  runs.forEach((L, j) => {
+    const x0 = j * 870;
+    txt(svg, x0, 26, titles[j], 'ttl', 'start');
+    const top = el('svg', { id: `ins-top-${j}`, x: x0, y: 30, width: 810, height: 280, viewBox: '0 0 810 280', overflow: 'visible' }, svg);
+    const F = frame(top, { W: 810, H: 280, l: 100, t: 20, b: 30, r: 10, x: [0, 800], y: [0, 2.6], xt: [0, 200, 400, 600, 800], yt: [0, 1, 2], fx: () => '', xl: '', yl: 'loss' });
+    [Math.log(4), Math.log(2)].forEach((v) => el('line', { class: 'curve-t', x1: F.L, x2: F.W - F.R, y1: F.sy(v), y2: F.sy(v) }, F.plot));
+    [1, 0].forEach((c) => el('path', { style: `fill:none;stroke:var(${c ? '--c-b' : '--c-a'});stroke-width:2`, d: L.map((v, i) => (i ? 'L' : 'M') + F.sx(i + 1).toFixed(1) + ' ' + F.sy(Math.min(v[c], 2.6)).toFixed(1)).join('') }, F.plot));
+    const bot = el('svg', { id: `ins-bot-${j}`, x: x0, y: 330, width: 810, height: 270, viewBox: '0 0 810 270', overflow: 'visible' }, svg);
+    const B = frame(bot, { W: 810, H: 270, l: 100, t: 10, b: 80, r: 10, x: [0, 800], y: [0, 1.8], xt: [0, 200, 400, 600, 800], yt: [0, 0.7, 1.4], fy: (v) => fmt(v, 1), xl: 'training step', yl: 'spread' });
+    el('line', { class: 'curve-t', x1: B.L, x2: B.W - B.R, y1: B.sy(0.7), y2: B.sy(0.7) }, B.plot);
+    el('path', { style: 'fill:none;stroke:var(--c-d);stroke-width:3.5', d: L.map((v, i) => (i ? 'L' : 'M') + B.sx(i + 1).toFixed(1) + ' ' + B.sy(Math.min(v[2], 1.8)).toFixed(1)).join('') }, B.plot);
+    if (!j) {
+      legend(top, 520, 50, [['line', 'curve-a', 'D loss'], ['line', 'curve-b', 'G loss']]);
+      txt(top, F.W - F.R - 6, F.sy(Math.log(4)) - 10, 'log 4', 'txs', 'end');
+      txt(top, F.W - F.R - 6, F.sy(Math.log(2)) + 30, 'log 2', 'txs', 'end');
+      txt(bot, B.sx(800), B.sy(0.7) - 12, 'real spread 0.7', 'txs', 'end');
+      txt(bot, B.sx(60), B.sy(1.45), 'spread near 0: samples all alike', 'txs', 'start', { style: 'fill:var(--c-d)' });
+      arrow(bot, `M${B.sx(120)} ${B.sy(1.3)}L${B.sx(120)} ${B.sy(0.12)}`);
+    }
+  });
+}
+
+/* Hand-drawn faces for Figure 12 and Figure 14 */
+function face(g, cx, cy, s, p, extra = {}) {
+  const f = el('g', extra, g);
+  el('ellipse', { cx, cy: cy + 0.04 * s, rx: 0.36 * s * p.w, ry: 0.44 * s, style: `fill:${p.skin};stroke:var(--myst-color-text);stroke-width:2` }, f);
+  el('path', { d: `M${cx - 0.37 * s * p.w} ${cy - 0.02 * s}Q${cx} ${cy - (0.62 + p.hair) * s} ${cx + 0.37 * s * p.w} ${cy - 0.02 * s}Q${cx} ${cy - 0.3 * s} ${cx - 0.37 * s * p.w} ${cy - 0.02 * s}Z`, style: `fill:${p.hc}` }, f);
+  [-1, 1].forEach((k) => el('circle', { cx: cx + k * p.eye * s, cy: cy + 0.04 * s, r: 0.045 * s, style: 'fill:var(--myst-color-text)' }, f));
+  el('path', { d: `M${cx - 0.13 * s} ${cy + 0.24 * s}Q${cx} ${cy + (0.24 + p.smile) * s} ${cx + 0.13 * s} ${cy + 0.24 * s}`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3;stroke-linecap:round' }, f);
+  return f;
+}
+const SKINS = ['#f5d0a9', '#e0ac69', '#c68642', '#8d5524', '#ffdbac'];
+const HAIRS = ['#3b2314', '#6b4423', '#111111', '#a0522d', '#d4a017'];
+function faceParams(r) {
+  return { w: 0.85 + 0.25 * r(), skin: SKINS[Math.floor(r() * 5)], hc: HAIRS[Math.floor(r() * 5)], hair: 0.05 + 0.15 * r(), eye: 0.12 + 0.05 * r(), smile: -0.06 + 0.16 * r() };
+}
+
+function drawEval() {
+  const svg = $('ev-svg'), XS = [0, 410, 820], CELL = 113, Y0 = 130;
+  const r = rng(12), fixed = faceParams(rng(3));
+  const sets = [
+    { t: '(a) sharp, varied', v: 'good', c: 'var(--c-c)' },
+    { t: '(b) sharp, all alike', v: 'low variety', c: 'var(--c-b)' },
+    { t: '(c) varied, blurry', v: 'low quality', c: 'var(--c-b)' },
+  ];
+  sets.forEach((s, j) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${j * 0.4}s` }, svg);
+    el('rect', { class: 'box', x: XS[j], y: Y0, width: 340, height: 340, rx: 6 }, g);
+    txt(g, XS[j], Y0 - 16, s.t, 'ttl', 'start');
+    for (let i = 0; i < 9; i++) {
+      const cx = XS[j] + 57 + (i % 3) * CELL, cy = Y0 + 57 + Math.floor(i / 3) * CELL;
+      const p = j === 1 ? fixed : faceParams(r);
+      face(g, cx, cy, 92, p, j === 2 ? { filter: 'url(#blur-s)' } : {});
+    }
+    txt(g, XS[j] + 170, Y0 + 400, s.v, 'tx', 'middle', { style: `fill:${s.c};font-weight:700` });
+  });
+  const g = el('g', { class: 'frag', 'data-step': 'j1' }, svg);
+  txt(g, 580, 610, 'FID: real features vs generated features', 'txs');
+  el('ellipse', { cx: 520, cy: 655, rx: 70, ry: 24, style: 'fill:var(--c-a);fill-opacity:.25;stroke:var(--c-a);stroke-width:3' }, g);
+  el('ellipse', { cx: 650, cy: 660, rx: 90, ry: 30, style: 'fill:var(--c-b);fill-opacity:.25;stroke:var(--c-b);stroke-width:3' }, g);
+}
+
+function pixelGrid(g, x0, y0, size, n, f, extra = {}) {
+  const gg = el('g', extra, g), c = size / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const v = clamp(f((j + 0.5) / n, (i + 0.5) / n), 0, 1);
+    if (v > 0.02) el('rect', { x: x0 + j * c, y: y0 + i * c, width: c + 0.5, height: c + 0.5, style: `fill:var(--myst-color-text);fill-opacity:${v.toFixed(2)}` }, gg);
+  }
+  return gg;
+}
+function segDist(px, py, ax, ay, bx, by) {
+  const vx = bx - ax, vy = by - ay, t = clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy), 0, 1);
+  return Math.hypot(px - ax - t * vx, py - ay - t * vy);
+}
+function drawTimeline() {
+  const svg = $('tl-svg'), XS = [220, 640, 1060, 1480], S = 280, Y = 70, LINE = 440;
+  el('path', { class: 'ax', d: `M40 ${LINE}H1640`, 'marker-end': 'url(#ah)' }, svg);
+  const seven = (u, v) => {
+    const d = Math.min(segDist(u, v, 0.22, 0.2, 0.8, 0.2), segDist(u, v, 0.8, 0.2, 0.45, 0.85));
+    return Math.exp(-((d / 0.09) ** 2));
+  };
+  const faceF = (u, v) => {
+    const head = ((u - 0.5) / 0.32) ** 2 + ((v - 0.55) / 0.38) ** 2;
+    if (head > 1) return 0;
+    if (v < 0.38 && head > 0.35) return 0.9;
+    if (Math.hypot(u - 0.38, v - 0.52) < 0.05 || Math.hypot(u - 0.62, v - 0.52) < 0.05) return 1;
+    if (Math.abs(v - 0.74) < 0.03 && Math.abs(u - 0.5) < 0.11) return 0.85;
+    return 0.25;
+  };
+  const items = [
+    ['2014', 'original GAN', '28 × 28 digits, blurry'],
+    ['2015', 'DCGAN', '64 × 64, conv layers'],
+    ['2017', 'Wasserstein GAN', 'steadier training'],
+    ['2019', 'StyleGAN', '1024 × 1024 faces'],
+  ];
+  items.forEach(([yr, name, sub], j) => {
+    const x = XS[j], g = el('g', { class: 'an-fade', style: `--d:${j * 0.4}s` }, svg);
+    el('rect', { class: 'box', x: x - S / 2, y: Y, width: S, height: S, rx: 6, style: 'fill:var(--myst-color-bg)' }, g);
+    if (j === 0) pixelGrid(g, x - S / 2 + 10, Y + 10, S - 20, 14, seven, { filter: 'url(#blur-s)' });
+    if (j === 1) pixelGrid(g, x - S / 2 + 10, Y + 10, S - 20, 20, faceF);
+    if (j === 2) {
+      const sx = lin(0, 1, x - S / 2 + 30, x + S / 2 - 20), sy = lin(0, 1, Y + S - 40, Y + 20);
+      const lossF = (t) => 0.12 + 0.75 * Math.exp(-3.2 * t);
+      el('path', { class: 'ax', d: `M${sx(0)} ${sy(1)}V${sy(0)}H${sx(1)}` }, g);
+      el('path', { class: 'curve-a', d: curvePath(lossF, 0, 1, sx, sy, 60) }, g);
+      txt(g, sx(0.98), sy(0.6), 'loss', 'txs', 'end');
+    }
+    if (j === 3) face(g, x, Y + S / 2 + 6, 220, { w: 1, skin: '#e0ac69', hc: '#3b2314', hair: 0.12, eye: 0.14, smile: 0.06 });
+    el('circle', { cx: x, cy: LINE, r: 12, style: 'fill:var(--myst-color-bg);stroke:var(--c-a);stroke-width:4' }, g);
+    txt(g, x, LINE + 52, `${yr} · ${name}`, 'tx', 'middle', { style: 'font-weight:700' });
+    txt(g, x, LINE + 90, sub, 'txs');
+  });
+}
+
+function drawUses() {
+  const svg = $('use-svg'), Y = 70, H = 400;
+  el('rect', { class: 'box', x: 0, y: Y - 50, width: 1090, height: H + 160, rx: 10, style: 'fill:none' }, svg);
+  el('rect', { class: 'box', x: 1150, y: Y - 50, width: 530, height: H + 160, rx: 10, style: 'fill:none;stroke:var(--c-b)' }, svg);
+  txt(svg, 30, Y - 10, 'uses', 'ttl', 'start');
+  txt(svg, 1180, Y - 10, 'risks', 'ttl', 'start', { style: 'fill:var(--c-b)' });
+  const r = rng(31);
+  /* data augmentation */
+  const g1 = el('g', { class: 'an-fade' }, svg);
+  el('rect', { class: 'box', x: 40, y: Y + 30, width: 310, height: 310, rx: 6 }, g1);
+  const jit = (s, m) => clamp(s * gauss(r), -m, m);
+  for (let i = 0; i < 40; i++) el('circle', { class: 'pt fb', cx: 195 + jit(50, 130), cy: Y + 185 + jit(42, 130), r: 7, style: 'fill-opacity:.7' }, g1);
+  for (let i = 0; i < 8; i++) el('circle', { class: 'pt fa', cx: 195 + jit(50, 130), cy: Y + 185 + jit(42, 130), r: 10 }, g1);
+  txt(g1, 195, Y + 390, 'more training data', 'tx');
+  txt(g1, 195, Y + 430, 'blue real, orange generated', 'txs');
+  /* art */
+  const g2 = el('g', { class: 'an-fade', style: '--d:.3s' }, svg);
+  el('rect', { class: 'box', x: 390, y: Y + 30, width: 310, height: 310, rx: 6 }, g2);
+  [['--c-a', 480, 160, 70], ['--c-b', 600, 200, 80], ['--c-c', 520, 270, 60], ['--c-d', 620, 300, 40]].forEach(([c, x, y, rr]) => el('circle', { cx: x, cy: Y + y, r: rr, style: `fill:var(${c});fill-opacity:.45` }, g2));
+  el('path', { d: `M420 ${Y + 320}C500 ${Y + 220} 580 ${Y + 340} 680 ${Y + 80}`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:5;stroke-linecap:round' }, g2);
+  txt(g2, 545, Y + 390, 'art and design', 'tx');
+  /* super-resolution */
+  const g3 = el('g', { class: 'an-fade', style: '--d:.6s' }, svg);
+  el('rect', { class: 'box', x: 740, y: Y + 30, width: 310, height: 310, rx: 6 }, g3);
+  const disc = (u, v) => (Math.hypot(u - 0.5, v - 0.5) < 0.44 ? 0.8 : 0);
+  pixelGrid(g3, 760, Y + 125, 120, 8, disc);
+  arrow(g3, `M888 ${Y + 185}H914`);
+  el('circle', { cx: 980, cy: Y + 185, r: 50, style: 'fill:var(--myst-color-text);fill-opacity:.8' }, g3);
+  txt(g3, 895, Y + 390, 'sharper images', 'tx');
+  txt(g3, 895, Y + 430, 'super-resolution', 'txs');
+  /* deepfake */
+  const g4 = el('g', { class: 'an-fade', style: '--d:.9s' }, svg);
+  face(g4, 1290, Y + 170, 180, { w: 1, skin: '#c68642', hc: '#111111', hair: 0.1, eye: 0.14, smile: 0.08 });
+  face(g4, 1540, Y + 170, 180, { w: 0.9, skin: '#f5d0a9', hc: '#d4a017', hair: 0.16, eye: 0.13, smile: -0.04 });
+  arrow(g4, `M1370 ${Y + 140}Q1415 ${Y + 100} 1455 ${Y + 140}`, 'wire-b', 'ah-b');
+  arrow(g4, `M1455 ${Y + 220}Q1415 ${Y + 260} 1370 ${Y + 220}`, 'wire-b', 'ah-b');
+  txt(g4, 1415, Y + 330, 'deepfakes: face swaps', 'tx');
+  txt(g4, 1415, Y + 390, 'ask for consent', 'txs');
+  txt(g4, 1415, Y + 430, 'build and use detectors', 'txs');
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.map = (() => {
+  const svg = $('map-svg');
+  const Gmap = (z1, z2) => {
+    const th = Math.PI * (0.12 + 0.76 * Phi(z1)), rr = 3 + 0.35 * z2;
+    return [5 + rr * Math.cos(th), 0.6 + rr * Math.sin(th)];
+  };
+  const L = panel(svg, 0, 160, 400, 400, { x: [-3, 3], y: [-3, 3] }, 'noise space: z');
+  const R = panel(svg, 560, 160, 600, 400, { x: [1, 9.5], y: [0, 5.67] }, 'data space: x');
+  txt(svg, 200, 610, 'round cloud, N(0, I)', 'txs');
+  txt(svg, 860, 650, 'gray dots: real data', 'txs', 'middle', { style: 'fill:var(--myst-color-text-tertiary)' });
+  txt(svg, 860, 610, 'G bends it into the data shape', 'txs');
+  arrow(svg, 'M412 120Q480 80 548 120', 'wire', 'ah', { style: 'stroke-width:3' });
+  txt(svg, 480, 70, 'G', 'tx', 'middle', { style: 'font-weight:700;font-size:36px' });
+  const r0 = rng(77);
+  for (let i = 0; i < 160; i++) {
+    const z1 = clamp(gauss(r0), -2.9, 2.9), z2 = clamp(gauss(r0), -2.9, 2.9), [x, y] = Gmap(z1, z2);
+    el('circle', { class: 'pt', cx: L.sx(z1), cy: L.sy(z2), r: 5, style: 'fill:var(--myst-color-border-strong)' }, svg);
+    el('circle', { class: 'pt', cx: R.sx(x), cy: R.sy(y), r: 6, style: 'fill:var(--myst-color-border-strong)' }, svg);
+  }
+  const zl = el('g', {}, svg), xl = el('g', {}, svg), links = el('g', {}, svg);
+  let r = rng(1), n = 0;
+  function sample(count) {
+    clear(links);
+    let last = null;
+    for (let i = 0; i < count; i++) {
+      const z = [clamp(gauss(r), -2.9, 2.9), clamp(gauss(r), -2.9, 2.9)], x = Gmap(z[0], z[1]);
+      el('circle', { class: 'pt fa', cx: L.sx(z[0]), cy: L.sy(z[1]), r: 8 }, zl);
+      star(xl, R.sx(x[0]), R.sy(x[1]), 14, 'fill:var(--c-b);stroke:var(--myst-color-text);stroke-width:1.5');
+      last = [z, x];
+    }
+    n += count;
+    const [z, x] = last;
+    el('circle', { cx: L.sx(z[0]), cy: L.sy(z[1]), r: 18, style: 'fill:none;stroke:var(--c-a);stroke-width:4' }, links);
+    el('circle', { cx: R.sx(x[0]), cy: R.sy(x[1]), r: 24, style: 'fill:none;stroke:var(--c-b);stroke-width:4' }, links);
+    arrow(links, `M${L.sx(z[0]) + 18} ${L.sy(z[1])}C${L.sx(z[0]) + 200} ${L.sy(z[1]) - 120} ${R.sx(x[0]) - 200} ${R.sy(x[1]) - 120} ${R.sx(x[0]) - 26} ${R.sy(x[1]) - 4}`, 'wire', 'ah', { style: 'stroke-dasharray:8 6' });
+    $('map-z').textContent = `(${fmt(z[0], 2)}, ${fmt(z[1], 2)})`;
+    $('map-x').textContent = `(${fmt(x[0], 2)}, ${fmt(x[1], 2)})`;
+    $('map-n').textContent = n;
+  }
+  function reset() {
+    clear(zl); clear(xl); clear(links); r = rng(1); n = 0;
+    $('map-z').textContent = '—'; $('map-x').textContent = '—'; $('map-n').textContent = 0;
+  }
+  $('map-one').addEventListener('click', () => sample(1));
+  $('map-many').addEventListener('click', () => sample(50));
+  $('map-reset').addEventListener('click', reset);
+  reset(); sample(1);
+  return {};
+})();
+
+DEMOS.sat = (() => {
+  const svg = $('sat-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 100, t: 40, x: [0, 1], y: [-5, 5], xt: [0, 0.25, 0.5, 0.75, 1], yt: [-4, -2, 0, 2, 4], xl: 'D(G(z)): how much D believes the fake', yl: 'generator loss' });
+  el('rect', { x: F.sx(0), y: F.T, width: F.sx(0.15) - F.sx(0), height: F.H - F.B - F.T, style: 'fill:var(--c-b);fill-opacity:.08' }, F.back);
+  txt(svg, F.sx(0.01), F.sy(-4.4), 'early training', 'txs', 'start', { style: 'fill:var(--c-b)' });
+  const f1 = (d) => Math.log(1 - d), f2 = (d) => -Math.log(d);
+  el('path', { class: 'curve-b', d: curvePath(f1, 0.001, 0.999, F.sx, F.sy, 400) }, F.plot);
+  el('path', { class: 'curve-a', d: curvePath(f2, 0.001, 0.999, F.sx, F.sy, 400) }, F.plot);
+  txt(svg, F.sx(0.3), F.sy(f1(0.3)) + 52, 'log(1 − D)', 'tx', 'start', { style: 'fill:var(--c-b);font-weight:700' });
+  txt(svg, F.sx(0.2), F.sy(f2(0.2)) - 30, '−log D', 'tx', 'start', { style: 'fill:var(--c-a);font-weight:700' });
+  const t1 = el('line', { class: 'curve-t', style: 'stroke:var(--c-b)' }, F.plot), t2 = el('line', { class: 'curve-t', style: 'stroke:var(--c-a)' }, F.plot);
+  const p1 = el('circle', { class: 'pt fb', r: 11 }, F.plot), p2 = el('circle', { class: 'pt fa', r: 11 }, F.plot);
+  const slider = $('sat-d');
+  function tangent(line, dot, f, s, d) {
+    const h = 0.12;
+    line.setAttribute('x1', F.sx(d - h)); line.setAttribute('y1', F.sy(f(d) - s * h));
+    line.setAttribute('x2', F.sx(d + h)); line.setAttribute('y2', F.sy(f(d) + s * h));
+    dot.setAttribute('cx', F.sx(d)); dot.setAttribute('cy', F.sy(f(d)));
+  }
+  function draw() {
+    const d = +slider.value, s1 = -1 / (1 - d), s2 = -1 / d;
+    tangent(t1, p1, f1, s1, d); tangent(t2, p2, f2, s2, d);
+    $('sat-d-val').textContent = fmt(d, 2);
+    $('sat-s1').textContent = fmt(s1, 2);
+    $('sat-s2').textContent = fmt(s2, 2);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.opt = (() => {
+  const svg = $('opt-svg'), MR = 6, SR = 0.8;
+  const F = frame(svg, { W: 1160, H: 700, l: 90, t: 60, x: [0, 10], y: [0, 1.05], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.5, 1], fy: (v) => fmt(v, 1), xl: 'feature x', yl: 'density and D*(x)' });
+  el('line', { class: 'curve-t', x1: F.L, x2: F.W - F.R, y1: F.sy(0.5), y2: F.sy(0.5) }, F.plot);
+  const pr = (x) => npdf(x, MR, SR);
+  el('path', { class: 'fill-a', d: areaPath(pr, 0, 10, F.sx, F.sy) }, F.plot);
+  const pg = el('path', { class: 'fill-b' }, F.plot), dc = el('path', { class: 'curve-d' }, F.plot);
+  legend(svg, F.L + 20, F.T + 10, [['dot', 'fa', 'p_data'], ['dot', 'fb', 'p_G'], ['line', 'curve-d', 'D*']]);
+  const sm = $('opt-m'), ss = $('opt-s');
+  function draw() {
+    const m = +sm.value, s = +ss.value, q = (x) => npdf(x, m, s);
+    const D = (x) => { const a = pr(x), b = q(x); return a + b < 1e-12 ? 0.5 : a / (a + b); };
+    pg.setAttribute('d', areaPath(q, 0, 10, F.sx, F.sy));
+    dc.setAttribute('d', curvePath(D, 0, 10, F.sx, F.sy, 300));
+    let V = 0;
+    const h = 0.005;
+    for (let x = -6; x <= 16; x += h) { const d = D(x); V += h * (pr(x) * lg(d) + q(x) * lg(1 - d)); }
+    $('opt-m-val').textContent = fmt(m, 1); $('opt-s-val').textContent = fmt(s, 2);
+    $('opt-d').textContent = fmt(D(6), 2); $('opt-v').textContent = fmt(V, 2);
+  }
+  sm.addEventListener('input', draw); ss.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.toy = (() => {
+  const svg = $('toy-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 90, r: 90, t: 60, x: [0, 10], y: [0, 1.05], xt: [0, 2, 4, 6, 8, 10], yt: [0, 0.5, 1], fy: (v) => fmt(v, 1), xl: 'x', yl: 'density' });
+  [0, 0.5, 1].forEach((v) => txt(svg, F.W - F.R + 12, F.sy(v) + 8, fmt(v, 1), 'tk', 'start', { style: 'fill:var(--c-d)' }));
+  el('text', { class: 'lb', transform: `translate(${F.W - 20} ${(F.T + F.H - F.B) / 2}) rotate(90)`, 'text-anchor': 'middle', text: 'D(x)', style: 'fill:var(--c-d)' }, svg);
+  el('line', { class: 'curve-t', x1: F.L, x2: F.W - F.R, y1: F.sy(0.5), y2: F.sy(0.5) }, F.plot);
+  const BW = 0.2, NB = 50, NS = 3000, r0 = rng(99);
+  const REAL = Array.from({ length: NS }, () => TOY.MU + TOY.SD * gauss(r0));
+  const Z = Array.from({ length: NS }, () => gauss(r0));
+  const hist = (X) => {
+    const h = new Array(NB).fill(0);
+    X.forEach((x) => { const b = Math.floor(x / BW); if (b >= 0 && b < NB) h[b]++; });
+    return h.map((c) => c / (NS * BW));
+  };
+  const barsPath = (h) => h.map((v, i) => (v > 0 ? `M${F.sx(i * BW)} ${F.sy(0)}V${F.sy(Math.min(v, 1.2))}H${F.sx((i + 1) * BW)}V${F.sy(0)}` : '')).join('');
+  el('path', { d: barsPath(hist(REAL)), style: 'fill:var(--c-a);fill-opacity:.35;stroke:var(--c-a);stroke-width:1.5' }, F.plot);
+  const fake = el('path', { style: 'fill:var(--c-b);fill-opacity:.35;stroke:var(--c-b);stroke-width:1.5' }, F.plot);
+  const dcur = el('path', { class: 'curve-d' }, F.plot);
+  legend(svg, F.sx(7.4), F.T + 10, [['dot', 'fa', 'real data'], ['dot', 'fb', 'fakes G(z)'], ['line', 'curve-d', 'D(x)']]);
+  const msg = el('text', { class: 'txs', x: F.L, y: 34, text: '' }, svg);
+  let gan, busy = false;
+  const btns = ['toy-step', 'toy-run'].map($);
+  function draw() {
+    const { st } = gan;
+    fake.setAttribute('d', barsPath(hist(Z.map((z) => st.a * z + st.b))));
+    dcur.setAttribute('d', curvePath(gan.D, 0, 10, F.sx, F.sy, 300));
+    $('toy-it').textContent = st.it;
+    $('toy-g').textContent = `${fmt(st.b, 2)}, ${fmt(Math.abs(st.a), 2)}`;
+    $('toy-l').textContent = st.it ? `${fmt(st.LD, 2)}, ${fmt(st.LG, 2)}` : '—';
+    const dm = Math.max(...[0, 2, 4, 6, 8, 10].map((x) => Math.abs(gan.D(x) - 0.5)));
+    msg.textContent = !st.it ? 'Start: D answers 0.5 everywhere; the fakes sit far to the left'
+      : dm < 0.06 && Math.abs(Math.abs(st.a) - TOY.SD) < 0.1 ? 'Close to the end of the game: D is near 0.5 everywhere'
+        : Math.abs(st.a) < 0.1 ? 'The fakes have collapsed to almost one value; D will push them apart'
+          : 'D is high where real data is more likely than fakes';
+  }
+  function reset() { gan = makeGAN(1, 0.5, 0.1, 3); busy = false; btns.forEach((b) => { b.disabled = false; }); draw(); }
+  function run(n) {
+    if (busy) return;
+    if (REDUCED || n === 1) { for (let i = 0; i < n; i++) gan.step(); draw(); return; }
+    busy = true; btns.forEach((b) => { b.disabled = true; });
+    let left = n;
+    const tick = () => {
+      if (!busy) return;
+      for (let i = 0; i < 5 && left > 0; i++, left--) gan.step();
+      draw();
+      if (left > 0) requestAnimationFrame(tick);
+      else { busy = false; btns.forEach((b) => { b.disabled = false; }); }
+    };
+    requestAnimationFrame(tick);
+  }
+  $('toy-step').addEventListener('click', () => run(1));
+  $('toy-run').addEventListener('click', () => run(200));
+  $('toy-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.cond = (() => {
+  const svg = $('cond-svg');
+  const D8 = [[0.5, 0.5], [0.27, 0.33], [0.5, 0.1], [0.73, 0.3], [0.5, 0.5], [0.24, 0.72], [0.5, 0.92], [0.76, 0.72], [0.5, 0.5]];
+  const ZERO = Array.from({ length: 21 }, (_, i) => { const a = (i / 20) * 2 * Math.PI - Math.PI / 2; return [0.5 + 0.28 * Math.cos(a), 0.5 + 0.4 * Math.sin(a)]; });
+  const DIGITS = [
+    ZERO,
+    [[0.32, 0.26], [0.55, 0.1], [0.55, 0.9]],
+    [[0.2, 0.3], [0.35, 0.12], [0.65, 0.12], [0.78, 0.3], [0.7, 0.5], [0.2, 0.9], [0.82, 0.9]],
+    [[0.2, 0.15], [0.75, 0.15], [0.45, 0.45], [0.7, 0.55], [0.78, 0.72], [0.6, 0.9], [0.2, 0.85]],
+    [[0.65, 0.9], [0.65, 0.1], [0.15, 0.65], [0.85, 0.65]],
+    [[0.78, 0.12], [0.3, 0.12], [0.25, 0.45], [0.6, 0.42], [0.78, 0.6], [0.7, 0.85], [0.45, 0.92], [0.2, 0.82]],
+    [[0.7, 0.12], [0.4, 0.3], [0.25, 0.6], [0.3, 0.85], [0.55, 0.92], [0.75, 0.75], [0.65, 0.55], [0.4, 0.55], [0.27, 0.68]],
+    [[0.18, 0.12], [0.82, 0.12], [0.45, 0.9]],
+    D8,
+    [[0.75, 0.35], [0.55, 0.5], [0.3, 0.42], [0.3, 0.2], [0.5, 0.1], [0.72, 0.2], [0.75, 0.35], [0.7, 0.9]],
+  ];
+  /* smooth stroke through the points (Catmull-Rom as cubic Bézier) */
+  function stroke(P) {
+    let d = `M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(i - 1, 0)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(i + 2, P.length - 1)];
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
+  function digit(g, y, x0, y0, size, r, color) {
+    const slant = 0.35 * (r() - 0.5), wide = 0.8 + 0.35 * r(), wt = 6 + 7 * r();
+    const P = DIGITS[y].map(([u, v]) => {
+      const uu = 0.5 + (u - 0.5) * wide + slant * (0.5 - v) + 0.025 * gauss(r), vv = v + 0.025 * gauss(r);
+      return [x0 + uu * size, y0 + vv * size];
+    });
+    el('path', { d: stroke(P), style: `fill:none;stroke:${color};stroke-width:${wt.toFixed(1)};stroke-linecap:round;stroke-linejoin:round` }, g);
+  }
+  /* diagram */
+  const dg = el('g', {}, svg);
+  tbox(dg, 0, 20, 110, 70, 'box', ['z']);
+  tbox(dg, 0, 120, 110, 70, 'box-a', ['y']);
+  el('path', { class: 'box-b', d: 'M180 50L320 20L320 190L180 160Z' }, dg);
+  txt(dg, 250, 118, 'G', 'tx', 'middle', { style: 'font-size:40px;font-weight:700' });
+  arrow(dg, 'M114 55H172'); arrow(dg, 'M114 155H172', 'wire-a', 'ah-a');
+  el('rect', { class: 'box', x: 400, y: 40, width: 130, height: 130, rx: 6, style: 'fill:var(--myst-color-bg)' }, dg);
+  const mini = el('g', {}, dg);
+  arrow(dg, 'M326 105H392');
+  el('path', { class: 'box-a', d: 'M610 20L750 50L750 160L610 190Z' }, dg);
+  txt(dg, 680, 118, 'D', 'tx', 'middle', { style: 'font-size:40px;font-weight:700' });
+  arrow(dg, 'M536 105H602');
+  tbox(dg, 820, 120, 110, 70, 'box-a', ['y']);
+  arrow(dg, 'M816 155H758', 'wire-a', 'ah-a');
+  arrow(dg, 'M756 70H816');
+  const q = txt(dg, 826, 78, '', 'tx', 'start');
+  el('line', { class: 'gl', x1: 0, x2: 1160, y1: 240, y2: 240 }, svg);
+  const title = txt(svg, 0, 290, '', 'ttl', 'start');
+  const grid = el('g', {}, svg);
+  const sel = $('cond-y');
+  let seed = 0;
+  function draw() {
+    const y = +sel.value, r = rng(500 + 31 * seed + y);
+    clear(grid); clear(mini);
+    digit(mini, y, 415, 55, 100, rng(7 + y), 'var(--c-b)');
+    q.textContent = `real, and a ${y}?`;
+    title.textContent = `ten samples of G(z, y = ${y}), each with new noise z`;
+    for (let i = 0; i < 10; i++) {
+      const x0 = (i % 5) * 234, y0 = 320 + Math.floor(i / 5) * 190;
+      el('rect', { class: 'box', x: x0, y: y0, width: 170, height: 170, rx: 6, style: 'fill:var(--myst-color-bg)' }, grid);
+      digit(grid, y, x0 + 20, y0 + 15, 140, r, 'var(--myst-color-text)');
+    }
+  }
+  sel.addEventListener('change', draw);
+  $('cond-new').addEventListener('click', () => { seed++; draw(); });
+  draw();
+  return {};
+})();
+
+/* "p_data" or "θ_D" in figure text: draw the part after "_" as a subscript */
+function subscripts() {
+  document.querySelectorAll('deck-stage svg text').forEach((t) => {
+    if (t.children.length || !/_[A-Za-z]/.test(t.textContent)) return;
+    const parts = t.textContent.split(/_([A-Za-z]+)/);
+    t.textContent = '';
+    parts.forEach((s, i) => {
+      if (!s) return;
+      el('tspan', i % 2 ? { 'baseline-shift': 'sub', style: 'font-size:75%', text: s } : { text: s }, t);
+    });
+  });
+}
+
+drawGenDisc(); drawCounterfeit(); drawNets(); drawPush(); drawLoop(); drawModeCollapse(); drawUnstable(); drawEval(); drawTimeline(); drawUses();
+subscripts();
+})();
+</script>
+</body>
+</html>

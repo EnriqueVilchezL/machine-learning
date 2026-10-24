@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naive Bayes</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.side .bt.chip[aria-pressed="true"]{background:var(--myst-color-primary);border-color:transparent;color:#fff}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 13</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Naive Bayes</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Classify by asking which class makes the evidence most likely</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 13 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Probability by counting</li>
+<li class="an-up" style="--d:.15s">Bayes' rule: updating a belief</li>
+<li class="an-up" style="--d:.25s">The naive assumption</li>
+<li class="an-up" style="--d:.35s">Training by counting words</li>
+<li class="an-up" style="--d:.45s">Numeric features, strengths and weaknesses</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x} = (x_1, \dots, x_d)</span></td><td>Features of a new example, such as the words of an email</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">c, \ \hat{y}</span></td><td>A class (spam or other) and the predicted class</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">P(c)</span></td><td>Prior: share of class <span class="tex">c</span> before any evidence</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">P(x_j \mid c)</span></td><td>Likelihood: chance of feature <span class="tex">j</span> within class <span class="tex">c</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">P(c \mid \mathbf{x})</span></td><td>Posterior: chance of class <span class="tex">c</span> after seeing <span class="tex">\mathbf{x}</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">N_c, \ N_{jc}</span></td><td>Examples of class <span class="tex">c</span>, and those among them with word <span class="tex">j</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>The bar <span class="tex">\mid</span> reads “given”: <span class="tex">P(\text{free} \mid \text{spam})</span> is the chance of “free” among spam emails.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Counting and Bayes' rule</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A probability is a share of a group. Evidence shrinks the group we look at.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Probability by counting">
+<div class="hdr" data-s="Bayes' rule"></div>
+<h2>Probability by counting</h2>
+<div class="fr">
+<div class="figbox"><svg id="count-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Of 100 training emails, 40 are spam. Before reading anything, an email is spam 40% of the time.</p>
+<p class="small frag up" data-step="free" style="margin:0">The word “free” appears in 24 of the 40 spam emails (60%), but only in 6 of the 60 others (10%).</p>
+<p class="small frag up" data-step="pull" style="margin:0">Keep only the emails with “free”: 24 of those 30 are spam. The share jumps from 40% to <strong>80%</strong>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>Each square is one training email. A ring marks the emails that contain the word “free”.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A frequency tree">
+<div class="hdr" data-s="Bayes' rule"></div>
+<h2>A frequency tree</h2>
+<div class="fr">
+<div class="figbox"><svg id="tree-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The same 100 emails, split first by class and then by the word.</p>
+<p class="small frag up" data-step="res" style="margin:0">To answer “is an email with free spam?”, follow the two branches that end in “free” and compare their counts.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>A frequency tree for the emails of Figure 1. Percentages on the branches are shares of the box on the left.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Updating a belief" data-demo="bayes">
+<div class="hdr" data-s="Bayes' rule"></div>
+<h2>Updating a belief</h2>
+<div class="fr">
+<div class="col">
+<div class="eq" style="margin:0 0 8px;font-size:30px"><div class="m tex-d">\underbrace{P(\text{class} \mid \text{evidence})}_{\text{after}} \;\propto\; \underbrace{P(\text{evidence} \mid \text{class})}_{\text{how likely the evidence is}} \cdot \underbrace{P(\text{class})}_{\text{before}}</div></div>
+<div class="figbox"><svg id="bayes-svg" viewBox="0 0 1160 560"></svg></div>
+</div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Compute the right side for each class, then rescale so the classes add up to 100%.</p>
+<div class="ctl"><label><span>Share of spam (before)</span><b id="bayes-p-val">40%</b></label><input type="range" id="bayes-p" min="5" max="90" step="1" value="40"></div>
+<div class="ctl"><label><span>Spam with “free”</span><b id="bayes-a-val">60%</b></label><input type="range" id="bayes-a" min="5" max="95" step="1" value="60"></div>
+<div class="ctl"><label><span>Other emails with “free”</span><b id="bayes-b-val">10%</b></label><input type="range" id="bayes-b" min="1" max="60" step="1" value="10"></div>
+<div class="ro"><span>Spam after “free”</span><b id="bayes-post" class="bb">80%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Bayes' rule on 100 emails. Faded squares do not contain the word; icons are rounded to whole emails.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bayes' rule formula">
+<div class="hdr" data-s="Bayes' rule"></div>
+<h2>Bayes' rule</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The chance of a class after the evidence is the prior times the likelihood, divided by the chance of the evidence:</p>
+<div class="eq"><div class="m tex-d">P(c \mid \mathbf{x}) = \frac{P(\mathbf{x} \mid c) \, P(c)}{P(\mathbf{x})}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="b1" style="margin:0">The bottom adds the top over all classes. It only rescales, so the classes add up to 1:</p>
+<div class="eq frag up" data-step="b1"><div class="m tex-d">P(\mathbf{x}) = \sum_{c} P(\mathbf{x} \mid c) \, P(c)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="b2" style="margin:0">This is the “rescale to 100%” step of Figure 3.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>An email contains “free”.</p><p>Spam: <span class="tex">0.6 \cdot 0.4 = 0.24</span></p><p>Other: <span class="tex">0.1 \cdot 0.6 = 0.06</span></p><p>Spam after “free”:</p><p><span class="tex">\tfrac{0.24}{0.24 + 0.06} = 0.8</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A rare disease">
+<div class="hdr" data-s="Bayes' rule"></div>
+<h2>A rare disease</h2>
+<div class="fr">
+<div class="figbox"><svg id="dis-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">1 person in 100 has the disease. The test finds 9 of 10 sick people, and wrongly flags 9 of 100 healthy ones.</p>
+<p class="small frag up" data-step="pos" style="margin:0">Most positive tests come from the large healthy group.</p>
+<p class="small frag up" data-step="ans" style="margin:0">A positive test raises the chance from 1% to about 9%, not to 90%. A small prior pulls the answer down.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>1000 people, one square each. Rings mark the people with a positive test.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The naive assumption</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Treat every word as a separate piece of evidence, and learn by counting.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why naive">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>Why “naive”</h2>
+<div class="fr">
+<div class="figbox"><svg id="naive-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Once we know the class, naive Bayes assumes the words tell us nothing about each other. Their evidence is multiplied.</p>
+<p class="small frag up" data-step="link" style="margin:0">This is false: “free” and “money” often come together, so their evidence is counted twice.</p>
+<p class="small frag up" data-step="mult" style="margin:0">It still works well, because it only needs the right class to win, not exact probabilities.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>The class points to each word. No arrows between words: that is the naive assumption.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Naive formula">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>The naive formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Within a class, the features are treated as independent, so their chances multiply:</p>
+<div class="eq"><div class="m tex-d">P(\mathbf{x} \mid c) = \prod_{j=1}^{d} P(x_j \mid c)</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="n1" style="margin:0"><span class="tex">P(\mathbf{x})</span> is the same for every class, so it can be dropped. Pick the class with the largest score:</p>
+<div class="eq frag up" data-step="n1"><div class="m tex-d">\hat{y} = \underset{c}{\arg\max} \ P(c) \prod_{j=1}^{d} P(x_j \mid c)</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="n2" style="margin:0">Many small numbers multiplied become too small for a computer. Adding logarithms gives the same winner:</p>
+<div class="eq frag up" data-step="n2"><div class="m tex-d">\hat{y} = \underset{c}{\arg\max} \ \Big[\log P(c) + \sum_{j=1}^{d} \log P(x_j \mid c)\Big]</div><div class="n">(5)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>An email with “free” and “money”:</p><p>Spam: <span class="tex">0.4 \cdot 0.6 \cdot 0.5 = 0.12</span></p><p>Other: <span class="tex">0.6 \cdot 0.1 \cdot 0.05 = 0.003</span></p><p><span class="tex">\Rightarrow \ \hat{y} = \text{spam}</span>, with <span class="tex">\tfrac{0.12}{0.123} \approx 98\%</span></p><p>In logs: <span class="tex">\ln 0.12 \approx -2.12</span> beats <span class="tex">\ln 0.003 \approx -5.81</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Counting words">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>Counting words</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>100 training emails. Each cell counts the emails of that class that contain the word.</p>
+<table class="tb">
+<colgroup><col style="width:22%"><col style="width:20%"><col style="width:20%"><col style="width:19%"><col style="width:19%"></colgroup>
+<thead><tr><th>Word</th><th>Spam (of 40)</th><th>Other (of 60)</th><th>Share in spam</th><th>Share in other</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>free</strong></td><td>24</td><td>6</td><td>60%</td><td>10%</td></tr>
+<tr class="an-up" style="--d:.1s"><td><strong>money</strong></td><td>20</td><td>3</td><td>50%</td><td>5%</td></tr>
+<tr class="an-up" style="--d:.15s"><td><strong>winner</strong></td><td>12</td><td style="color:var(--c-b);font-weight:700">0</td><td>30%</td><td style="color:var(--c-b);font-weight:700">0%</td></tr>
+<tr class="an-up" style="--d:.2s"><td><strong>click</strong></td><td>16</td><td>6</td><td>40%</td><td>10%</td></tr>
+<tr class="an-up" style="--d:.25s"><td><strong>meeting</strong></td><td>2</td><td>24</td><td>5%</td><td>40%</td></tr>
+<tr class="an-up" style="--d:.3s"><td><strong>tomorrow</strong></td><td>4</td><td>21</td><td>10%</td><td>35%</td></tr>
+<tr class="an-up" style="--d:.35s"><td><strong>report</strong></td><td>1</td><td>18</td><td>2.5%</td><td>30%</td></tr>
+<tr class="an-up" style="--d:.4s"><td><strong>lunch</strong></td><td>1</td><td>12</td><td>2.5%</td><td>20%</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Training is counting</div><p>For each class, count the emails that contain each word and divide by the size of the class.</p></aside>
+<aside class="am"><div class="t">The prior</div><p>40 of the 100 emails are spam, so the starting belief is 40% spam.</p></aside>
+<aside class="am frag up"><div class="t" style="color:var(--c-b)">A zero</div><p>“winner” never appeared in a normal email. The next slide shows why that is a problem.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The zero-count problem">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>The zero-count problem</h2>
+<div class="fr">
+<div class="figbox"><svg id="zero-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A share of 0% multiplies the whole score of a class by zero. One word erases all the other evidence.</p>
+<p class="small frag up" data-step="sm" style="margin:0"><strong>Add-one smoothing:</strong> add 1 to every count and 2 to every class size, as if each class had seen one extra email with the word and one without.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The new email “winner, meeting, tomorrow, report”, scored with the counts of Table 2.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Counting formulas">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>Counting and smoothing</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The prior is the share of training examples in each class:</p>
+<div class="eq"><div class="m tex-d">P(c) = \frac{N_c}{n}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="c1" style="margin:0">The likelihood of a word is the share of the class that contains it:</p>
+<div class="eq frag up" data-step="c1"><div class="m tex-d">P(x_j \mid c) = \frac{N_{jc}}{N_c}</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="c2" style="margin:0">Add-one smoothing: 1 on top, and 2 below because a word is either present or absent. No share is ever 0.</p>
+<div class="eq frag up" data-step="c2"><div class="m tex-d">P(x_j \mid c) = \frac{N_{jc} + 1}{N_c + 2}</div><div class="n">(8)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>From Table 2:</p><p><span class="tex">P(\text{spam}) = \tfrac{40}{100} = 0.4</span></p><p>“winner” in other emails:</p><p>raw: <span class="tex">\tfrac{0}{60} = 0</span></p><p>smoothed: <span class="tex">\tfrac{0 + 1}{60 + 2} \approx 0.016</span></p><p>“winner” in spam, smoothed:</p><p><span class="tex">\tfrac{12 + 1}{40 + 2} \approx 0.31</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A spam filter" data-demo="filter">
+<div class="hdr" data-s="Naive assumption"></div>
+<h2>A spam filter</h2>
+<div class="fr">
+<div class="figbox"><svg id="filter-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Click the words that appear in a new email.</p>
+<div class="btns" id="filter-words" style="gap:10px">
+<button class="bt chip" data-w="free" aria-pressed="true">free</button>
+<button class="bt chip" data-w="money" aria-pressed="true">money</button>
+<button class="bt chip" data-w="winner" aria-pressed="false">winner</button>
+<button class="bt chip" data-w="click" aria-pressed="false">click</button>
+<button class="bt chip" data-w="meeting" aria-pressed="false">meeting</button>
+<button class="bt chip" data-w="tomorrow" aria-pressed="false">tomorrow</button>
+<button class="bt chip" data-w="report" aria-pressed="false">report</button>
+<button class="bt chip" data-w="lunch" aria-pressed="false">lunch</button>
+</div>
+<div class="ro"><span>Spam probability</span><b id="filter-post" class="bb">0%</b></div>
+<div class="ro"><span>Decision</span><b id="filter-dec">spam</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Smoothed counts from Table 2. Each bar shows how many times more likely the word is in one class than in the other.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Numbers and practice</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Bell curves for numeric features, and when naive Bayes is a good choice.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Numeric features" data-demo="gauss">
+<div class="hdr" data-s="In practice"></div>
+<h2>Numeric features</h2>
+<div class="fr">
+<div class="figbox"><svg id="gauss-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0"><strong>Gaussian naive Bayes</strong> fits one bell curve per class: its center is the class average, its width the spread.</p>
+<div class="ctl"><label><span>Share of virginica (before)</span><b id="gauss-p-val">50%</b></label><input type="range" id="gauss-p" min="10" max="90" step="1" value="50"></div>
+<div class="ctl"><label><span>New flower, petal length</span><b id="gauss-x-val">5.40 cm</b></label><input type="range" id="gauss-x" min="3" max="7" step="0.05" value="5.4"></div>
+<div class="ro"><span>Boundary</span><b id="gauss-bd">0 cm</b></div>
+<div class="ro"><span>Chance of virginica</span><b id="gauss-post" class="bb">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>25 flowers per class. Each curve is scaled by its prior; the boundary is where the curves cross.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Gaussian formula">
+<div class="hdr" data-s="In practice"></div>
+<h2>The bell curve formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">For a numeric feature, compute in each class the mean <span class="tex">\mu_{jc}</span> and the standard deviation <span class="tex">\sigma_{jc}</span> of feature <span class="tex">j</span>.</p>
+<p class="small frag up" data-step="g1" style="margin:16px 0 0">The likelihood of a value is the height of that class's bell curve at the value:</p>
+<div class="eq frag up" data-step="g1"><div class="m tex-d">P(x_j \mid c) = \frac{1}{\sqrt{2\pi} \, \sigma_{jc}} \exp\Big(-\frac{(x_j - \mu_{jc})^2}{2 \sigma_{jc}^2}\Big)</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="g2" style="margin:0">Values near the class mean get a high likelihood, values far away a low one. The rest of the model is unchanged: plug the heights into equation (4).</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A class with <span class="tex">\mu = 5.5</span> cm and <span class="tex">\sigma = 0.5</span> cm, and a flower with <span class="tex">x = 5.0</span> cm.</p><p>The flower is one standard deviation below the mean.</p><p><span class="tex">\tfrac{1}{\sqrt{2\pi} \cdot 0.5} \approx 0.80, \quad e^{-0.5} \approx 0.61</span></p><p><span class="tex">P(x \mid c) \approx 0.80 \cdot 0.61 \approx 0.48</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="In practice"></div>
+<h2>Strengths and weaknesses</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>What naive Bayes does well, and what to watch out for.</p>
+<table class="tb">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Trains in one pass: it only counts</td><td>Its probabilities are often too close to 0% or 100%</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Works with little training data</td><td>Related features count their evidence twice</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Handles thousands of words with ease</td><td>Needs smoothing to avoid zero counts</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Easy to explain: each word's evidence is visible</td><td>A bell curve can fit a numeric feature badly</td></tr>
+</tbody>
+</table>
+<aside class="adm k-tip sm frag up" style="margin-top:32px"><div class="h"><i data-i="hint"></i><span>Rule of thumb</span></div><div class="b"><p>For text, train naive Bayes first. Keep a slower model only if it beats it on cross-validation.</p></div></aside>
+</div>
+<div class="side" style="gap:32px;padding-top:8px">
+<aside class="am"><div class="t">Typical uses</div><p>Spam filters, sorting news or support tickets by topic, and telling positive from negative reviews.</p></aside>
+<aside class="am"><div class="t">Ranking, not exact numbers</div><p>Trust which class wins more than the exact percentage it reports.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Naive Bayes picks the class that makes the evidence most likely, weighted by how common the class is.</li>
+<li class="an-up" style="--d:.15s">Bayes' rule turns a belief before the evidence into a belief after it; counting a group of 100 makes it easy to follow.</li>
+<li class="an-up" style="--d:.25s">When a class is rare, even strong evidence can leave its probability low.</li>
+<li class="an-up" style="--d:.35s">The naive assumption treats features as independent within each class, so their evidence is multiplied.</li>
+<li class="an-up" style="--d:.45s">Training is counting. Add-one smoothing avoids zeros, and numeric features get one bell curve per class.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic covers Bayes' rule, the different kinds of naive Bayes, and why the method works despite its assumption.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Mitchell, T. M. (1997). <em>Machine Learning</em>, Chapter 6. McGraw-Hill.</li>
+<li style="margin:.4em 0">Manning, C. D., Raghavan, P., &amp; Schütze, H. (2008). <em>Introduction to Information Retrieval</em>, Chapter 13. Cambridge University Press.</li>
+<li style="margin:.4em 0">Domingos, P., &amp; Pazzani, M. (1997). On the optimality of the simple Bayesian classifier under zero-one loss. <em>Machine Learning</em>, 29, 103–130.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Section 4.4. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 14: ensemble methods.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared data ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const RING = 'fill:none;stroke:var(--myst-color-text);stroke-width:4';
+const DIM = 'fill:var(--myst-color-bg);fill-opacity:.72';
+
+/* Training emails of Table 2: 40 spam, 60 other; counts of emails containing each word */
+const NS_ = 40, NH_ = 60;
+const WORDS = {
+  free: [24, 6], money: [20, 3], winner: [12, 0], click: [16, 6],
+  meeting: [2, 24], tomorrow: [4, 21], report: [1, 18], lunch: [1, 12],
+};
+/* naive Bayes score for a set of words; smooth = add-one smoothing */
+function spamProb(words, smooth) {
+  const a = smooth ? 1 : 0, b = smooth ? 2 : 0;
+  let s = NS_ / (NS_ + NH_), h = NH_ / (NS_ + NH_);
+  words.forEach((w) => {
+    s *= (WORDS[w][0] + a) / (NS_ + b);
+    h *= (WORDS[w][1] + a) / (NH_ + b);
+  });
+  return s / (s + h);
+}
+
+/* ───────── static figures ───────── */
+function drawCount() {
+  const svg = document.getElementById('count-svg');
+  const S = 50, G = 8, X0 = 20, Y0 = 70;
+  const isSpam = (i) => i < 40, hasFree = (i) => i < 24 || (i >= 40 && i < 46);
+  el('text', { class: 'ttl', x: X0, y: 40, text: '100 training emails: 40 spam, 60 other' }, svg);
+  const dim = el('g', { class: 'frag', 'data-step': 'free' }, svg);
+  for (let i = 0; i < 100; i++) {
+    const x = X0 + (i % 10) * (S + G), y = Y0 + Math.floor(i / 10) * (S + G);
+    el('rect', { class: `${isSpam(i) ? 'fb' : 'fa'} an-pop`, x, y, width: S, height: S, rx: 6, style: `--d:${(i % 10) * 0.03 + Math.floor(i / 10) * 0.05}s` }, svg);
+    if (hasFree(i)) el('rect', { x: x + 2, y: y + 2, width: S - 4, height: S - 4, rx: 5, style: RING }, dim);
+    else el('rect', { x: x - 1, y: y - 1, width: S + 2, height: S + 2, style: DIM }, dim);
+  }
+  const pull = el('g', { class: 'frag', 'data-step': 'pull' }, svg);
+  const PX = 700, PS = 56;
+  el('text', { class: 'ttl', x: PX, y: 40, text: 'only emails with “free”' }, pull);
+  el('path', { class: 'wire', d: `M${X0 + 10 * (S + G) + 14} ${Y0 + 150}H${PX - 20}`, 'marker-end': 'url(#ah)' }, pull);
+  for (let j = 0; j < 30; j++) {
+    const x = PX + (j % 6) * (PS + G), y = Y0 + Math.floor(j / 6) * (PS + G);
+    el('rect', { class: j < 24 ? 'fb' : 'fa', x, y, width: PS, height: PS, rx: 6 }, pull);
+    el('rect', { x: x + 2, y: y + 2, width: PS - 4, height: PS - 4, rx: 5, style: RING }, pull);
+  }
+  el('text', { class: 'tx', x: PX, y: Y0 + 5 * (PS + G) + 40, text: '24 spam, 6 other' }, pull);
+  el('text', { class: 'tx', x: PX, y: Y0 + 5 * (PS + G) + 90, 'font-weight': 700, style: 'fill:var(--c-b)', text: '24 of 30 = 80% spam' }, pull);
+  legend(svg, X0 + 6, 670, [['dot', 'fb', 'spam']]);
+  legend(svg, X0 + 160, 670, [['dot', 'fa', 'other']]);
+  const lg = legend(svg, X0 + 310, 670, [['dot', '', 'contains “free”']]);
+  lg.querySelector('circle').setAttribute('style', 'fill:none;stroke:var(--myst-color-text);stroke-width:3');
+}
+
+function drawTree() {
+  const svg = document.getElementById('tree-svg');
+  const node = (x, y, w, n, label, cls, g) => {
+    el('rect', { class: cls, x, y: y - 50, width: w, height: 100, rx: 8 }, g);
+    el('text', { class: 'tx', x: x + w / 2, y: y - 6, 'text-anchor': 'middle', 'font-weight': 700, text: n }, g);
+    el('text', { class: 'txs', x: x + w / 2, y: y + 30, 'text-anchor': 'middle', text: label }, g);
+  };
+  const edge = (x1, y1, x2, y2, label, g) => {
+    el('path', { class: 'wire an-draw', pathLength: 1, d: `M${x1} ${y1}C${(x1 + x2) / 2} ${y1} ${(x1 + x2) / 2} ${y2} ${x2 - 8} ${y2}`, 'marker-end': 'url(#ah)' }, g);
+    el('text', { class: 'lb', x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 14, 'text-anchor': 'middle', style: 'paint-order:stroke;stroke:var(--myst-color-bg);stroke-width:8px', text: label }, g);
+  };
+  const g0 = el('g', { class: 'an-fade' }, svg), g1 = el('g', { class: 'an-fade', style: '--d:.4s' }, svg), g2 = el('g', { class: 'an-fade', style: '--d:.9s' }, svg);
+  const R = [20, 180], L1 = [330, 200], L2 = [690, 220];
+  const Y = { root: 340, s: 160, h: 520, s1: 60, s0: 250, h1: 430, h0: 620 };
+  node(R[0], Y.root, R[1], '100', 'emails', 'box', g0);
+  edge(R[0] + R[1], Y.root, L1[0], Y.s, '40%', g1); edge(R[0] + R[1], Y.root, L1[0], Y.h, '60%', g1);
+  node(L1[0], Y.s, L1[1], '40', 'spam', 'box-b', g1);
+  node(L1[0], Y.h, L1[1], '60', 'other', 'box-a', g1);
+  edge(L1[0] + L1[1], Y.s, L2[0], Y.s1, '60%', g2); edge(L1[0] + L1[1], Y.s, L2[0], Y.s0, '40%', g2);
+  edge(L1[0] + L1[1], Y.h, L2[0], Y.h1, '10%', g2); edge(L1[0] + L1[1], Y.h, L2[0], Y.h0, '90%', g2);
+  node(L2[0], Y.s1, L2[1], '24', 'spam with “free”', 'box-b', g2);
+  node(L2[0], Y.s0, L2[1], '16', 'spam without', 'box', g2);
+  node(L2[0], Y.h1, L2[1], '6', 'other with “free”', 'box-a', g2);
+  node(L2[0], Y.h0, L2[1], '54', 'other without', 'box', g2);
+  const res = el('g', { class: 'frag', 'data-step': 'res' }, svg);
+  [Y.s1, Y.h1].forEach((y) => el('rect', { x: L2[0] - 8, y: y - 58, width: L2[1] + 16, height: 116, rx: 12, style: RING }, res));
+  const RX = 960, RW = 190, RY = 245;
+  el('path', { class: 'wire', d: `M${L2[0] + L2[1] + 10} ${Y.s1}C${RX - 20} ${Y.s1} ${RX - 40} ${RY} ${RX - 6} ${RY}`, 'marker-end': 'url(#ah)' }, res);
+  el('path', { class: 'wire', d: `M${L2[0] + L2[1] + 10} ${Y.h1}C${RX - 20} ${Y.h1} ${RX - 40} ${RY} ${RX - 6} ${RY}`, 'marker-end': 'url(#ah)' }, res);
+  el('rect', { class: 'box-b', x: RX, y: RY - 80, width: RW, height: 160, rx: 8 }, res);
+  el('text', { class: 'txs', x: RX + RW / 2, y: RY - 38, 'text-anchor': 'middle', text: '24 of 24 + 6' }, res);
+  el('text', { class: 'tx', x: RX + RW / 2, y: RY + 14, 'text-anchor': 'middle', 'font-weight': 700, style: 'font-size:40px', text: '80%' }, res);
+  el('text', { class: 'txs', x: RX + RW / 2, y: RY + 56, 'text-anchor': 'middle', text: 'are spam' }, res);
+}
+
+function drawDisease() {
+  const svg = document.getElementById('dis-svg');
+  const COLS = 50, ROWS = 20, P = 22, C = 18, X0 = 32, Y0 = 70;
+  /* column-major order: 9 sick and positive, 1 sick and negative, 89 healthy and positive, the rest healthy and negative */
+  const sick = (i) => i < 10, pos = (i) => i < 9 || (i >= 10 && i < 99);
+  el('text', { class: 'ttl', x: X0, y: 40, text: '1000 people' }, svg);
+  const base = el('g', { class: 'an-fade' }, svg);
+  const pg = el('g', { class: 'frag', 'data-step': 'pos' }, svg);
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const x = X0 + Math.floor(i / ROWS) * P, y = Y0 + (i % ROWS) * P;
+    el('rect', { class: sick(i) ? 'fb' : 'fa', x, y, width: C, height: C, rx: 3 }, base);
+    if (pos(i)) el('rect', { x: x - 1.5, y: y - 1.5, width: C + 3, height: C + 3, rx: 4, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, pg);
+    else el('rect', { x: x - 2, y: y - 2, width: P, height: P, style: DIM }, pg);
+  }
+  const yb = Y0 + ROWS * P + 50;
+  legend(svg, X0, yb, [['dot', 'fb', '10 sick']]);
+  legend(svg, X0 + 190, yb, [['dot', 'fa', '990 healthy']]);
+  const t1 = el('g', { class: 'frag', 'data-step': 'pos' }, svg);
+  el('text', { class: 'tx', x: X0, y: yb + 70, text: '98 positive tests: 9 sick people and 89 healthy people' }, t1);
+  const t2 = el('g', { class: 'frag', 'data-step': 'ans' }, svg);
+  el('text', { class: 'tx', x: X0, y: yb + 130, 'font-weight': 700, style: 'fill:var(--c-b)', text: 'Only 9 of 98 positives are sick: about 9%' }, t2);
+}
+
+function drawNaive() {
+  const svg = document.getElementById('naive-svg');
+  const CX = 580, CY = 90, WY = 330, BW = 220, BH = 80;
+  const XS = [145, 435, 725, 1015], LAB = ['free', 'money', 'meeting', 'tomorrow'];
+  const top = el('g', { class: 'an-up' }, svg);
+  el('rect', { class: 'box', x: CX - 170, y: CY - 45, width: 340, height: 90, rx: 45 }, top);
+  el('text', { class: 'tx', x: CX, y: CY + 10, 'text-anchor': 'middle', 'font-weight': 600, text: 'spam or other?' }, top);
+  XS.forEach((x, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.3 + i * 0.12}s` }, svg);
+    el('path', { class: 'wire', d: `M${CX + (x - CX) * 0.25} ${CY + 45}L${x} ${WY - BH / 2 - 8}`, 'marker-end': 'url(#ah)' }, g);
+    el('rect', { class: i < 2 ? 'box-b' : 'box-a', x: x - BW / 2, y: WY - BH / 2, width: BW, height: BH, rx: 8 }, g);
+    el('text', { class: 'tx', x, y: WY + 10, 'text-anchor': 'middle', text: `“${LAB[i]}”` }, g);
+  });
+  const link = el('g', { class: 'frag', 'data-step': 'link' }, svg);
+  el('path', { d: `M${XS[0]} ${WY + BH / 2 + 6}Q${(XS[0] + XS[1]) / 2} ${WY + 150} ${XS[1]} ${WY + BH / 2 + 6}`, style: 'fill:none;stroke:var(--c-b);stroke-width:3;stroke-dasharray:10 8' }, link);
+  el('text', { class: 'txs', x: (XS[0] + XS[1]) / 2, y: WY + 150, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'often together: ignored' }, link);
+  const mult = el('g', { class: 'frag', 'data-step': 'mult' }, svg);
+  const Y = 590;
+  el('rect', { class: 'zone', x: 10, y: Y - 60, width: 1140, height: 120, rx: 8 }, mult);
+  el('text', { class: 'tx', x: CX, y: Y - 8, 'text-anchor': 'middle', text: 'score of a class = before × evidence of “free” × evidence of “money” × …' }, mult);
+  el('text', { class: 'txs', x: CX, y: Y + 34, 'text-anchor': 'middle', text: 'compute it for spam and for other; the larger score wins' }, mult);
+}
+
+function drawZero() {
+  const svg = document.getElementById('zero-svg');
+  const EMAIL = ['winner', 'meeting', 'tomorrow', 'report'];
+  const panel = (x0, title, smooth, attrs) => {
+    const g = el('g', attrs, svg), a = smooth ? 1 : 0, b = smooth ? 2 : 0;
+    el('text', { class: 'ttl', x: x0, y: 40, text: title }, g);
+    el('text', { class: 'lb', x: x0 + 300, y: 96, 'text-anchor': 'middle', text: 'in spam' }, g);
+    el('text', { class: 'lb', x: x0 + 460, y: 96, 'text-anchor': 'middle', text: 'in other' }, g);
+    EMAIL.forEach((w, i) => {
+      const y = 160 + i * 64, [cs, ch] = WORDS[w];
+      el('text', { class: 'tx', x: x0, y, text: w }, g);
+      el('text', { class: 'tx', x: x0 + 300, y, 'text-anchor': 'middle', text: `${cs + a} / ${NS_ + b}` }, g);
+      const zero = !smooth && ch === 0;
+      el('text', { class: 'tx', x: x0 + 460, y, 'text-anchor': 'middle', style: zero ? 'fill:var(--c-b);font-weight:700' : '', text: `${ch + a} / ${NH_ + b}` }, g);
+      if (zero) el('rect', { x: x0 + 400, y: y - 38, width: 120, height: 54, rx: 8, style: 'fill:none;stroke:var(--c-b);stroke-width:3' }, g);
+    });
+    const p = spamProb(EMAIL, smooth), BY = 470, BW = 520;
+    el('text', { class: 'lb', x: x0, y: BY - 20, text: 'spam probability' }, g);
+    el('rect', { class: 'fa', x: x0, y: BY, width: BW, height: 56, rx: 4, style: 'fill-opacity:.35' }, g);
+    el('rect', { class: 'fb an-grow', x: x0, y: BY, width: Math.max(2, BW * p), height: 56, rx: 4 }, g);
+    el('text', { class: 'tx', x: x0, y: BY + 110, 'font-weight': 700, style: 'font-size:44px;fill:var(--c-b)', text: pct(p) }, g);
+    el('text', { class: 'txs', x: x0 + 170, y: BY + 108, text: smooth ? 'the normal words now count' : 'one zero decides alone' }, g);
+  };
+  panel(10, '(a) counts as they are', false, { class: 'an-fade' });
+  el('line', { x1: 575, x2: 575, y1: 20, y2: 640, style: 'stroke:var(--myst-color-border);stroke-width:2' }, svg);
+  panel(620, '(b) add-one smoothing', true, { class: 'frag', 'data-step': 'sm' });
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.bayes = (() => {
+  const svg = document.getElementById('bayes-svg');
+  const S = 42, G = 8, X0 = 0, Y0 = 50;
+  el('text', { class: 'ttl', x: X0, y: 26, text: '100 emails' }, svg);
+  const cells = [];
+  for (let i = 0; i < 100; i++) {
+    const x = X0 + (i % 10) * (S + G), y = Y0 + Math.floor(i / 10) * (S + G);
+    cells.push(el('rect', { x, y, width: S, height: S, rx: 5 }, svg));
+  }
+  const BX = 600, BW = 540, BH = 52;
+  const stage = (y, title) => {
+    el('text', { class: 'ttl', x: BX, y: y - 16, text: title }, svg);
+    const bg = el('rect', { x: BX, y, width: BW, height: BH, rx: 4, style: 'fill:var(--myst-color-surface)' }, svg);
+    const s = el('rect', { class: 'fb', x: BX, y, height: BH, rx: 4 }, svg);
+    const h = el('rect', { class: 'fa', y, height: BH, rx: 4 }, svg);
+    const ts = el('text', { class: 'tx', y: y + BH + 36, 'font-weight': 700, style: 'fill:var(--c-b)' }, svg);
+    const th = el('text', { class: 'tx', y: y + BH + 36, 'text-anchor': 'end', style: 'fill:var(--c-a)' }, svg);
+    return { bg, s, h, ts, th, y };
+  };
+  const st1 = stage(70, 'before: share of spam');
+  const st2 = stage(250, 'emails with “free”, out of 100');
+  const st3 = stage(430, 'after: share of spam among them');
+  [[100, 268], [280, 448]].forEach(([a, b]) => el('path', { class: 'wire', d: `M${BX - 36} ${a}V${b}`, 'marker-end': 'url(#ah)' }, svg));
+  const ids = ['p', 'a', 'b'].map((k) => document.getElementById('bayes-' + k));
+  function setBar(st, fs, fh, ls, lh) {
+    st.s.setAttribute('width', BW * fs);
+    st.h.setAttribute('x', BX + BW * fs); st.h.setAttribute('width', BW * fh);
+    st.ts.setAttribute('x', BX); st.ts.textContent = ls;
+    st.th.setAttribute('x', BX + BW); st.th.textContent = lh;
+  }
+  function draw() {
+    const [p, a, b] = ids.map((s) => +s.value / 100);
+    ['p', 'a', 'b'].forEach((k, i) => { document.getElementById(`bayes-${k}-val`).textContent = ids[i].value + '%'; });
+    const nS = Math.round(100 * p), kS = Math.round(nS * a), kH = Math.round((100 - nS) * b);
+    cells.forEach((c, i) => {
+      const spam = i < nS, word = spam ? i < kS : i - nS < kH;
+      c.setAttribute('class', spam ? 'fb' : 'fa');
+      c.setAttribute('style', word ? 'stroke:var(--myst-color-text);stroke-width:3' : 'opacity:.2');
+    });
+    const post = (p * a) / (p * a + (1 - p) * b);
+    setBar(st1, p, 1 - p, `spam ${pct(p)}`, `other ${pct(1 - p)}`);
+    setBar(st2, p * a, (1 - p) * b, `${kS} spam`, `${kH} other`);
+    st2.th.setAttribute('x', BX + BW * (p * a + (1 - p) * b) + 8); st2.th.setAttribute('text-anchor', 'start');
+    if (p * a + (1 - p) * b > 0.72) { st2.th.setAttribute('x', BX + BW); st2.th.setAttribute('text-anchor', 'end'); }
+    setBar(st3, post, 1 - post, `spam ${pct(post)}`, `other ${pct(1 - post)}`);
+    document.getElementById('bayes-post').textContent = pct(post);
+  }
+  ids.forEach((s) => s.addEventListener('input', draw));
+  draw();
+  return {};
+})();
+
+DEMOS.filter = (() => {
+  const svg = document.getElementById('filter-svg');
+  const names = Object.keys(WORDS);
+  const CX = 640, HALF = 380, MAXL = 1.4, RH = 58, Y0 = 96, BH = 34;
+  const sx = (l) => CX + (l / MAXL) * HALF;
+  el('text', { class: 'ttl', x: CX - 20, y: 36, 'text-anchor': 'end', style: 'fill:var(--c-a)', text: '← points to other' }, svg);
+  el('text', { class: 'ttl', x: CX + 20, y: 36, style: 'fill:var(--c-b)', text: 'points to spam →' }, svg);
+  el('line', { x1: CX, x2: CX, y1: 56, y2: Y0 + 9 * RH - 10, style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, svg);
+  const rows = [['before', NS_ / NH_]].concat(names.map((w) => [w, ((WORDS[w][0] + 1) / (NS_ + 2)) / ((WORDS[w][1] + 1) / (NH_ + 2))]));
+  const gs = rows.map(([w, r], i) => {
+    const y = Y0 + i * RH, l = Math.log10(r), g = el('g', {}, svg);
+    el('text', { class: 'tx', x: 0, y: y + BH / 2 + 10, style: i ? '' : 'font-style:italic', text: i ? w : 'prior (40% spam)' }, g);
+    el('rect', { class: l > 0 ? 'fb' : 'fa', x: Math.min(CX, sx(l)), y, width: Math.abs(sx(l) - CX), height: BH, rx: 3 }, g);
+    el('text', { class: 'tk', x: l > 0 ? sx(l) + 10 : sx(l) - 10, y: y + BH / 2 + 8, 'text-anchor': l > 0 ? 'start' : 'end', text: `${fmt(l > 0 ? r : 1 / r, 1)}×` }, g);
+    return g;
+  });
+  const FY = Y0 + 9 * RH + 20, FX = 260, FW = 760;
+  el('text', { class: 'lb', x: 0, y: FY + 36, text: 'spam probability' }, svg);
+  el('rect', { class: 'fa', x: FX, y: FY, width: FW, height: 50, rx: 4 }, svg);
+  const fb = el('rect', { class: 'fb', x: FX, y: FY, height: 50, rx: 4 }, svg);
+  el('line', { x1: FX + FW / 2, x2: FX + FW / 2, y1: FY - 10, y2: FY + 60, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:6 5' }, svg);
+  el('text', { class: 'tk', x: FX + FW / 2, y: FY + 88, 'text-anchor': 'middle', text: '50%' }, svg);
+  const ft = el('text', { class: 'tx', x: FX + FW + 16, y: FY + 36, 'font-weight': 700 }, svg);
+  const btns = [...document.querySelectorAll('#filter-words button')];
+  function draw() {
+    const on = btns.filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.dataset.w);
+    names.forEach((w, i) => gs[i + 1].setAttribute('style', on.includes(w) ? '' : 'opacity:.18'));
+    const p = spamProb(on, true);
+    fb.setAttribute('width', FW * p);
+    ft.textContent = pct(p);
+    ft.setAttribute('style', `fill:var(${p >= 0.5 ? '--c-b' : '--c-a'})`);
+    document.getElementById('filter-post').textContent = pct(p);
+    document.getElementById('filter-dec').textContent = p >= 0.5 ? 'spam' : 'not spam';
+  }
+  btns.forEach((b) => b.addEventListener('click', () => { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); draw(); }));
+  draw();
+  return {};
+})();
+
+DEMOS.gauss = (() => {
+  const svg = document.getElementById('gauss-svg');
+  const r = rng(13);
+  const A = Array.from({ length: 25 }, () => 4.26 + 0.47 * gauss(r)), B = Array.from({ length: 25 }, () => 5.55 + 0.55 * gauss(r));
+  const fit = (d) => { const m = mean(d); return [m, Math.sqrt(mean(d.map((v) => (v - m) ** 2)))]; };
+  const [mA, sA] = fit(A), [mB, sB] = fit(B);
+  const pdf = (x, m, s) => Math.exp(-((x - m) ** 2) / (2 * s * s)) / (s * Math.sqrt(2 * Math.PI));
+  const F = frame(svg, { W: 1160, H: 700, l: 60, t: 90, x: [2.5, 7.5], y: [-0.08, 0.8], xt: [3, 4, 5, 6, 7], yt: [], xl: 'petal length (cm)', yl: 'prior × bell curve' });
+  const zones = el('g', {}, F.plot);
+  A.forEach((v) => el('circle', { class: 'pt fa', cx: F.sx(v), cy: F.sy(-0.03), r: 8, style: 'opacity:.8' }, F.plot));
+  B.forEach((v) => el('circle', { class: 'pt fb', cx: F.sx(v), cy: F.sy(-0.06), r: 8, style: 'opacity:.8' }, F.plot));
+  const cA = el('path', { class: 'curve-a' }, F.plot), cB = el('path', { class: 'curve-b' }, F.plot);
+  const bd = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8' }, F.plot);
+  const bdl = el('text', { class: 'txs', y: F.T - 14, 'text-anchor': 'middle' }, svg);
+  const xl = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2' }, F.plot);
+  const dA = el('circle', { class: 'pt fa', r: 11 }, F.plot), dB = el('circle', { class: 'pt fb', r: 11 }, F.plot);
+  legend(svg, F.L + 24, 24, [['line', 'curve-a', 'versicolor']]);
+  legend(svg, F.L + 240, 24, [['line', 'curve-b', 'virginica']]);
+  const ps = document.getElementById('gauss-p'), xs = document.getElementById('gauss-x');
+  function draw() {
+    const p = +ps.value / 100, x = +xs.value;
+    const fA = (t) => (1 - p) * pdf(t, mA, sA), fB = (t) => p * pdf(t, mB, sB);
+    document.getElementById('gauss-p-val').textContent = ps.value + '%';
+    document.getElementById('gauss-x-val').textContent = fmt(x, 2) + ' cm';
+    cA.setAttribute('d', curvePath(fA, 2.5, 7.5, F.sx, F.sy, 300));
+    cB.setAttribute('d', curvePath(fB, 2.5, 7.5, F.sx, F.sy, 300));
+    clear(zones);
+    const N = 500, xsAt = (i) => 2.5 + (5 * i) / N;
+    let start = 0;
+    for (let i = 1; i <= N; i++) {
+      const w0 = fB(xsAt(start)) > fA(xsAt(start));
+      if (i === N || (fB(xsAt(i)) > fA(xsAt(i))) !== w0) {
+        el('rect', { x: F.sx(xsAt(start)), y: F.T, width: F.sx(xsAt(i)) - F.sx(xsAt(start)), height: F.H - F.B - F.T, style: `fill:var(${w0 ? '--c-b' : '--c-a'});fill-opacity:.08` }, zones);
+        start = i;
+      }
+    }
+    let b = mA;
+    for (let t = mA; t <= mB; t += 0.002) { if (fB(t) >= fA(t)) { b = t; break; } }
+    bd.setAttribute('x1', F.sx(b)); bd.setAttribute('x2', F.sx(b));
+    bdl.setAttribute('x', F.sx(b)); bdl.textContent = `boundary ${fmt(b, 2)} cm`;
+    xl.setAttribute('x1', F.sx(x)); xl.setAttribute('x2', F.sx(x));
+    dA.setAttribute('cx', F.sx(x)); dA.setAttribute('cy', F.sy(fA(x)));
+    dB.setAttribute('cx', F.sx(x)); dB.setAttribute('cy', F.sy(fB(x)));
+    document.getElementById('gauss-bd').textContent = fmt(b, 2) + ' cm';
+    document.getElementById('gauss-post').textContent = pct(fB(x) / (fA(x) + fB(x)));
+  }
+  ps.addEventListener('input', draw); xs.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawCount(); drawTree(); drawDisease(); drawNaive(); drawZero();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Components" viewport="700x440" name="Frontmatter" subtitle="FrontmatterBlock, Abstract" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{margin:0;background:#fff}.half{--slide-fs-body:16px;--slide-fs-small:14px;--slide-fs-label:12px;--slide-fs-lead:20px;font-size:16px;padding:20px 24px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.ArticleSlidesDesignSystem_a47fec;
+const { FrontmatterBlock, Abstract } = NS;
+ReactDOM.createRoot(document.getElementById('root')).render(<div className="ats-prose half">
+<FrontmatterBlock subject="Research Article" venue="Proceedings" volume={4} issue={2} openAccess github="org/repo"
+ title="Reproducible figures from executable notebooks" subtitle="A workflow for article-style presentations"
+ authors={[{name:'Ana Rojas',affiliations:['a'],orcid:'0000-0002-1825-0097',email:'ana@example.org',corresponding:true},{name:'Luis Mora',affiliations:['a','b']}]}
+ affiliations={[{id:'a',name:'Universidad Ejemplo'},{id:'b',name:'Escuela de Física'}]} date="2026-10-22" doi="10.5281/zenodo.0000000" />
+<div style={{marginTop:24}}><Abstract keywords={['reproducibility','notebooks','slides']}><p style={{margin:0}}>We describe how notebook outputs flow directly into slides without manual export.</p></Abstract></div>
+</div>);</script></body></html>

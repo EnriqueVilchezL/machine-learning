@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierarchical clustering</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+:root{--c-e:#0891b2;--c-f:#db2777;--c-g:#ca8a04;--c-h:#65a30d}
+.dark{--c-e:#22d3ee;--c-f:#f472b6;--c-g:#facc15;--c-h:#a3e635}
+.tk{font-size:24px}
+.bt.chip.on{background:var(--myst-color-primary);border-color:transparent;color:#fff}
+.bt:disabled{opacity:.45;cursor:default}
+.hull{stroke-linejoin:round;stroke-linecap:round}
+.link{fill:none;stroke-width:4;stroke-linecap:round}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 17</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Hierarchical clustering</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Build a tree of nested clusters, then choose how many clusters you want</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 17 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Building a hierarchy by merging</li>
+<li class="an-up" style="--d:.15s">Distances and the merge rule</li>
+<li class="an-up" style="--d:.25s">Linkage: distance between clusters</li>
+<li class="an-up" style="--d:.35s">Reading and cutting a dendrogram</li>
+<li class="an-up" style="--d:.45s">Choosing a linkage, and limits</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{\mathbf{x}_i\}_{i=1}^{n}</span></td><td>Data set with <span class="tex">n</span> examples and no labels</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">d(\mathbf{x}_i, \mathbf{x}_j)</span></td><td>Distance between two examples</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">A, \ B</span></td><td>Two clusters: sets of examples</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">|A|</span></td><td>Size of <span class="tex">A</span>: how many examples it has</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\boldsymbol{\mu}_A</span></td><td>Mean (centroid) of the examples in <span class="tex">A</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">D(A, B)</span></td><td>Distance between two clusters (the linkage)</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Small <span class="tex">d</span> compares two examples. Capital <span class="tex">D</span> compares two clusters.</p><p>There is no <span class="tex">y</span>: the data have no labels.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Building a hierarchy</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Start with every example alone and merge, one step at a time.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bottom-up or top-down">
+<div class="hdr" data-s="Hierarchy"></div>
+<h2>Bottom-up or top-down</h2>
+<div class="fr">
+<div class="figbox"><svg id="dir-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">k-means needs K before it starts. A hierarchy keeps every grouping, and you choose K afterwards.</p>
+<p class="small frag up" data-step="ag" style="margin:0"><strong>Agglomerative</strong> (bottom-up): start with each example alone and merge the closest pair of clusters.</p>
+<p class="small frag up" data-step="dv" style="margin:0"><strong>Divisive</strong> (top-down): start with one cluster and split it. This topic uses the agglomerative version.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>Five examples. Each level of the tree is one grouping.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Merging step by step" data-demo="merge">
+<div class="hdr" data-s="Hierarchy"></div>
+<h2>Merging step by step</h2>
+<div class="fr">
+<div class="figbox"><svg id="merge-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each press merges the two closest clusters. Here the distance between two clusters is the distance of their closest pair of points.</p>
+<div class="btns"><button class="bt" id="merge-go">▶ Merge</button><button class="bt chip" id="merge-reset">Reset</button></div>
+<div class="ro"><span>Clusters</span><b id="merge-k" class="a">10</b></div>
+<div class="ro"><span>Merges done</span><b id="merge-m">0</b></div>
+<div class="ro"><span>Last merge distance</span><b id="merge-h" class="bb">none</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>(a) Ten examples; shaded shapes are the current clusters. (b) The dendrogram: each new bar sits at the merge distance.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distances and the merge rule">
+<div class="hdr" data-s="Hierarchy"></div>
+<h2>Distances and the merge rule</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Euclidean distance between two examples: one squared gap per feature, added, then a square root.</p>
+<div class="eq"><div class="m tex-d">d(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_{j=1}^{d} (a_j - b_j)^2}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="r1" style="margin:0">At every step, merge the pair of clusters with the smallest distance <span class="tex">D</span> between them:</p>
+<div class="eq frag up" data-step="r1"><div class="m tex-d">(A^{*}, B^{*}) = \underset{A \neq B}{\arg\min} \; D(A, B)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="r2" style="margin:0">Each merge turns two clusters into one, so going from <span class="tex">n</span> clusters to a single cluster takes</p>
+<div class="eq frag up" data-step="r2"><div class="m tex-d">\text{number of merges} = n - 1</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Three examples: <span class="tex">p = (1, 1)</span>, <span class="tex">q = (4, 5)</span>, <span class="tex">r = (5, 5)</span>.</p><p><span class="tex">d(p, q) = \sqrt{3^2 + 4^2} = 5</span></p><p><span class="tex">d(q, r) = \sqrt{1^2 + 0^2} = 1</span></p><p><span class="tex">d(p, r) = \sqrt{4^2 + 4^2} \approx 5.66</span></p><p>First merge: <span class="tex">\{q, r\}</span>. With <span class="tex">n = 3</span> there are 2 merges.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Linkage and the dendrogram</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">How far apart two groups are, and how to read the tree.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Distance between clusters">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Distance between clusters</h2>
+<div class="fr">
+<div class="figbox"><svg id="link-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Once a cluster has several examples, we need a distance between two groups. This choice is called the <strong>linkage</strong>.</p>
+<p class="small frag up" data-step="l1" style="margin:0">Single: the closest pair. Complete: the farthest pair. Average: the mean over all pairs.</p>
+<p class="small frag up" data-step="l2" style="margin:0">Ward: how much the spread inside the clusters grows if A and B merge.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Two clusters with three examples each. The thick line is what each linkage measures.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Linkage formulas">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Linkage formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Single linkage: the distance of the closest pair, one example from each cluster.</p>
+<div class="eq"><div class="m tex-d">D_{\text{single}}(A, B) = \min_{\mathbf{a} \in A, \, \mathbf{b} \in B} d(\mathbf{a}, \mathbf{b})</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="f1" style="margin:0">Complete linkage: the distance of the farthest pair.</p>
+<div class="eq frag up" data-step="f1"><div class="m tex-d">D_{\text{complete}}(A, B) = \max_{\mathbf{a} \in A, \, \mathbf{b} \in B} d(\mathbf{a}, \mathbf{b})</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="f2" style="margin:0">Average linkage: add the distances of all <span class="tex">|A| \cdot |B|</span> pairs and divide by the number of pairs.</p>
+<div class="eq frag up" data-step="f2"><div class="m tex-d">D_{\text{average}}(A, B) = \frac{1}{|A|\,|B|} \sum_{\mathbf{a} \in A} \sum_{\mathbf{b} \in B} d(\mathbf{a}, \mathbf{b})</div><div class="n">(6)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">A = \{(0, 0), (0, 4)\}</span>, <span class="tex">B = \{(3, 0), (6, 0)\}</span>.</p><p>The four pair distances: 3, 6, 5 and <span class="tex">\sqrt{52} \approx 7.21</span>.</p><p>Single: 3. Complete: 7.21.</p><p>Average: <span class="tex">\tfrac{3 + 6 + 5 + 7.21}{4} \approx 5.30</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Ward's linkage">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Ward's linkage</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The within-cluster sum of squares adds the squared distance from each example to the mean of its cluster:</p>
+<div class="eq"><div class="m tex-d">W(A) = \sum_{\mathbf{a} \in A} \lVert \mathbf{a} - \boldsymbol{\mu}_A \rVert^2</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="w1" style="margin:0">Ward merges the pair that makes this sum grow the least. The growth has a short formula:</p>
+<div class="eq frag up" data-step="w1"><div class="m tex-d">\Delta(A, B) = W(A \cup B) - W(A) - W(B) = \frac{|A|\,|B|}{|A| + |B|} \, \lVert \boldsymbol{\mu}_A - \boldsymbol{\mu}_B \rVert^2</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="w2" style="margin:0">Large clusters with distant means are costly to merge, so Ward builds compact groups. It is the same sum that k-means makes small (Topic 16).</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Same <span class="tex">A</span> and <span class="tex">B</span>: <span class="tex">\boldsymbol{\mu}_A = (0, 2)</span>, <span class="tex">\boldsymbol{\mu}_B = (4.5, 0)</span>.</p><p><span class="tex">\lVert \boldsymbol{\mu}_A - \boldsymbol{\mu}_B \rVert^2 = 4.5^2 + 2^2 = 24.25</span></p><p><span class="tex">\Delta = \tfrac{2 \cdot 2}{2 + 2} \cdot 24.25 = 24.25</span></p><p>Check: <span class="tex">W(A) = 8</span>, <span class="tex">W(B) = 4.5</span>, <span class="tex">W(A \cup B) = 36.75</span>, and <span class="tex">36.75 - 8 - 4.5 = 24.25</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Same data, four linkages" data-demo="four">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Same data, four linkages</h2>
+<div class="fr">
+<div class="figbox"><svg id="four-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Pick a linkage. The examples stay the same; the tree and the three clusters change.</p>
+<div class="btns" id="four-btns"><button class="bt chip" data-m="single">Single</button><button class="bt chip" data-m="complete">Complete</button><button class="bt chip" data-m="average">Average</button><button class="bt chip" data-m="ward">Ward</button></div>
+<div class="ro"><span>Height of last merge</span><b id="four-h" class="bb">0</b></div>
+<p class="small" id="four-note" style="margin:0"></p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>15 examples. Colors show the tree cut into 3 clusters.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reading a dendrogram">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Reading a dendrogram</h2>
+<div class="fr">
+<div class="figbox"><svg id="read-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Each leaf is one example. Two branches join at the height where their clusters merged.</p>
+<p class="small frag up" data-step="rd1" style="margin:0">Low joins mean very similar examples. A long vertical branch is a group that stays apart for a long time.</p>
+<p class="small frag up" data-step="rd2" style="margin:0">Only heights carry meaning. Any join can be flipped left to right, so neighboring leaves are not always close.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Six examples, average linkage. The dashed cut crosses three branches: three clusters.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Cutting the tree" data-demo="cut">
+<div class="hdr" data-s="Linkage"></div>
+<h2>Cutting the tree</h2>
+<div class="fr">
+<div class="figbox"><svg id="cut-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Move the cut line. Every branch it crosses becomes one cluster.</p>
+<div class="ctl"><label><span>Cut height</span><b id="cut-h-val">0</b></label><input type="range" id="cut-h" min="0" max="1" step="0.01" value="0.5"></div>
+<div class="ro"><span>Clusters K</span><b id="cut-k" class="a">3</b></div>
+<p class="small frag up" data-step="ct" style="margin:0">A good cut sits in a long gap between joins: moving it a little does not change K.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>24 examples from three groups, average linkage. (a) The clusters. (b) The dendrogram and the cut.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Choosing and limits</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Which linkage to use, and where the method struggles.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Chaining and compact clusters">
+<div class="hdr" data-s="Choosing and limits"></div>
+<h2>Chaining and compact clusters</h2>
+<p class="small" style="margin:-8px 0 8px">Single linkage needs only one close pair to merge, so it follows thin chains of points. Complete linkage looks at the farthest pair and prefers compact groups.</p>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="chain-a-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox frag" data-step="ch"><svg id="chain-b-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Single linkage: the bridge chains both groups</div>
+<div class="subcap frag" data-step="ch">(b) Complete linkage: two compact groups</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 7:</b>Two groups joined by a thin bridge, plus one far example. Each tree is cut into K = 2 clusters.</p>
+</section>
+
+<section class="s ats-prose" data-label="Scaling matters">
+<div class="hdr" data-s="Choosing and limits"></div>
+<h2>Scaling matters</h2>
+<p class="small" style="margin:-8px 0 8px">Every linkage starts from distances between examples, so a feature with large units decides the tree. Scale the features first (Topic 4).</p>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="scale-a-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox frag" data-step="sc"><svg id="scale-b-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Raw units: spending decides the split</div>
+<div class="subcap frag" data-step="sc">(b) Both features scaled to 0 to 1: hours decide</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 8:</b>20 students: weekly study hours and monthly spending. Average linkage, K = 2. Both panels plot the same points.</p>
+</section>
+
+<section class="s ats-prose" data-label="Cost and greedy merges">
+<div class="hdr" data-s="Choosing and limits"></div>
+<h2>Cost and greedy merges</h2>
+<p class="small" style="margin:-8px 0 8px">The method needs the distance between every pair of examples, and it never undoes a merge.</p>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="cost-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox frag" data-step="gr"><svg id="greedy-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) The number of pairs grows like <span class="tex">n^2</span></div>
+<div class="subcap frag" data-step="gr">(b) Greedy: an early merge is final</div>
+</div>
+<p class="cap" style="margin-top:12px"><b>Figure 9:</b>(a) <span class="tex">n(n-1)/2</span> distances for <span class="tex">n</span> examples. (b) Five examples on a line. Ward joins 4 and 7 early; the best split into two groups keeps them apart.</p>
+</section>
+
+<section class="s ats-prose" data-label="Hierarchical or k-means">
+<div class="hdr" data-s="Choosing and limits"></div>
+<h2>Hierarchical or k-means</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>The two clustering methods of this unit side by side.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:24%"><col style="width:38%"><col style="width:38%"></colgroup>
+<thead><tr><th></th><th>k-means</th><th>Hierarchical (agglomerative)</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Choose K</strong></td><td>Before running</td><td>After, by cutting the tree</td></tr>
+<tr class="an-up" style="--d:.12s"><td><strong>Result</strong></td><td>One grouping</td><td>A tree of nested groupings</td></tr>
+<tr class="an-up" style="--d:.19s"><td><strong>Repeated runs</strong></td><td>Can differ (random start)</td><td>Same tree every time</td></tr>
+<tr class="an-up" style="--d:.26s"><td><strong>Cluster shape</strong></td><td>Round, of similar size</td><td>Depends on the linkage</td></tr>
+<tr class="an-up" style="--d:.33s"><td><strong>Work</strong></td><td>About <span class="tex">n \cdot K</span> distances per round</td><td>At least <span class="tex">n^2</span> distances</td></tr>
+<tr class="an-up" style="--d:.40s"><td><strong>Mistakes</strong></td><td>Examples can change cluster</td><td>Merges are never undone</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Choosing and limits"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 3:</b>Hierarchical clustering at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>No need to fix K in advance</td><td>At least <span class="tex">n^2</span> distances: slow and memory hungry for large data</td></tr>
+<tr class="an-up" style="--d:.15s"><td>The dendrogram shows the groups at every scale</td><td>Greedy: a bad early merge stays forever</td></tr>
+<tr class="an-up" style="--d:.25s"><td>Same result on every run</td><td>The result depends on the linkage</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Works with any distance between examples</td><td>Sensitive to feature scales and to outliers</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>Small or medium data sets, when K is unknown or when you want to see how groups nest inside each other.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">Agglomerative clustering starts with <span class="tex">n</span> clusters of one and merges the closest pair <span class="tex">n - 1</span> times.</li>
+<li class="an-up" style="--d:.15s">The linkage defines the distance between clusters: single, complete, average or Ward.</li>
+<li class="an-up" style="--d:.25s">The dendrogram records every merge at the height of its distance.</li>
+<li class="an-up" style="--d:.35s">Cutting the tree at a height gives K clusters; cut inside a long gap.</li>
+<li class="an-up" style="--d:.45s">Single linkage chains; complete and Ward give compact groups. Scale features first.</li>
+<li class="an-up" style="--d:.55s">The cost grows at least like <span class="tex">n^2</span>, and merges are never undone.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>References</h2>
+<section>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Section 12.4. Springer.</li>
+<li style="margin:.4em 0">Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning</em> (2nd ed.), Section 14.3.12. Springer.</li>
+<li style="margin:.4em 0">Ward, J. H. (1963). Hierarchical grouping to optimize an objective function. <em>Journal of the American Statistical Association</em>, 58(301), 236–244.</li>
+<li style="margin:.4em 0">Murtagh, F., &amp; Contreras, P. (2012). Algorithms for hierarchical clustering: an overview. <em>WIREs Data Mining and Knowledge Discovery</em>, 2(1), 86–97.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 18: principal component analysis.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { el, rng, gauss, lin, clamp, mean, fmt, frame } = window.Deck;
+
+/* ───────── clustering helpers ───────── */
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const PAL = ['--c-a', '--c-b', '--c-c', '--c-d', '--c-e', '--c-f', '--c-g', '--c-h'];
+const col = (i) => `var(${PAL[i % PAL.length]})`;
+const GREY = 'var(--myst-color-text-tertiary)';
+const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+const centroid = (P, A) => [mean(A.map((i) => P[i][0])), mean(A.map((i) => P[i][1]))];
+function pairDists(P, A, B) {
+  const out = [];
+  A.forEach((i) => B.forEach((j) => out.push(dist(P[i], P[j]))));
+  return out;
+}
+const LINK = {
+  single: (P, A, B) => Math.min(...pairDists(P, A, B)),
+  complete: (P, A, B) => Math.max(...pairDists(P, A, B)),
+  average: (P, A, B) => mean(pairDists(P, A, B)),
+  ward: (P, A, B) => {
+    const ma = centroid(P, A), mb = centroid(P, B);
+    return (A.length * B.length) / (A.length + B.length) * ((ma[0] - mb[0]) ** 2 + (ma[1] - mb[1]) ** 2);
+  },
+};
+/* Agglomerative clustering: leaves are nodes 0..n-1, merge k creates node n+k. */
+function cluster(P, method) {
+  const nodes = P.map((_, i) => ({ id: i, m: [i], h: 0, leaf: true }));
+  let C = nodes.slice();
+  const merges = [];
+  while (C.length > 1) {
+    let best = null;
+    for (let i = 0; i < C.length; i++) {
+      for (let j = i + 1; j < C.length; j++) {
+        const v = LINK[method](P, C[i].m, C[j].m);
+        if (!best || v < best.v - 1e-12) best = { v, i, j };
+      }
+    }
+    const a = C[best.i], b = C[best.j];
+    const nd = { id: nodes.length, a: a.id, b: b.id, h: best.v, m: [...a.m, ...b.m] };
+    nodes.push(nd); merges.push(nd);
+    C = C.filter((_, k) => k !== best.i && k !== best.j);
+    C.push(nd);
+  }
+  const order = [];
+  (function walk(id) { const nd = nodes[id]; if (nd.leaf) order.push(id); else { walk(nd.a); walk(nd.b); } })(nodes.length - 1);
+  return { P, nodes, merges, order, n: P.length };
+}
+/* Cut into K clusters: undo the last K-1 merges. Returns labels per point and colors per node. */
+function cutK(T, K) {
+  let tops = [T.nodes.length - 1];
+  for (let k = 0; k < K - 1; k++) {
+    const nd = T.merges[T.n - 2 - k];
+    tops = tops.filter((t) => t !== nd.id).concat([nd.a, nd.b]);
+  }
+  const pos = (id) => Math.min(...T.nodes[id].m.map((i) => T.order.indexOf(i)));
+  tops.sort((a, b) => pos(a) - pos(b));
+  const label = new Array(T.n).fill(0), nodeCol = {};
+  tops.forEach((t, c) => {
+    (function walk(id) { nodeCol[id] = col(c); const nd = T.nodes[id]; if (!nd.leaf) { walk(nd.a); walk(nd.b); } })(t);
+    T.nodes[t].m.forEach((i) => { label[i] = c; });
+  });
+  return { label, nodeCol, groups: tops.map((t) => T.nodes[t].m) };
+}
+const kAt = (T, c) => 1 + T.merges.filter((m) => m.h > c).length;
+function niceTicks(max, count = 5) {
+  const raw = max / count, p = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((s) => s * p).find((s) => s >= raw);
+  const out = [];
+  for (let v = 0; v <= max + 1e-9; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+/* Draw a dendrogram into group g. o: x0, x1, yb, yt, hmax, upto, color(id), last, labels, ticks, axisX */
+function dendro(g, T, o) {
+  const n = T.n, xs = {}, ys = {};
+  const y = (h) => o.yb - (h / o.hmax) * (o.yb - o.yt);
+  T.order.forEach((id, k) => { xs[id] = o.x0 + ((k + 0.5) * (o.x1 - o.x0)) / n; ys[id] = o.yb; });
+  T.merges.forEach((nd) => { xs[nd.id] = (xs[nd.a] + xs[nd.b]) / 2; ys[nd.id] = y(nd.h); });
+  if (o.ticks) {
+    const ax = o.axisX ?? o.x0 - 24;
+    o.ticks.forEach((v) => {
+      el('line', { class: 'gl', x1: ax, x2: o.x1, y1: y(v), y2: y(v), style: 'opacity:.6' }, g);
+      el('text', { class: 'tk', x: ax - 10, y: y(v) + 8, 'text-anchor': 'end', text: fmt(v, v < 10 && v % 1 ? 1 : 0) }, g);
+    });
+    el('path', { class: 'ax', d: `M${ax} ${o.yt - 10}V${o.yb}` }, g);
+    if (o.ylabel) el('text', { class: 'lb', transform: `translate(${ax - 70} ${(o.yt + o.yb) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: o.ylabel }, g);
+  }
+  const upto = o.upto ?? T.merges.length;
+  T.merges.slice(0, upto).forEach((nd, k) => {
+    const c = (o.color && o.color(nd.id)) || GREY;
+    const hot = o.last !== undefined && nd.id === o.last;
+    el('path', { class: 'link', d: `M${xs[nd.a]} ${ys[nd.a]}V${ys[nd.id]}H${xs[nd.b]}V${ys[nd.b]}`, style: `stroke:${hot ? 'var(--c-b)' : c};stroke-width:${hot ? 7 : 4}` }, g);
+  });
+  T.order.forEach((id) => {
+    el('circle', { cx: xs[id], cy: o.yb, r: o.leafR ?? 6, style: `fill:${(o.color && o.color(id)) || GREY}` }, g);
+    if (o.labels) el('text', { class: 'txs', x: xs[id], y: o.yb + 36, 'text-anchor': 'middle', text: o.labels(id) }, g);
+  });
+  return { xs, ys, y };
+}
+/* Convex hull (monotone chain) as a path; one or two points give a dot or a capsule. */
+function hullPath(pts) {
+  if (pts.length === 1) return `M${pts[0][0]} ${pts[0][1]}h0.1`;
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], hi = [];
+  p.forEach((q) => { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+  p.slice().reverse().forEach((q) => { while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); });
+  const h = lo.slice(0, -1).concat(hi.slice(0, -1));
+  return h.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('') + 'Z';
+}
+function hull(g, pts, color, w = 46, op = 0.18) {
+  return el('path', { class: 'hull', d: hullPath(pts), style: `fill:${color};stroke:${color};stroke-width:${w};fill-opacity:${op};stroke-opacity:${op}` }, g);
+}
+/* Simple scatter area with equal units on both axes, no axes drawn. */
+function area(x0, y0, w, h, dom) {
+  const s = Math.min(w / (dom.x[1] - dom.x[0]), h / (dom.y[1] - dom.y[0]));
+  return { sx: (v) => x0 + (v - dom.x[0]) * s, sy: (v) => y0 + h - (v - dom.y[0]) * s };
+}
+
+/* ───────── data ───────── */
+const P10 = [[1.2, 5.6], [2.1, 6.4], [1.6, 4.4], [3.6, 5.3], [6.5, 6.0], [7.5, 5.2], [7.1, 6.8], [4.9, 1.9], [6.0, 1.3], [8.7, 2.2]];
+const P15 = [[1.5, 6.2], [2.3, 6.6], [2.0, 5.5], [2.8, 5.9], [3.8, 5.2], [4.7, 4.6], [5.6, 4.0], [6.5, 3.4], [7.6, 2.6], [8.4, 3.0], [8.1, 2.0], [8.9, 2.4], [2.5, 1.6], [3.3, 1.2], [2.8, 0.8]];
+const DOM = { x: [0.4, 9.6], y: [0.3, 7.4] };
+/* two groups joined by a thin bridge, plus one far example */
+const PCH = [[1.2, 4.6], [2.0, 5.1], [2.6, 4.3], [1.6, 3.5], [2.4, 3.3], [1.0, 4.0], [2.9, 4.9], [1.9, 4.1], [3.6, 4.1], [4.3, 4.0], [5.0, 4.1], [5.7, 4.0], [6.4, 4.1],
+  [7.6, 4.5], [7.1, 3.7], [8.2, 5.0], [8.0, 3.4], [8.8, 4.2], [7.4, 4.9], [8.6, 3.2], [7.9, 4.1], [9.0, 1.0]];
+
+/* ───────── static figures ───────── */
+function drawDirection() {
+  const svg = document.getElementById('dir-svg');
+  const P = [[0, 0], [0.8, 0], [3, 0], [4.2, 0], [4.7, 0]], NAMES = 'abcde';
+  const T = cluster(P, 'single');
+  const X0 = 330, X1 = 700, YB = 600, YT = 120, HM = 2.4;
+  const g = el('g', { class: 'an-fade' }, svg);
+  const D = dendro(g, T, { x0: X0, x1: X1, yb: YB, yt: YT, hmax: HM, labels: (id) => NAMES[id], leafR: 8 });
+  /* the grouping at each level */
+  let groups = P.map((_, i) => [i]);
+  const show = (gs) => gs.map((s) => '{' + s.map((i) => NAMES[i]).sort().join(',') + '}').join(' ');
+  const sortG = (gs) => gs.sort((a, b) => Math.min(...a.map((i) => T.order.indexOf(i))) - Math.min(...b.map((i) => T.order.indexOf(i))));
+  const levels = [[0, show(sortG(groups)), 5]];
+  T.merges.forEach((nd) => {
+    groups = groups.filter((s) => !s.every((i) => nd.m.includes(i)));
+    groups.push(nd.m.slice());
+    levels.push([nd.h, show(sortG(groups)), groups.length]);
+  });
+  levels.forEach(([h, txt, k], i) => {
+    const yy = D.y(h);
+    const lg = el('g', { class: 'an-up', style: `--d:${0.3 + i * 0.15}s` }, svg);
+    el('line', { x1: X1 + 10, x2: 750, y1: yy, y2: yy, style: 'stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:4 6' }, lg);
+    el('text', { class: 'txs', x: 762, y: yy + 8, text: `K = ${k}: ${txt}` }, lg);
+  });
+  el('text', { class: 'ttl', x: 762, y: 70, text: 'grouping at each level' }, svg);
+  /* direction arrows */
+  const ag = el('g', { class: 'frag', 'data-step': 'ag' }, svg);
+  el('path', { d: `M110 ${YB}V${YT - 10}`, style: 'stroke:var(--c-a);stroke-width:6;fill:none', 'marker-end': 'url(#ah-a)' }, ag);
+  el('text', { class: 'tx', transform: `translate(80 ${(YB + YT) / 2}) rotate(-90)`, 'text-anchor': 'middle', style: 'fill:var(--c-a);font-weight:600', text: 'agglomerative: merge' }, ag);
+  const dv = el('g', { class: 'frag', 'data-step': 'dv' }, svg);
+  el('path', { d: `M210 ${YT}V${YB + 10}`, style: 'stroke:var(--c-b);stroke-width:6;fill:none', 'marker-end': 'url(#ah)' }, dv);
+  el('text', { class: 'tx', transform: `translate(250 ${(YB + YT) / 2}) rotate(90)`, 'text-anchor': 'middle', style: 'fill:var(--c-b);font-weight:600', text: 'divisive: split' }, dv);
+}
+
+function drawLinkages() {
+  const svg = document.getElementById('link-svg');
+  const A = [[0.4, 1.1], [1.2, 2.2], [1.6, 0.8]], B = [[3.7, 1.7], [4.4, 0.6], [5.1, 2.0]];
+  const U = 86;
+  const pairs = [];
+  A.forEach((a) => B.forEach((b) => pairs.push([a, b, dist(a, b)])));
+  const mn = pairs.reduce((p, q) => (q[2] < p[2] ? q : p)), mx = pairs.reduce((p, q) => (q[2] > p[2] ? q : p));
+  const PANELS = [['(a) single: closest pair', 'single'], ['(b) complete: farthest pair', 'complete'], ['(c) average: mean of all 9 pairs', 'average'], ['(d) Ward: distance between means', 'ward']];
+  PANELS.forEach(([title, kind], k) => {
+    const ox = (k % 2) * 600, oy = Math.floor(k / 2) * 365;
+    const g = el('g', k ? { class: 'frag', 'data-step': k < 3 ? 'l1' : 'l2' } : { class: 'an-fade' }, svg);
+    el('rect', { class: 'box', x: ox, y: oy, width: 560, height: 335, rx: 8, style: 'fill:none;stroke:var(--myst-color-border)' }, g);
+    el('text', { class: 'ttl', x: ox + 20, y: oy + 38, text: title }, g);
+    const sx = (v) => ox + 50 + v * U, sy = (v) => oy + 300 - v * U;
+    const line = (a, b, style) => el('line', { x1: sx(a[0]), y1: sy(a[1]), x2: sx(b[0]), y2: sy(b[1]), style }, g);
+    const thin = 'stroke:var(--myst-color-border-strong);stroke-width:2;stroke-dasharray:6 6';
+    if (kind === 'single' || kind === 'complete') {
+      pairs.forEach(([a, b]) => line(a, b, thin));
+      const [a, b, d] = kind === 'single' ? mn : mx;
+      line(a, b, 'stroke:var(--myst-color-text);stroke-width:6');
+      el('text', { class: 'txs', x: (sx(a[0]) + sx(b[0])) / 2, y: (sy(a[1]) + sy(b[1])) / 2 - (kind === 'single' ? 16 : -40), 'text-anchor': 'middle', style: 'font-weight:600', text: `${kind === 'single' ? 'min' : 'max'} ${fmt(d, 2)}` }, g);
+    } else if (kind === 'average') {
+      pairs.forEach(([a, b]) => line(a, b, 'stroke:var(--myst-color-text);stroke-width:3.5;opacity:.7'));
+      el('text', { class: 'txs', x: ox + 280, y: oy + 322, 'text-anchor': 'middle', style: 'font-weight:600', text: `mean ${fmt(mean(pairs.map((p) => p[2])), 2)}` }, g);
+    } else {
+      const ma = [mean(A.map((p) => p[0])), mean(A.map((p) => p[1]))], mb = [mean(B.map((p) => p[0])), mean(B.map((p) => p[1]))];
+      A.forEach((a) => line(a, ma, 'stroke:var(--c-a);stroke-width:2.5;opacity:.8'));
+      B.forEach((b) => line(b, mb, 'stroke:var(--c-b);stroke-width:2.5;opacity:.8'));
+      line(ma, mb, 'stroke:var(--myst-color-text);stroke-width:6');
+      [[ma, 'fa'], [mb, 'fb']].forEach(([m, c]) => {
+        const x = sx(m[0]), y = sy(m[1]);
+        el('path', { d: `M${x - 13} ${y - 13}L${x + 13} ${y + 13}M${x - 13} ${y + 13}L${x + 13} ${y - 13}`, style: `stroke:var(${c === 'fa' ? '--c-a' : '--c-b'});stroke-width:6;stroke-linecap:round` }, g);
+      });
+      el('text', { class: 'txs', x: sx(2.1), y: (sy(ma[1]) + sy(mb[1])) / 2 + 44, style: 'font-weight:600', text: 'μA to μB' }, g);
+    }
+    A.forEach((p) => el('circle', { class: 'pt fa', cx: sx(p[0]), cy: sy(p[1]), r: 13 }, g));
+    B.forEach((p) => el('circle', { class: 'pt fb', cx: sx(p[0]), cy: sy(p[1]), r: 13 }, g));
+    el('text', { class: 'tx', x: sx(0.1), y: sy(2.4), style: 'fill:var(--c-a);font-weight:700', text: 'A' }, g);
+    el('text', { class: 'tx', x: sx(5.5), y: sy(2.5), style: 'fill:var(--c-b);font-weight:700', text: 'B' }, g);
+  });
+}
+
+function drawReading() {
+  const svg = document.getElementById('read-svg');
+  const P = [[1, 1], [1.6, 1.3], [4, 1.2], [4.4, 2.2], [5.2, 1.6], [9, 2]];
+  const T = cluster(P, 'average'), CUT = 2.4;
+  const C = cutK(T, kAt(T, CUT));
+  const X0 = 170, X1 = 700, YB = 600, YT = 70, HM = 6;
+  const D = dendro(el('g', { class: 'an-fade' }, svg), T, { x0: X0, x1: X1, yb: YB, yt: YT, hmax: HM, ticks: [0, 1, 2, 3, 4, 5, 6], axisX: 120, ylabel: 'merge distance', color: (id) => C.nodeCol[id], labels: (id) => String(id + 1), leafR: 8 });
+  const yc = D.y(CUT);
+  const cg = el('g', { class: 'frag', 'data-step': 'rd1' }, svg);
+  el('line', { x1: X0 - 40, x2: X1 + 30, y1: yc, y2: yc, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8' }, cg);
+  el('text', { class: 'tx', x: X1 + 48, y: yc + 9, style: 'font-weight:600', text: 'cut: 3 clusters' }, cg);
+  const note = (tx, ty, px, py, text, parent) => {
+    el('path', { class: 'wire', d: `M${tx - 12} ${ty - 8}L${px + 10} ${py}`, 'marker-end': 'url(#ah)' }, parent);
+    el('text', { class: 'txs', x: tx, y: ty, text }, parent);
+  };
+  const ng = el('g', { class: 'an-fade', style: '--d:.8s' }, svg);
+  const root = T.merges[T.merges.length - 1], low = T.merges.find((m) => m.m.length === 3);
+  note(830, 120, Math.max(D.xs[root.a], D.xs[root.b]) + 8, D.ys[root.id], 'last merge: one cluster', ng);
+  note(830, 480, Math.max(D.xs[low.a], D.xs[low.b]) + 8, D.ys[low.id], 'join height = D(A, B)', ng);
+  const leaf = T.order[T.order.length - 1];
+  note(830, 580, D.xs[leaf] + 14, YB - 4, 'leaf: one example', ng);
+  const g2 = el('g', { class: 'frag', 'data-step': 'rd2' }, svg);
+  const top = T.merges[T.merges.length - 2];
+  el('path', { d: `M${D.xs[top.a]} ${D.ys[top.id] - 40}C${D.xs[top.a]} ${D.ys[top.id] - 110} ${D.xs[top.b]} ${D.ys[top.id] - 110} ${D.xs[top.b]} ${D.ys[top.id] - 40}`, style: 'fill:none;stroke:var(--c-d);stroke-width:4', 'marker-start': 'url(#ah)', 'marker-end': 'url(#ah)' }, g2);
+  el('text', { class: 'txs', x: D.xs[top.id], y: D.ys[top.id] - 110, 'text-anchor': 'middle', style: 'fill:var(--c-d)', text: 'flip: same tree' }, g2);
+}
+
+function drawChain() {
+  const T1 = cluster(PCH, 'single'), T2 = cluster(PCH, 'complete');
+  [['chain-a-svg', T1], ['chain-b-svg', T2]].forEach(([id, T]) => {
+    const svg = document.getElementById(id);
+    const A = area(40, 20, 712, 520, { x: [0.5, 9.5], y: [0.5, 5.6] }), C = cutK(T, 2);
+    const g = el('g', {}, svg);
+    C.groups.forEach((m, c) => hull(g, m.map((i) => [A.sx(PCH[i][0]), A.sy(PCH[i][1])]), col(c), 54, 0.16));
+    PCH.forEach((p, i) => el('circle', { class: 'pt an-pop', cx: A.sx(p[0]), cy: A.sy(p[1]), r: 13, style: `fill:${col(C.label[i])};--d:${i * 0.04}s` }, g));
+  });
+}
+
+function drawScaling() {
+  const r = rng(41);
+  const P = Array.from({ length: 20 }, (_, i) => [clamp((i < 10 ? 3 : 9) + 0.7 * gauss(r), 0.5, 11.5), 100 + 800 * r()]);
+  const lo = [0, 0], hi = [12, 1000];
+  const scaled = P.map((p) => [(p[0] - lo[0]) / (hi[0] - lo[0]), (p[1] - lo[1]) / (hi[1] - lo[1])]);
+  const fix = (L) => { const first = L[P.findIndex((p) => p[0] < 6)]; return L.map((v) => (first === 0 ? v : 1 - v)); };
+  const labRaw = cutK(cluster(P, 'average'), 2).label, labSc = fix(cutK(cluster(scaled, 'average'), 2).label);
+  [['scale-a-svg', labRaw], ['scale-b-svg', labSc]].forEach(([id, lab]) => {
+    const svg = document.getElementById(id);
+    const F = frame(svg, { W: 792, H: 560, l: 150, t: 20, r: 30, b: 84, x: [0, 12], y: [0, 1000], xt: [0, 3, 6, 9, 12], yt: [0, 250, 500, 750, 1000], fy: (v) => (v ? v + 'k' : '0'), xl: 'study hours per week' });
+    el('text', { class: 'lb', transform: `translate(${F.L - 100} ${(F.T + F.H - F.B) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'spending (₡ per month)' }, svg);
+    P.forEach((p, i) => el('circle', { class: 'pt an-pop', cx: F.sx(p[0]), cy: F.sy(p[1]), r: 13, style: `fill:${col(lab[i])};--d:${i * 0.03}s` }, F.plot));
+  });
+}
+
+function drawCost() {
+  const svg = document.getElementById('cost-svg');
+  const F = frame(svg, { W: 792, H: 560, l: 120, t: 30, r: 40, b: 84, x: [0, 10000], y: [0, 55e6], xt: [0, 2500, 5000, 7500, 10000], yt: [0, 10e6, 20e6, 30e6, 40e6, 50e6], fx: (v) => (v ? (v / 1000) + 'k' : '0'), fy: (v) => (v ? v / 1e6 + 'M' : '0'), xl: 'examples n', yl: 'pairs of examples' });
+  const f = (n) => (n * (n - 1)) / 2;
+  el('path', { class: 'curve-b an-draw', pathLength: 1, d: Array.from({ length: 101 }, (_, i) => (i ? 'L' : 'M') + F.sx(i * 100).toFixed(1) + ' ' + F.sy(f(i * 100)).toFixed(1)).join('') }, F.plot);
+  el('circle', { class: 'fb an-pop', style: '--d:1.2s', cx: F.sx(10000), cy: F.sy(f(10000)), r: 10 }, F.plot);
+  el('text', { class: 'txs an-fade', style: '--d:1.2s', x: F.sx(9700), y: F.sy(f(10000)) + 8, 'text-anchor': 'end', text: '10 000 examples: 50 million' }, svg);
+  el('circle', { class: 'fb an-pop', style: '--d:1s', cx: F.sx(5000), cy: F.sy(f(5000)), r: 10 }, F.plot);
+  el('text', { class: 'txs an-fade', style: '--d:1s', x: F.sx(5000) + 20, y: F.sy(f(5000)) + 44, text: 'half the data: a quarter of the pairs' }, svg);
+}
+
+function drawGreedy() {
+  const svg = document.getElementById('greedy-svg');
+  const X = [0, 1, 4, 7, 11], P = X.map((x) => [x, 0]);
+  const T = cluster(P, 'ward'), W = cutK(T, 2);
+  const sse = (groups) => groups.reduce((s, g) => { const m = mean(g.map((i) => X[i])); return s + g.reduce((t, i) => t + (X[i] - m) ** 2, 0); }, 0);
+  let best = null;
+  for (let k = 1; k < X.length; k++) {
+    const g = [[...Array(k).keys()], [...Array(X.length - k).keys()].map((i) => i + k)];
+    if (!best || sse(g) < best.s) best = { g, s: sse(g) };
+  }
+  const sx = lin(-0.5, 11.5, 60, 750);
+  const ROWS = [[150, "Ward's tree cut at K = 2", W.groups], [400, 'best split into 2 groups', best.g]];
+  ROWS.forEach(([y, title, groups]) => {
+    el('text', { class: 'ttl', x: 40, y: y - 80, text: title }, svg);
+    el('line', { class: 'ax', x1: 40, x2: 770, y1: y, y2: y }, svg);
+    groups.forEach((g, c) => hull(svg, g.map((i) => [sx(X[i]), y]), col(c), 50, 0.18));
+    groups.forEach((g, c) => g.forEach((i) => {
+      el('circle', { class: 'pt', cx: sx(X[i]), cy: y, r: 14, style: `fill:${col(c)}` }, svg);
+      el('text', { class: 'txs', x: sx(X[i]), y: y + 58, 'text-anchor': 'middle', text: X[i] }, svg);
+    }));
+    el('text', { class: 'tx', x: 770, y: y + 110, 'text-anchor': 'end', text: `sum of squares W = ${fmt(sse(groups), 2)}` }, svg);
+  });
+  const first = T.merges.find((m) => m.m.includes(2) && m.m.includes(3));
+  el('text', { class: 'txs', x: sx(5.5), y: 150 - 44, 'text-anchor': 'middle', style: 'fill:var(--c-b);font-weight:600', text: `merged at step ${T.merges.indexOf(first) + 1}` }, svg);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.merge = (() => {
+  const svg = document.getElementById('merge-svg');
+  const T = cluster(P10, 'single');
+  const A = area(20, 110, 540, 450, DOM);
+  el('text', { class: 'ttl', x: 20, y: 40, text: '(a) the examples' }, svg);
+  el('text', { class: 'ttl', x: 640, y: 40, text: '(b) the dendrogram' }, svg);
+  const gHull = el('g', {}, svg), gEdge = el('g', {}, svg), gPts = el('g', {}, svg), gTree = el('g', {}, svg);
+  /* the closest pair of points behind each merge */
+  const pair = T.merges.map((nd) => {
+    let b = null;
+    T.nodes[nd.a].m.forEach((i) => T.nodes[nd.b].m.forEach((j) => { const v = dist(P10[i], P10[j]); if (!b || v < b[2]) b = [i, j, v]; }));
+    return b;
+  });
+  const btn = document.getElementById('merge-go');
+  let k = 0;
+  function draw() {
+    [gHull, gEdge, gPts, gTree].forEach(clear);
+    let groups = P10.map((_, i) => [i]);
+    T.merges.slice(0, k).forEach((nd) => { groups = groups.filter((s) => !s.every((i) => nd.m.includes(i))); groups.push(nd.m); });
+    const last = k ? T.merges[k - 1] : null;
+    groups.forEach((g) => { if (g.length > 1) hull(gHull, g.map((i) => [A.sx(P10[i][0]), A.sy(P10[i][1])]), last && g === last.m ? 'var(--c-b)' : 'var(--c-a)', 56, 0.16); });
+    pair.slice(0, k).forEach(([i, j], s) => el('line', { x1: A.sx(P10[i][0]), y1: A.sy(P10[i][1]), x2: A.sx(P10[j][0]), y2: A.sy(P10[j][1]), style: s === k - 1 ? 'stroke:var(--c-b);stroke-width:6' : 'stroke:var(--myst-color-text-tertiary);stroke-width:3' }, gEdge));
+    P10.forEach((p, i) => {
+      const hot = last && last.m.includes(i);
+      el('circle', { class: `pt ${hot ? 'fb' : 'fa'}`, cx: A.sx(p[0]), cy: A.sy(p[1]), r: 13 }, gPts);
+      el('text', { class: 'txs', x: A.sx(p[0]) + 18, y: A.sy(p[1]) - 14, text: i + 1 }, gPts);
+    });
+    dendro(gTree, T, { x0: 700, x1: 1150, yb: 600, yt: 90, hmax: 3.5, upto: k, last: last ? last.id : undefined, ticks: [0, 1, 2, 3], axisX: 680, ylabel: 'merge distance', labels: (id) => String(id + 1), leafR: 7 });
+    document.getElementById('merge-k').textContent = P10.length - k;
+    document.getElementById('merge-m').textContent = k;
+    document.getElementById('merge-h').textContent = last ? fmt(last.h, 2) : 'none';
+    btn.disabled = k >= T.merges.length;
+    btn.textContent = k >= T.merges.length ? 'Done' : '▶ Merge';
+  }
+  btn.addEventListener('click', () => { if (k < T.merges.length) { k++; draw(); } });
+  document.getElementById('merge-reset').addEventListener('click', () => { k = 0; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.four = (() => {
+  const svg = document.getElementById('four-svg');
+  const TREES = Object.fromEntries(['single', 'complete', 'average', 'ward'].map((m) => [m, cluster(P15, m)]));
+  const NOTES = {
+    single: 'Follows chains: the bridge and the top-left group form one long cluster.',
+    complete: 'Prefers compact groups: the chain leaves the top-left group.',
+    average: 'Here the same 3 clusters as single, with other heights.',
+    ward: 'Heights are increases in the sum of squares, so the scale changes.',
+  };
+  const A = area(20, 110, 540, 450, DOM);
+  el('text', { class: 'ttl', x: 20, y: 40, text: '(a) the examples, 3 clusters' }, svg);
+  el('text', { class: 'ttl', x: 640, y: 40, text: '(b) the dendrogram' }, svg);
+  const g = el('g', {}, svg);
+  const btns = [...document.querySelectorAll('#four-btns button')];
+  function draw(m) {
+    clear(g);
+    const T = TREES[m], C = cutK(T, 3), hmax = T.merges[T.merges.length - 1].h * 1.08;
+    C.groups.forEach((s, c) => hull(g, s.map((i) => [A.sx(P15[i][0]), A.sy(P15[i][1])]), col(c), 48, 0.16));
+    P15.forEach((p, i) => el('circle', { class: 'pt', cx: A.sx(p[0]), cy: A.sy(p[1]), r: 13, style: `fill:${col(C.label[i])}` }, g));
+    dendro(g, T, { x0: 720, x1: 1150, yb: 620, yt: 90, hmax, ticks: niceTicks(hmax, 4), axisX: 700, ylabel: 'merge height', color: (id) => C.nodeCol[id], leafR: 7 });
+    btns.forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+    document.getElementById('four-h').textContent = fmt(T.merges[T.merges.length - 1].h, 2);
+    document.getElementById('four-note').textContent = NOTES[m];
+  }
+  btns.forEach((b) => b.addEventListener('click', () => draw(b.dataset.m)));
+  draw('single');
+  return {};
+})();
+
+DEMOS.cut = (() => {
+  const svg = document.getElementById('cut-svg');
+  const r = rng(23), CEN = [[2.4, 5.4], [7.4, 5.7], [5, 1.9]];
+  const P = Array.from({ length: 24 }, (_, i) => { const c = CEN[i % 3]; return [clamp(c[0] + 0.8 * gauss(r), 0.6, 9.4), clamp(c[1] + 0.8 * gauss(r), 0.5, 7.2)]; });
+  const T = cluster(P, 'average'), n = P.length, hs = T.merges.map((m) => m.h);
+  const hmax = hs[n - 2] * 1.08;
+  const A = area(20, 110, 540, 450, DOM);
+  el('text', { class: 'ttl', x: 20, y: 40, text: '(a) the examples' }, svg);
+  el('text', { class: 'ttl', x: 640, y: 40, text: '(b) the dendrogram' }, svg);
+  const g = el('g', {}, svg);
+  const slider = document.getElementById('cut-h');
+  slider.min = (Math.ceil(hs[n - 9] * 100) / 100).toFixed(2); slider.max = (hs[n - 2] * 1.05).toFixed(2);
+  slider.value = ((hs[n - 4] + hs[n - 3]) / 2).toFixed(2);
+  function draw() {
+    clear(g);
+    const c = +slider.value, K = kAt(T, c), C = cutK(T, K);
+    C.groups.forEach((s, j) => hull(g, s.map((i) => [A.sx(P[i][0]), A.sy(P[i][1])]), col(j), 44, 0.16));
+    P.forEach((p, i) => el('circle', { class: 'pt', cx: A.sx(p[0]), cy: A.sy(p[1]), r: 12, style: `fill:${col(C.label[i])}` }, g));
+    const D = dendro(g, T, { x0: 720, x1: 1150, yb: 620, yt: 90, hmax, ticks: niceTicks(hmax, 4), axisX: 700, ylabel: 'merge distance', color: (id) => C.nodeCol[id], leafR: 6 });
+    el('line', { x1: 700, x2: 1150, y1: D.y(c), y2: D.y(c), style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:12 8' }, g);
+    el('text', { class: 'txs', x: 1150, y: D.y(c) - 12, 'text-anchor': 'end', style: 'font-weight:600', text: `cut: K = ${K}` }, g);
+    document.getElementById('cut-h-val').textContent = fmt(c, 2);
+    document.getElementById('cut-k').textContent = K;
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawDirection(); drawLinkages(); drawReading(); drawChain(); drawScaling(); drawCost(); drawGreedy();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autoencoders</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.ats-prose table.tb.cmp td,.ats-prose table.tb.cmp th{padding:.28em .6em}
+.ctl select{font:inherit;font-size:26px;padding:4px 8px;border-radius:var(--radius);border:1px solid var(--myst-color-border-strong);background:var(--myst-color-bg);color:var(--myst-color-text)}
+.side .eq{margin:0}
+.side .eq .m{font-size:1em}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 27</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Autoencoders</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Networks that learn to copy their input through a narrow middle, and what the middle learns</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 27 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Copy the input through a bottleneck</li>
+<li class="an-up" style="--d:.15s">The loss and the link to PCA</li>
+<li class="an-up" style="--d:.25s">Curved data and nonlinear codes</li>
+<li class="an-up" style="--d:.35s">Maps, denoising and anomaly detection</li>
+<li class="an-up" style="--d:.45s">From compressing to generating</li>
+<li class="an-up" style="--d:.55s">Variational autoencoders</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+<aside class="am"><div class="t">Before this topic</div><p>Topic 23: layers, activations, loss and gradient descent.</p><p>Topic 18: PCA, scores and reconstruction error.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb cmp">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x}_i \in \mathbb{R}^d,\ i = 1, \dots, n</span></td><td>Example <span class="tex">i</span>, with <span class="tex">d</span> features and no label</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">f_{\boldsymbol\phi}</span></td><td>Encoder, with parameters <span class="tex">\boldsymbol\phi</span></td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">\mathbf{z} = f_{\boldsymbol\phi}(\mathbf{x}) \in \mathbb{R}^q</span></td><td>Code (latent vector), with <span class="tex">q &lt; d</span></td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">g_{\boldsymbol\psi}</span></td><td>Decoder, with parameters <span class="tex">\boldsymbol\psi</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">\hat{\mathbf{x}} = g_{\boldsymbol\psi}(\mathbf{z})</span></td><td>Reconstruction of <span class="tex">\mathbf{x}</span></td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">\mathbf{W},\ \mathbf{b},\ g</span></td><td>Weights, biases, activation of a layer</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">\boldsymbol\theta,\ J,\ \alpha</span></td><td>All parameters, cost, learning rate</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">\tilde{\mathbf{x}}</span></td><td>Noisy copy of <span class="tex">\mathbf{x}</span></td></tr>
+<tr class="an-up" style="--d:.45s"><td><span class="tex">\boldsymbol\mu,\ \boldsymbol\sigma,\ \boldsymbol\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})</span></td><td>Mean, spread and noise of a variational autoencoder</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors or matrices.</p><p>The decoder <span class="tex">g_{\boldsymbol\psi}</span> always carries its subscript. A plain <span class="tex">g</span> is an activation, as in Topic 23.</p><p>A hat marks a reconstruction and a tilde a noisy input. The sign <span class="tex">\odot</span> multiplies two vectors entry by entry.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Copy through a bottleneck</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A network whose target is its own input.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The idea">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>Output your own input</h2>
+<div class="fr">
+<div class="figbox"><svg id="hour-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">An <strong>autoencoder</strong> is a network trained to output its own input. No labels are needed.</p>
+<p class="small frag up" data-step="h1" style="margin:0">The middle layer, the <strong>code</strong> <span class="tex">\mathbf{z}</span>, has <span class="tex">q</span> numbers, fewer than the <span class="tex">d</span> inputs.</p>
+<p class="small frag up" data-step="h2" style="margin:0">The <strong>encoder</strong> squeezes the input into the code. The <strong>decoder</strong> rebuilds <span class="tex">\hat{\mathbf{x}}</span> from the code alone.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>A 5 × 7 picture: 35 numbers in, a code of 2, 35 out. The output is close to the input, not equal.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Why a narrow middle">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>Why a narrow middle</h2>
+<div class="fr">
+<div class="figbox"><svg id="neck-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">With a middle as wide as the input, the network can pass each number straight through. It copies perfectly and learns nothing about the data.</p>
+<p class="small frag up" data-step="n1" style="margin:0">With only <span class="tex">q</span> numbers in the middle, it must keep what matters most and drop the rest.</p>
+<p class="small frag up" data-step="n2" style="margin:0">To rebuild many examples well, it has to find the patterns they share. The code is a <strong>compression</strong> learned from data.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>(a) A wide middle allows a plain copy (orange). (b) A narrow middle forces 6 numbers into 2.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Reconstruction loss">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>The reconstruction loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The encoder maps an example to its code, and the decoder maps the code back:</p>
+<div class="eq"><div class="m tex-d">\mathbf{z}_i = f_{\boldsymbol\phi}(\mathbf{x}_i)</div><div class="n">(1)</div></div>
+<div class="eq"><div class="m tex-d">\hat{\mathbf{x}}_i = g_{\boldsymbol\psi}(\mathbf{z}_i) = g_{\boldsymbol\psi}\big(f_{\boldsymbol\phi}(\mathbf{x}_i)\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">Training makes the reconstruction close to the input. The cost is the average squared distance between them, the same reconstruction error as in PCA:</p>
+<div class="eq frag up" data-step="l1"><div class="m tex-d">J(\boldsymbol\phi, \boldsymbol\psi) = \frac{1}{n} \sum_{i=1}^{n} \lVert \mathbf{x}_i - \hat{\mathbf{x}}_i \rVert^2</div><div class="n">(3)</div></div>
+<p class="small frag up" data-step="l2" style="margin:0">Encoder and decoder are trained together, by gradient descent on <span class="tex">J</span>.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{x}_1 = (1, 0, 2)</span></p><p><span class="tex">\hat{\mathbf{x}}_1 = (0.8, 0.1, 1.7)</span></p><p><span class="tex">0.2^2 + 0.1^2 + 0.3^2 = 0.14</span></p><p><span class="tex">\mathbf{x}_2 = (0, 1, 1)</span></p><p><span class="tex">\hat{\mathbf{x}}_2 = (0.2, 0.9, 1.0)</span></p><p><span class="tex">0.2^2 + 0.1^2 + 0^2 = 0.05</span></p><p><span class="tex">J = (0.14 + 0.05)/2 = 0.095</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="One layer each way">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>One layer each way</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The simplest autoencoder has one layer in the encoder and one in the decoder, built as in Topic 23:</p>
+<div class="eq"><div class="m tex-d">\mathbf{z} = g\big(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1\big), \qquad \mathbf{W}_1 \text{ is } q \times d</div><div class="n">(4)</div></div>
+<div class="eq"><div class="m tex-d">\hat{\mathbf{x}} = \mathbf{W}_2\, \mathbf{z} + \mathbf{b}_2, \qquad \mathbf{W}_2 \text{ is } d \times q</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="o1" style="margin:0">All weights and biases form <span class="tex">\boldsymbol\theta = (\boldsymbol\phi, \boldsymbol\psi)</span>. Backpropagation gives the gradient of <span class="tex">J</span>, and each step moves against it:</p>
+<div class="eq frag up" data-step="o1"><div class="m tex-d">\boldsymbol\theta \leftarrow \boldsymbol\theta - \alpha\, \nabla_{\boldsymbol\theta} J</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="o2" style="margin:0">Deeper autoencoders stack more layers on each side, usually shrinking toward the code and growing back.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">d = 3</span>, <span class="tex">q = 1</span>, <span class="tex">g(t) = t</span>, zero biases.</p><p><span class="tex">\mathbf{W}_1 = (0.5,\ 0.5,\ 0)</span></p><p><span class="tex">\mathbf{W}_2 = (1, 1, 0)^\top</span></p><p><span class="tex">\mathbf{x} = (3, 1, 0)</span>:</p><p><span class="tex">z = 1.5 + 0.5 = 2</span></p><p><span class="tex">\hat{\mathbf{x}} = (2, 2, 0)</span></p><p>Error: <span class="tex">1^2 + 1^2 + 0^2 = 2</span>. One number cannot keep the difference between the first two features.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Link to PCA">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>Linear autoencoders and PCA</h2>
+<div class="fr">
+<div class="figbox"><svg id="pca-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">With <span class="tex">g(t) = t</span> and squared error, the best code space is spanned by the first <span class="tex">q</span> principal components (Topic 18):</p>
+<div class="eq"><div class="m tex-d">\min J = \sum_{k=q+1}^{d} \lambda_k</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="p1" style="margin:0">Same reconstructions as PCA. Example: eigenvalues 3 and 1, <span class="tex">q = 1</span>: best error 1.</p>
+<p class="small frag up" data-step="p2" style="margin:0">Nonlinear activations let the decoder bend.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>(b) A 2, 1, 2 linear autoencoder, trained in this page by gradient descent.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Curved data" data-demo="curve">
+<div class="hdr" data-s="Bottleneck"></div>
+<h2>Following a curve</h2>
+<div class="fr">
+<div class="figbox"><svg id="curve-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Both keep one number per point. PCA rebuilds on a line, the autoencoder on a curve.</p>
+<div class="btns"><button class="bt chip" id="curve-pca">PCA line</button><button class="bt chip" id="curve-ae">Autoencoder</button></div>
+<div class="ctl"><label><span>Code value <span class="tex">z</span></span><b id="curve-z-val">0</b></label><input type="range" id="curve-z" min="0" max="100" step="1" value="30"></div>
+<div class="ro"><span>Error, PCA line</span><b id="curve-e1" class="bb">0</b></div>
+<div class="ro"><span>Error, autoencoder</span><b id="curve-e2" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>70 points near an arc. The autoencoder (2, 10, 1, 10, 2 tanh units) was trained beforehand; the page only runs it.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">What the code is good for</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Maps of the data, cleaner inputs and unusual examples.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A map of the data">
+<div class="hdr" data-s="Uses of the code"></div>
+<h2>A map of the data</h2>
+<div class="fr">
+<div class="figbox"><svg id="map-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">With <span class="tex">q = 2</span>, the code of every example is a point we can plot.</p>
+<p class="small frag up" data-step="mp1" style="margin:0">Examples that look alike get nearby codes: 0 near 6, 1 near 7. The groups come from the pictures alone.</p>
+<p class="small frag up" data-step="mp2" style="margin:0">Hinton and Salakhutdinov (2006) showed deep autoencoders giving clearer maps of digits than PCA.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Sketch of a 2-D code space for digit pictures. Colors are labels added only to read the plot.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Denoising loss">
+<div class="hdr" data-s="Uses of the code"></div>
+<h2>Train on noisy copies</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A <strong>denoising autoencoder</strong> gets a damaged input, for example with a random number added to every feature:</p>
+<div class="eq"><div class="m tex-d">\tilde{\mathbf{x}}_i = \mathbf{x}_i + \text{noise}</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="d1" style="margin:0">The target stays the clean example:</p>
+<div class="eq frag up" data-step="d1"><div class="m tex-d">J = \frac{1}{n} \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - g_{\boldsymbol\psi}\big(f_{\boldsymbol\phi}(\tilde{\mathbf{x}}_i)\big) \big\rVert^2</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="d2" style="margin:0">Copying the input now gives a large error, since the noise is not in the target. The network must learn what clean examples look like and pull each input toward them. A wide code is then allowed.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{x} = (1, 0, 1)</span></p><p><span class="tex">\tilde{\mathbf{x}} = (0.8, 0.3, 1.1)</span></p><p>Noisy input error:</p><p><span class="tex">0.2^2 + 0.3^2 + 0.1^2 = 0.14</span></p><p>Output <span class="tex">(0.9, 0.1, 1.0)</span>:</p><p><span class="tex">0.1^2 + 0.1^2 + 0^2 = 0.02</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Denoising demo" data-demo="den">
+<div class="hdr" data-s="Uses of the code"></div>
+<h2>Cleaning a noisy picture</h2>
+<div class="fr">
+<div class="figbox"><svg id="den-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<div class="ctl"><label><span>Noise level</span><b id="den-s-val">0.4</b></label><input type="range" id="den-s" min="0" max="0.8" step="0.05" value="0.4"></div>
+<div class="ctl"><label><span>Digit</span></label><select id="den-d"><option>0</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
+<div class="btns"><button class="bt chip" id="den-new">New noise</button></div>
+<div class="ro"><span>Error of (b)</span><b id="den-e1" class="bb">0</b></div>
+<div class="ro"><span>Error of (c)</span><b id="den-e2" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>The cleaner is a linear autoencoder built in the page, not trained: its decoder only outputs mixtures of the ten clean digits. Errors: average per pixel.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Anomaly detection" data-demo="anom">
+<div class="hdr" data-s="Uses of the code"></div>
+<h2>Spotting odd examples</h2>
+<div class="fr">
+<div class="col">
+<div class="eq" style="margin:0 0 8px"><div class="m tex-d">s(\mathbf{x}) = \lVert \mathbf{x} - g_{\boldsymbol\psi}(f_{\boldsymbol\phi}(\mathbf{x})) \rVert^2, \qquad \text{flag } \mathbf{x} \text{ if } s(\mathbf{x}) &gt; \tau</div><div class="n">(10)</div></div>
+<div class="figbox"><svg id="anom-svg" viewBox="0 0 1160 620"></svg></div>
+</div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Train on normal data only. Odd points rebuild badly, so their score is high, as in Topic 15. Example: <span class="tex">0.12 &gt; \tau = 0.05</span> is flagged.</p>
+<div class="ctl"><label><span>Threshold <span class="tex">\tau</span></span><b id="anom-t-val">0</b></label><input type="range" id="anom-t" min="-3" max="0" step="0.05" value="-1.5"></div>
+<div class="ro"><span>Odd points caught</span><b id="anom-hit" class="bb">0</b></div>
+<div class="ro"><span>Normal points flagged</span><b id="anom-fa" class="a">0</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>The autoencoder of Figure 4 on 120 new normal points and 8 odd ones. Rings: flagged.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Other variants">
+<div class="hdr" data-s="Uses of the code"></div>
+<h2>Sparse and convolutional</h2>
+<div class="fr">
+<div class="figbox"><svg id="var-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A <strong>sparse autoencoder</strong> may have a large code, but a penalty in <span class="tex">J</span> keeps most code units near zero for each example.</p>
+<p class="small frag up" data-step="v1" style="margin:0">A <strong>convolutional autoencoder</strong> uses the filters of Topic 25. Its encoder shrinks an image into small feature maps, and its decoder grows them back.</p>
+<p class="small frag up" data-step="v2" style="margin:0">Both still minimize the reconstruction error.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>(a) Filled units are active for one example. (b) Blocks are stacks of feature maps.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Generating new data</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Decode codes that no example produced.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Holes in the code space">
+<div class="hdr" data-s="Generating"></div>
+<h2>Holes in the code space</h2>
+<div class="fr">
+<div class="figbox"><svg id="hole-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">The decoder turns any code into an output. Decode a new code and we may get a new example.</p>
+<p class="small frag up" data-step="ho1" style="margin:0">In a plain autoencoder, codes can sit in scattered groups with empty space between them. A code from a gap decodes to nonsense.</p>
+<p class="small frag up" data-step="ho2" style="margin:0">We want codes packed in a known region with no gaps, so that a random code decodes to something sensible.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>Sketch. (b) Codes of a variational autoencoder fill a round region around 0.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Variational autoencoder">
+<div class="hdr" data-s="Generating"></div>
+<h2>The variational autoencoder</h2>
+<div class="fr">
+<div class="figbox"><svg id="vae-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">In a <strong>variational autoencoder</strong> (VAE), the encoder outputs two vectors: a mean <span class="tex">\boldsymbol\mu</span> and a spread <span class="tex">\boldsymbol\sigma</span>.</p>
+<p class="small frag up" data-step="va1" style="margin:0">The code is drawn at random near <span class="tex">\boldsymbol\mu</span>, with spread <span class="tex">\boldsymbol\sigma</span>. Each example maps to a small cloud of codes.</p>
+<p class="small frag up" data-step="va2" style="margin:0">The decoder must rebuild the example from any code in that cloud, so nearby codes give similar outputs.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>Bottom: one code dimension, a bell curve centered at <span class="tex">\mu_1</span> with width <span class="tex">\sigma_1</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Sampling the code">
+<div class="hdr" data-s="Generating"></div>
+<h2>Sampling the code</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Draw standard noise, then stretch it by <span class="tex">\boldsymbol\sigma</span> and shift it by <span class="tex">\boldsymbol\mu</span>, entry by entry:</p>
+<div class="eq"><div class="m tex-d">\mathbf{z} = \boldsymbol\mu + \boldsymbol\sigma \odot \boldsymbol\epsilon, \qquad \boldsymbol\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})</div><div class="n">(11)</div></div>
+<p class="small frag up" data-step="sa1" style="margin:0">This is the <strong>reparameterization</strong>. The randomness sits in <span class="tex">\boldsymbol\epsilon</span>, which needs no training. The code is a simple sum of <span class="tex">\boldsymbol\mu</span> and <span class="tex">\boldsymbol\sigma</span>, so backpropagation passes through it to the encoder.</p>
+<p class="small frag up" data-step="sa2" style="margin:16px 0 0">After training, new data comes from decoding fresh codes <span class="tex">\mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})</span>: no encoder needed.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\boldsymbol\mu = (1, -0.5)</span>, <span class="tex">\boldsymbol\sigma = (0.5, 2)</span></p><p>Noise <span class="tex">\boldsymbol\epsilon = (0.4, -1)</span>:</p><p><span class="tex">z_1 = 1 + 0.5 \cdot 0.4 = 1.2</span></p><p><span class="tex">z_2 = -0.5 + 2 \cdot (-1) = -2.5</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="VAE loss">
+<div class="hdr" data-s="Generating"></div>
+<h2>The VAE loss</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The cost adds two terms for each example: the reconstruction error and a penalty <span class="tex">\text{KL}_i</span> on its codes:</p>
+<div class="eq"><div class="m tex-d">J = \frac{1}{n} \sum_{i=1}^{n} \Big( \lVert \mathbf{x}_i - \hat{\mathbf{x}}_i \rVert^2 + \text{KL}_i \Big)</div><div class="n">(12)</div></div>
+<p class="small frag up" data-step="k1" style="margin:0">The penalty compares the bell curve of the codes with the standard one (mean 0, spread 1), summed over the <span class="tex">q</span> code dimensions:</p>
+<div class="eq frag up" data-step="k1"><div class="m tex-d">\text{KL}_i = \sum_{j=1}^{q} \tfrac{1}{2}\big(\mu_j^2 + \sigma_j^2 - 1 - \ln \sigma_j^2\big)</div><div class="n">(13)</div></div>
+<p class="small frag up" data-step="k2" style="margin:0">It is 0 only when <span class="tex">\mu_j = 0</span> and <span class="tex">\sigma_j = 1</span>. It keeps all codes near a standard bell curve and fills the gaps, while the first term keeps examples apart.</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mu = 1</span>, <span class="tex">\sigma = 0.5</span>:</p><p><span class="tex">\tfrac12(1 + 0.25 - 1 - \ln 0.25)</span></p><p><span class="tex">= \tfrac12(0.25 + 1.386) \approx 0.82</span></p><p><span class="tex">\mu = 0</span>, <span class="tex">\sigma = 2</span>: <span class="tex">\approx 0.81</span>. Too wide also costs.</p><p><span class="tex">\mu = 0</span>, <span class="tex">\sigma = 1</span>: <span class="tex">0</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Latent walk" data-demo="walk">
+<div class="hdr" data-s="Generating"></div>
+<h2>Walking through the codes</h2>
+<div class="fr">
+<div class="figbox"><svg id="walk-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Move along a line in the code space and decode each point. In a well-trained VAE the output changes smoothly.</p>
+<div class="ctl"><label><span>Path</span></label><select id="walk-p"><option value="smile">Frown to smile</option><option value="eyes">Closed to open eyes</option><option value="diag">Both at once</option></select></div>
+<div class="ctl"><label><span>Position on the path</span><b id="walk-t-val">0</b></label><input type="range" id="walk-t" min="0" max="100" step="1" value="20"></div>
+<div class="ro"><span>Code <span class="tex">\mathbf{z}</span></span><b id="walk-z" class="a">(0, 0)</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>This decoder is built by hand: <span class="tex">z_1</span> bends the mouth, <span class="tex">z_2</span> opens the eyes. A trained VAE learns such directions.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="VAE and GAN">
+<div class="hdr" data-s="Generating"></div>
+<h2>Two ways to generate</h2>
+<div class="fr">
+<div class="figbox"><svg id="gan-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Both models turn a random code into a new example.</p>
+<p class="small frag up" data-step="g1" style="margin:0">A VAE learns an encoder and a decoder, using reconstruction error plus the KL term.</p>
+<p class="small frag up" data-step="g2" style="margin:0">A generative adversarial network (Topic 28) trains a generator against a judge network that tells real from generated examples; its samples are often sharper than a VAE's.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>(b) The generator never sees real data directly; the judge does.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Generating"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Autoencoders at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Learn from data without labels</td><td>Need much data and training time</td></tr>
+<tr class="an-up" style="--d:.15s"><td>Follow curved structure that PCA misses</td><td>Code axes are hard to interpret</td></tr>
+<tr class="an-up" style="--d:.25s"><td>One idea, many uses: maps, denoising, anomalies</td><td>Code size and network shape must be chosen</td></tr>
+<tr class="an-up" style="--d:.35s"><td>The encoder can feed later models</td><td>A wide code may learn a plain copy</td></tr>
+<tr class="an-up" style="--d:.45s"><td>A VAE gives a smooth space to generate from</td><td>Reconstructions and samples are often blurry</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>Many unlabeled examples with structure that is not a straight line: images, signals, sensor readings.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An autoencoder learns to output its own input through a small code, with no labels.</li>
+<li class="an-up" style="--d:.15s">It minimizes the reconstruction error; a linear one finds the PCA subspace.</li>
+<li class="an-up" style="--d:.25s">Nonlinear layers let the code follow curved data.</li>
+<li class="an-up" style="--d:.35s">The code gives maps of the data; noisy inputs teach denoising; large errors flag anomalies.</li>
+<li class="an-up" style="--d:.45s">A VAE samples <span class="tex">\mathbf{z} = \boldsymbol\mu + \boldsymbol\sigma \odot \boldsymbol\epsilon</span> and adds a KL term, so random codes decode to new data.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The encoder and decoder pattern returns in later topics, from image generation to translation with transformers.</p>
+<section style="margin-top:48px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Baldi, P., &amp; Hornik, K. (1989). Neural networks and principal component analysis: learning from examples without local minima. <em>Neural Networks</em>, 2(1), 53-58.</li>
+<li style="margin:.4em 0">Hinton, G. E., &amp; Salakhutdinov, R. R. (2006). Reducing the dimensionality of data with neural networks. <em>Science</em>, 313(5786), 504-507.</li>
+<li style="margin:.4em 0">Vincent, P., Larochelle, H., Bengio, Y., &amp; Manzagol, P.-A. (2008). Extracting and composing robust features with denoising autoencoders. <em>Proceedings of the 25th International Conference on Machine Learning</em>, 1096-1103.</li>
+<li style="margin:.4em 0">Kingma, D. P., &amp; Welling, M. (2014). Auto-encoding variational Bayes. <em>International Conference on Learning Representations</em>.</li>
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Chapter 14. MIT Press.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 28: generative adversarial networks.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, clamp, mean, fmt, frame, legend, solve } = window.Deck;
+const SHOW_ALL = new URLSearchParams(location.search).has('all');
+const DEG = Math.PI / 180;
+
+/* ───────── data: arc points and a small autoencoder trained beforehand (weights fixed) ───────── */
+const ARC_X = [[0.969,-0.554],[-0.915,0.2],[0.23,0.624],[-0.851,0.259],[-0.943,-0.731],[-0.082,0.674],[0.001,0.772],[1.06,-0.487],[0.828,0.322],[-0.009,0.611],[-0.636,0.489],[-0.925,-0.022],[0.458,0.555],[0.965,-0.436],[0.838,0.382],[-0.967,-0.368],[0.92,0.086],[0.161,0.678],[-0.869,-0.446],[0.915,-0.685],[-0.442,0.636],[-0.945,-0.637],[0.916,0.124],[-0.125,0.688],[-0.909,-0.423],[0.983,-0.212],[-0.043,0.724],[-0.915,0.23],[-0.636,0.45],[0.099,0.779],[0.914,0.015],[0.07,0.706],[0.494,0.606],[0.117,0.714],[0.569,0.568],[-1.013,-0.129],[-0.916,0.167],[0.635,0.333],[-0.288,0.59],[0.695,0.329],[0.156,0.706],[0.538,0.469],[-0.662,0.475],[0.491,0.522],[0.152,0.609],[-0.78,0.235],[0.338,0.672],[-0.941,-0.303],[0.887,0.001],[-0.773,0.302],[0.265,0.671],[0.389,0.58],[-0.498,0.609],[-0.128,0.725],[0.287,0.6],[0.853,-0.739],[0.991,-0.347],[-0.802,0.35],[-0.051,0.723],[-0.784,0.429],[-0.982,-0.566],[-0.664,0.495],[0.974,-0.644],[0.635,0.447],[-0.382,0.686],[0.896,0.132],[-0.893,-0.663],[-1.072,-0.441],[-1.085,-0.121],[0.16,0.701]];
+const ARC_N = [[1.006,-0.036],[0.922,-0.592],[0.26,0.687],[-0.698,0.207],[0.218,0.691],[0.046,0.727],[0.939,-0.711],[0.086,0.706],[-1.049,-0.521],[-0.981,-0.071],[-0.864,0.291],[0.978,-0.334],[-0.916,-0.319],[-1.017,-0.18],[1.018,-0.148],[-0.528,0.635],[0.969,-0.68],[0.976,-0.302],[0.604,0.479],[1.002,-0.12],[-0.936,0.155],[-0.938,-0.019],[0.568,0.531],[0.721,0.405],[0.973,-0.359],[0.934,-0.388],[-0.738,0.363],[-0.454,0.566],[0.967,-0.562],[0.088,0.662],[0.424,0.71],[-0.911,-0.07],[-0.773,0.376],[-0.424,0.66],[-0.231,0.653],[-0.998,-0.525],[-0.901,-0.696],[0.557,0.496],[0.801,0.261],[-0.942,0.062],[0.973,-0.589],[0.457,0.55],[1.058,-0.54],[0.637,0.438],[0.899,-0.568],[0.735,0.353],[-0.946,0.153],[-1.005,-0.367],[-0.85,0.152],[-0.329,0.649],[-0.398,0.521],[0.49,0.479],[0.908,-0.14],[0.266,0.73],[-0.738,0.282],[0.879,-0.516],[0.909,-0.659],[-0.9,0.059],[0.75,0.281],[-0.767,0.397],[-0.801,0.353],[-1.099,-0.479],[0.43,0.602],[0.578,0.482],[-0.917,0.04],[-0.931,0.138],[-0.593,0.479],[-0.903,0.005],[-0.483,0.595],[-0.953,-0.603],[0.58,0.438],[-0.867,0.28],[-1.009,-0.559],[0.636,0.455],[-0.45,0.67],[0.602,0.514],[0.147,0.669],[0.973,-0.387],[0.958,-0.619],[-0.784,0.166],[0.182,0.683],[-0.43,0.572],[-0.798,0.315],[0.384,0.668],[0.475,0.48],[1.032,-0.06],[-0.979,0.037],[-1.0,-0.175],[-0.805,0.237],[-1.014,-0.225],[-0.573,0.55],[-0.697,0.398],[0.953,0.105],[-0.897,0.241],[0.581,0.516],[0.259,0.632],[0.542,0.518],[-0.333,0.613],[-0.597,0.5],[-0.29,0.64],[0.601,0.48],[0.868,0.118],[-0.958,-0.08],[0.712,0.376],[0.238,0.576],[0.957,-0.448],[0.669,0.396],[0.977,-0.341],[0.67,0.409],[-0.748,0.306],[-0.906,-0.649],[-0.443,0.588],[0.847,0.273],[-0.723,0.443],[-0.538,0.544],[-1.022,0.02],[-0.146,0.755],[-1.011,-0.325],[0.278,0.671],[0.7,0.364]];
+const ARC_ODD = [[0.0,0.1],[0.3,-0.2],[-0.4,0.25],[1.5,0.9],[-1.55,-0.9],[0.0,1.35],[0.6,-1.2],[-0.9,1.05]];
+const AE_P = [[[0.0343,-0.1791],[-1.4082,0.5546],[-0.6015,-0.4176],[-1.7419,-0.8481],[-0.3419,-0.44],[0.7747,0.5958],[0.5784,2.0049],[1.3718,1.3816],[1.4095,-1.6211],[-0.2438,1.5722]],[0.0939,0.2163,0.163,-0.1974,0.2254,-0.1962,2.6592,1.1842,0.5154,1.825],[[0.0071,-1.2813,0.6272,-0.4449,0.2496,-0.3014,0.7258,0.461,-0.6629,-1.0689]],[-0.0545],[[-0.1625],[3.3613],[-2.856],[-0.4025],[-0.1489],[0.066],[2.4991],[1.2977],[1.0317],[1.3732]],[0.3451,-5.433,-1.1859,-0.5699,0.4965,0.0122,0.1089,-0.2335,1.081,-0.9425],[[-0.3947,-0.5046,-0.3956,0.1008,-0.3159,0.0253,0.8351,-0.3227,-0.2199,0.1591],[-0.8739,-0.3702,-0.4753,-0.8933,-1.5427,-0.0142,-0.3507,-0.4704,0.3902,-0.8336]],[-0.053,-0.5895]];
+
+/* ───────── shared helpers ───────── */
+/* frame() names its clip path after the svg id; this variant allows two frames in one svg */
+function frameAs(svg, suffix, o) {
+  const id = svg.id;
+  svg.id = id + suffix;
+  const F = frame(svg, o);
+  svg.id = id;
+  return F;
+}
+/* A square scatter panel with its own clip: unit = pixels per data unit */
+function panel(svg, cx, cy, half, unit, id) {
+  const cp = el('clipPath', { id }, svg);
+  el('rect', { x: cx - half, y: cy - half, width: 2 * half, height: 2 * half }, cp);
+  const g = el('g', { 'clip-path': `url(#${id})` }, svg);
+  el('rect', { x: cx - half, y: cy - half, width: 2 * half, height: 2 * half, style: 'fill:none;stroke:var(--myst-color-border);stroke-width:2' }, svg);
+  el('line', { class: 'gl', x1: cx - half, x2: cx + half, y1: cy, y2: cy }, g);
+  el('line', { class: 'gl', x1: cx, x2: cx, y1: cy - half, y2: cy + half }, g);
+  return { g, X: (v) => cx + v * unit, Y: (v) => cy - v * unit };
+}
+/* Text with a subscript, e.g. sub(svg, x, y, 'f', 'φ') */
+function sub(parent, x, y, base, s, attrs = {}) {
+  const t = el('text', { class: 'tx', x, y, ...attrs }, parent);
+  el('tspan', { text: base }, t);
+  el('tspan', { dy: 8, style: 'font-size:24px', text: s }, t);
+  return t;
+}
+/* x with a hat, optionally after a word: the combining hat renders poorly in SVG text */
+function xhat(parent, x, y, word) {
+  if (word) el('text', { class: 'tx', x: x - 14, y, 'text-anchor': 'end', text: word }, parent);
+  el('text', { class: 'tx', x, y, 'text-anchor': 'middle', text: 'x' }, parent);
+  el('path', { d: `M${x - 7} ${y - 19}L${x} ${y - 25}L${x + 7} ${y - 19}`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:2' }, parent);
+}
+/* 5 × 7 digit font */
+const FONT = {
+  0: ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+  1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  2: ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+  3: ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+  4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+  5: ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+  6: ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+  7: ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  8: ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+};
+/* Digit as a flat array of rows × cols values, scaled up by s */
+function digit(dg, s = 1) {
+  const R = FONT[dg], out = [];
+  for (let i = 0; i < 7 * s; i++) for (let j = 0; j < 5 * s; j++) out.push(+R[Math.floor(i / s)][Math.floor(j / s)]);
+  return out;
+}
+/* Light 3 × 3 blur, used to show that a reconstruction is close but not exact */
+function blur(v, rows, cols, keep = 0.55) {
+  return v.map((_, k) => {
+    const i = Math.floor(k / cols), j = k % cols;
+    let s = 0, c = 0;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+      const a = i + di, b = j + dj;
+      if (a < 0 || b < 0 || a >= rows || b >= cols || (!di && !dj)) continue;
+      s += v[a * cols + b]; c++;
+    }
+    return keep * v[k] + (1 - keep) * s / c;
+  });
+}
+/* Pixel picture: ink drawn with the text color, so it works in both themes */
+function pic(parent, x0, y0, cell, rows, cols, vals) {
+  el('rect', { x: x0, y: y0, width: cols * cell, height: rows * cell, style: 'fill:var(--myst-color-bg)' }, parent);
+  const cells = [];
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+    cells.push(el('rect', { x: x0 + j * cell, y: y0 + i * cell, width: cell + 0.5, height: cell + 0.5, 'shape-rendering': 'crispEdges', style: 'fill:var(--myst-color-text);fill-opacity:0' }, parent));
+  }
+  el('rect', { x: x0, y: y0, width: cols * cell, height: rows * cell, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, parent);
+  if (vals) setPic(cells, vals);
+  return cells;
+}
+function setPic(cells, vals) { cells.forEach((c, k) => { c.style.fillOpacity = clamp(vals[k], 0, 1).toFixed(3); }); }
+/* Network drawing: layers = [{x, n, code}], wires first, then nodes */
+function net(parent, layers, cy, gap, r = 15) {
+  const pts = layers.map((L) => Array.from({ length: L.n }, (_, k) => [L.x, cy + (k - (L.n - 1) / 2) * gap]));
+  const wg = el('g', {}, parent);
+  for (let l = 0; l + 1 < pts.length; l++) pts[l].forEach((a) => pts[l + 1].forEach((b) => el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5;opacity:.7' }, wg)));
+  pts.forEach((P, l) => P.forEach(([x, y]) => el('circle', { cx: x, cy: y, r, class: layers[l].code ? 'box-b' : 'box' }, parent)));
+  return { pts, wg };
+}
+const arrow = (parent, x1, y1, x2, y2, cls = 'wire', mk = 'url(#ah)') => el('path', { class: cls, d: `M${x1} ${y1}L${x2} ${y2}`, 'marker-end': mk }, parent);
+function cloud(seed, n, s1, s2, ang) {
+  const r = rng(seed), c = Math.cos(ang * DEG), s = Math.sin(ang * DEG);
+  const P = Array.from({ length: n }, () => { const a = s1 * gauss(r), b = s2 * gauss(r); return [a * c - b * s, a * s + b * c]; });
+  const m = [mean(P.map((p) => p[0])), mean(P.map((p) => p[1]))];
+  return P.map((p) => [p[0] - m[0], p[1] - m[1]]);
+}
+function cov2(P) {
+  const n = P.length;
+  return [P.reduce((s, p) => s + p[0] * p[0], 0) / n, P.reduce((s, p) => s + p[0] * p[1], 0) / n, P.reduce((s, p) => s + p[1] * p[1], 0) / n];
+}
+function eig2([a, b, c]) {
+  const th = 0.5 * Math.atan2(2 * b, a - c), w1 = [Math.cos(th), Math.sin(th)], w2 = [-Math.sin(th), Math.cos(th)];
+  const v = (w) => a * w[0] * w[0] + 2 * b * w[0] * w[1] + c * w[1] * w[1];
+  return { th, w1, w2, l1: v(w1), l2: v(w2) };
+}
+
+/* The trained autoencoder: 2 → 10 tanh → 1 → 10 tanh → 2 */
+const [AW1, Ab1, AW2, Ab2, AW3, Ab3, AW4, Ab4] = AE_P;
+function encode(x) {
+  let z = Ab2[0];
+  AW1.forEach((w, k) => { z += AW2[0][k] * Math.tanh(w[0] * x[0] + w[1] * x[1] + Ab1[k]); });
+  return z;
+}
+function decode(z) {
+  const a = AW3.map((w, k) => Math.tanh(w[0] * z + Ab3[k]));
+  return [0, 1].map((m) => Ab4[m] + a.reduce((s, v, k) => s + AW4[m][k] * v, 0));
+}
+const sq = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+/* PCA of the arc data, for comparison */
+const ARC_M = [mean(ARC_X.map((p) => p[0])), mean(ARC_X.map((p) => p[1]))];
+const ARC_E = eig2(cov2(ARC_X.map((p) => [p[0] - ARC_M[0], p[1] - ARC_M[1]])));
+const pcaZ = (x) => (x[0] - ARC_M[0]) * ARC_E.w1[0] + (x[1] - ARC_M[1]) * ARC_E.w1[1];
+const pcaX = (z) => [ARC_M[0] + z * ARC_E.w1[0], ARC_M[1] + z * ARC_E.w1[1]];
+
+/* ───────── static figures ───────── */
+function drawHourglass() {
+  const svg = document.getElementById('hour-svg');
+  const X = digit(7), Xh = blur(X, 7, 5);
+  const xs = [250, 390, 580, 770, 910], ns = [7, 4, 2, 4, 7], cy = 340;
+  el('path', { d: `M220 ${cy - 250}L610 ${cy - 70}L610 ${cy + 70}L220 ${cy + 250}Z`, style: 'fill:var(--c-a-soft);opacity:.55' }, svg);
+  el('path', { d: `M940 ${cy - 250}L550 ${cy - 70}L550 ${cy + 70}L940 ${cy + 250}Z`, style: 'fill:var(--c-c-soft);opacity:.55' }, svg);
+  net(svg, xs.map((x, l) => ({ x, n: ns[l], code: l === 2 })), cy, 68);
+  pic(svg, 20, cy - 77, 22, 7, 5, X);
+  pic(svg, 1030, cy - 77, 22, 7, 5, Xh);
+  arrow(svg, 140, cy, 222, cy);
+  arrow(svg, 935, cy, 1020, cy);
+  el('text', { class: 'ttl', x: 75, y: cy - 100, 'text-anchor': 'middle', text: '35 numbers' }, svg);
+  el('text', { class: 'ttl', x: 1085, y: cy - 100, 'text-anchor': 'middle', text: '35 numbers' }, svg);
+  const lab = el('g', { class: 'frag', 'data-step': 'h1' }, svg);
+  el('text', { class: 'ttl', x: 580, y: cy - 90, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: '2 numbers' }, lab);
+  el('text', { class: 'tx', x: 580, y: 660, 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-b)', text: 'code z' }, lab);
+  const enc = el('g', { class: 'frag', 'data-step': 'h2' }, svg);
+  sub(enc, 300, 660, 'encoder f', 'φ', { 'text-anchor': 'middle' });
+  sub(enc, 860, 660, 'decoder g', 'ψ', { 'text-anchor': 'middle' });
+  el('text', { class: 'tx', x: 75, y: 480, 'text-anchor': 'middle', text: 'input x' }, svg);
+  xhat(svg, 1118, 480, 'output');
+}
+
+function drawNeck() {
+  const svg = document.getElementById('neck-svg');
+  [[290, '(a) middle as wide as the input', [6, 6, 6], null], [870, '(b) narrow middle', [6, 2, 6], 'n1']].forEach(([cx, title, ns, step]) => {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : {}, svg);
+    el('text', { class: 'ttl', x: cx, y: 50, 'text-anchor': 'middle', text: title }, g);
+    const N = net(g, ns.map((n, l) => ({ x: cx - 190 + 190 * l, n, code: l === 1 })), 330, 74);
+    if (!step) {
+      N.wg.style.opacity = '.35';
+      N.pts[0].forEach((a, k) => el('path', { d: `M${a[0]} ${a[1]}H${N.pts[2][k][0]}`, style: 'stroke:var(--c-b);stroke-width:5;opacity:.85' }, g));
+      N.pts.forEach((P, l) => P.forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 15, class: l === 1 ? 'box-b' : 'box' }, g)));
+      el('text', { class: 'txs', x: cx, y: 620, 'text-anchor': 'middle', text: 'can copy each number' }, g);
+      el('text', { class: 'txs', x: cx, y: 656, 'text-anchor': 'middle', text: 'straight through' }, g);
+    } else {
+      el('text', { class: 'txs', x: cx, y: 620, 'text-anchor': 'middle', text: 'must keep only' }, g);
+      el('text', { class: 'txs', x: cx, y: 656, 'text-anchor': 'middle', text: 'what matters most' }, g);
+    }
+  });
+}
+
+function drawPcaLink() {
+  const svg = document.getElementById('pca-svg');
+  const P = cloud(3, 40, 1.9, 0.65, 32), E = eig2(cov2(P));
+  /* linear autoencoder 2 → 1 → 2 without biases, trained here by gradient descent */
+  let a = [0.3, -0.4], b = [0.2, 0.5];
+  const lr = 0.05;
+  for (let it = 0; it < 4000; it++) {
+    let ga = [0, 0], gb = [0, 0];
+    P.forEach((x) => {
+      const z = a[0] * x[0] + a[1] * x[1], r = [x[0] - b[0] * z, x[1] - b[1] * z], rb = r[0] * b[0] + r[1] * b[1];
+      gb = [gb[0] - 2 * r[0] * z, gb[1] - 2 * r[1] * z];
+      ga = [ga[0] - 2 * rb * x[0], ga[1] - 2 * rb * x[1]];
+    });
+    a = [a[0] - lr * ga[0] / P.length, a[1] - lr * ga[1] / P.length];
+    b = [b[0] - lr * gb[0] / P.length, b[1] - lr * gb[1] / P.length];
+  }
+  const recPca = P.map((x) => { const z = x[0] * E.w1[0] + x[1] * E.w1[1]; return [z * E.w1[0], z * E.w1[1]]; });
+  const recAe = P.map((x) => { const z = a[0] * x[0] + a[1] * x[1]; return [b[0] * z, b[1] * z]; });
+  const bn = Math.hypot(b[0], b[1]), bu = [b[0] / bn, b[1] / bn];
+  [[290, '(a) PCA, q = 1', recPca, E.w1, 'fb', null], [870, '(b) linear autoencoder', recAe, bu, 'fc', 'p1']].forEach(([cx, title, R, w, cls, step], k) => {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : {}, svg);
+    el('text', { class: 'ttl', x: cx, y: 50, 'text-anchor': 'middle', text: title }, g);
+    const S = panel(g, cx, 340, 260, 66, 'pca-clip-' + k);
+    el('line', { class: 'curve-a', x1: S.X(-6 * w[0]), y1: S.Y(-6 * w[1]), x2: S.X(6 * w[0]), y2: S.Y(6 * w[1]), style: 'stroke-width:4' }, S.g);
+    P.forEach((p, i) => el('line', { x1: S.X(p[0]), y1: S.Y(p[1]), x2: S.X(R[i][0]), y2: S.Y(R[i][1]), style: 'stroke:var(--myst-color-text-tertiary);stroke-width:1.5;stroke-dasharray:4 4' }, S.g));
+    P.forEach((p) => el('circle', { cx: S.X(p[0]), cy: S.Y(p[1]), r: 8, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2.5' }, S.g));
+    R.forEach((p) => el('circle', { class: 'pt ' + cls, cx: S.X(p[0]), cy: S.Y(p[1]), r: 8 }, S.g));
+    const err = mean(P.map((p, i) => sq(p, R[i])));
+    el('text', { class: 'tx', x: cx, y: 660, 'text-anchor': 'middle', text: `average error ${fmt(err, 3)}` }, g);
+  });
+}
+
+function drawMap() {
+  const svg = document.getElementById('map-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 100, r: 20, t: 20, b: 90, x: [-3.2, 3.2], y: [-2.6, 2.6], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [-2, -1, 0, 1, 2], xl: 'code z₁', yl: 'code z₂' });
+  const groups = [[0, [-2.0, 1.2], 'fa', [-2.75, 0.2]], [6, [-1.1, 0.2], 'fc', [-0.95, -0.8]], [1, [1.5, -1.0], 'fb', [2.45, -2.0]], [7, [1.9, 0.5], 'fd', [2.45, 1.5]]];
+  const r = rng(12);
+  groups.forEach(([dg, c, cls, tp], gi) => {
+    const g = el('g', gi < 1 ? {} : { class: 'frag', 'data-step': 'mp1' }, F.plot);
+    for (let i = 0; i < 22; i++) el('circle', { class: 'pt ' + cls, cx: F.sx(c[0] + 0.36 * gauss(r)), cy: F.sy(c[1] + 0.3 * gauss(r)), r: 9 }, g);
+    const tg = el('g', gi < 1 ? {} : { class: 'frag', 'data-step': 'mp1' }, svg);
+    pic(tg, F.sx(tp[0]) - 20, F.sy(tp[1]) - 28, 8, 7, 5, digit(dg));
+  });
+}
+
+function drawVariants() {
+  const svg = document.getElementById('var-svg');
+  /* (a) sparse */
+  el('text', { class: 'ttl', x: 270, y: 50, 'text-anchor': 'middle', text: '(a) sparse: few active units' }, svg);
+  const N = net(svg, [{ x: 90, n: 6 }, { x: 270, n: 10 }, { x: 450, n: 6 }], 340, 52, 14);
+  N.pts[1].forEach(([x, y], k) => el('circle', { cx: x, cy: y, r: 14, style: [2, 7].includes(k) ? 'fill:var(--c-b);stroke:var(--c-b);stroke-width:3' : 'fill:var(--myst-color-bg);stroke:var(--myst-color-border-strong);stroke-width:2' }, svg));
+  el('text', { class: 'txs', x: 270, y: 640, 'text-anchor': 'middle', text: '2 of 10 code units on' }, svg);
+  /* (b) convolutional */
+  const g = el('g', { class: 'frag', 'data-step': 'v1' }, svg);
+  el('text', { class: 'ttl', x: 870, y: 50, 'text-anchor': 'middle', text: '(b) convolutional' }, g);
+  pic(g, 545, 291, 14, 7, 5, digit(2));
+  pic(g, 1065, 291, 14, 7, 5, blur(digit(2), 7, 5));
+  const blocks = [[690, 160, 4, 'box-a'], [775, 100, 6, 'box-a'], [855, 44, 1, 'box-b'], [935, 100, 6, 'box-a'], [1020, 160, 4, 'box-a']];
+  const xs = [[545, 615]];
+  blocks.forEach(([x, h, stack, cls]) => {
+    const w = 18;
+    for (let k = stack - 1; k >= 0; k--) el('rect', { class: cls, x: x - w / 2 + k * 6, y: 340 - h / 2 - k * 6, width: w, height: h, rx: 3 }, g);
+    xs.push([x - w / 2, x + w / 2 + (stack - 1) * 6]);
+  });
+  xs.push([1065, 1135]);
+  for (let k = 0; k + 1 < xs.length; k++) arrow(g, xs[k][1] + 6, 352, xs[k + 1][0] - 8, 352);
+  el('text', { class: 'txs', x: 580, y: 440, 'text-anchor': 'middle', text: 'image' }, g);
+  el('text', { class: 'txs', x: 858, y: 440, 'text-anchor': 'middle', style: 'fill:var(--c-b)', text: 'code' }, g);
+  el('text', { class: 'txs', x: 1100, y: 440, 'text-anchor': 'middle', text: 'output' }, g);
+  el('text', { class: 'txs', x: 870, y: 640, 'text-anchor': 'middle', text: 'shrink, then grow back' }, g);
+}
+
+function drawHoles() {
+  const svg = document.getElementById('hole-svg');
+  const r = rng(31);
+  const cls = ['fa', 'fb', 'fc', 'fd'];
+  const blob = Array.from({ length: 35 }, () => r() * 0.9);
+  [[290, '(a) plain autoencoder', [[-2.0, 1.8], [1.8, 1.7], [-1.7, -1.8], [1.9, -1.6]], 0.35, null], [870, '(b) variational autoencoder', [[-0.7, 0.6], [0.7, 0.6], [-0.6, -0.7], [0.7, -0.6]], 0.42, 'ho2']].forEach(([cx, title, C, s, step], k) => {
+    const g = el('g', step ? { class: 'frag', 'data-step': step } : {}, svg);
+    el('text', { class: 'ttl', x: cx, y: 50, 'text-anchor': 'middle', text: title }, g);
+    const S = panel(g, cx, 340, 250, 76, 'hole-clip-' + k);
+    if (k) [1, 2].forEach((rad) => el('circle', { cx: S.X(0), cy: S.Y(0), r: rad * 76, class: 'curve-t' }, S.g));
+    C.forEach((c, j) => { for (let i = 0; i < 16; i++) el('circle', { class: 'pt ' + cls[j], cx: S.X(c[0] + s * gauss(r)), cy: S.Y(c[1] + s * gauss(r)), r: 8 }, S.g); });
+    const star = (x, y) => el('path', { d: `M${x} ${y - 20}L${x + 6} ${y - 6}L${x + 20} ${y - 6}L${x + 9} ${y + 4}L${x + 13} ${y + 19}L${x} ${y + 10}L${x - 13} ${y + 19}L${x - 9} ${y + 4}L${x - 20} ${y - 6}L${x - 6} ${y - 6}Z`, style: 'fill:var(--myst-color-text);stroke:var(--myst-color-bg);stroke-width:2' }, g);
+    const sg = el('g', k ? {} : { class: 'frag', 'data-step': 'ho1' }, g);
+    star(S.X(0.05), S.Y(0.0));
+    const tx = S.X(0.05) + 140;
+    arrow(sg, S.X(0.05) + 26, S.Y(0), tx - 8, S.Y(0));
+    pic(sg, tx, S.Y(0) - 42, 12, 7, 5, k ? blur(digit(7), 7, 5, 0.8) : blob);
+    el('text', { class: 'txs', x: cx, y: 640, 'text-anchor': 'middle', text: k ? 'a random code decodes to a digit' : 'a code from a gap decodes to noise' }, sg);
+  });
+}
+
+function drawVae() {
+  const svg = document.getElementById('vae-svg');
+  const cy = 270, X = digit(3);
+  pic(svg, 20, cy - 77, 22, 7, 5, X);
+  el('text', { class: 'tx', x: 75, y: cy + 120, 'text-anchor': 'middle', text: 'x' }, svg);
+  el('path', { class: 'box-a', d: `M170 ${cy - 140}L330 ${cy - 70}L330 ${cy + 70}L170 ${cy + 140}Z` }, svg);
+  el('text', { class: 'tx', x: 250, y: cy + 10, 'text-anchor': 'middle', text: 'encoder' }, svg);
+  arrow(svg, 135, cy, 166, cy);
+  const box = (x, y, t, cls) => { el('rect', { class: cls, x, y, width: 80, height: 64, rx: 8 }, svg); el('text', { class: 'tx', x: x + 40, y: y + 42, 'text-anchor': 'middle', 'font-weight': 700, text: t }, svg); };
+  box(380, cy - 92, 'μ', 'box'); box(380, cy + 28, 'σ', 'box');
+  arrow(svg, 332, cy - 50, 376, cy - 60); arrow(svg, 332, cy + 50, 376, cy + 60);
+  const smp = el('g', { class: 'frag', 'data-step': 'va1' }, svg);
+  el('circle', { cx: 590, cy, r: 50, class: 'box-b' }, smp);
+  el('text', { class: 'tx', x: 590, y: cy + 10, 'text-anchor': 'middle', 'font-weight': 700, text: 'z' }, smp);
+  arrow(smp, 462, cy - 60, 540, cy - 16); arrow(smp, 462, cy + 60, 540, cy + 16);
+  el('text', { class: 'txs', x: 590, y: cy + 150, 'text-anchor': 'middle', text: 'ε ∼ N(0, I)' }, smp);
+  arrow(smp, 590, cy + 120, 590, cy + 54);
+  el('text', { class: 'ttl', x: 590, y: cy - 80, 'text-anchor': 'middle', text: 'random code' }, smp);
+  const dec = el('g', { class: 'frag', 'data-step': 'va2' }, svg);
+  el('path', { class: 'box-a', d: `M690 ${cy - 70}L850 ${cy - 140}L850 ${cy + 140}L690 ${cy + 70}Z`, style: 'fill:var(--c-c-soft);stroke:var(--c-c)' }, dec);
+  el('text', { class: 'tx', x: 770, y: cy + 10, 'text-anchor': 'middle', text: 'decoder' }, dec);
+  arrow(dec, 642, cy, 686, cy);
+  arrow(dec, 854, cy, 900, cy);
+  pic(dec, 910, cy - 77, 22, 7, 5, blur(X, 7, 5));
+  xhat(dec, 965, cy + 120, '');
+  /* one code dimension as a bell curve */
+  const bg = el('g', { class: 'frag', 'data-step': 'va1' }, svg);
+  const mu = 590, sd = 70, base = 670, hgt = 110;
+  let d = '';
+  for (let x = 330; x <= 850; x += 4) d += (x === 330 ? 'M' : 'L') + x + ' ' + (base - hgt * Math.exp(-0.5 * ((x - mu) / sd) ** 2)).toFixed(1);
+  el('line', { class: 'ax', x1: 330, x2: 850, y1: base, y2: base }, bg);
+  el('path', { class: 'curve-b', d, style: 'stroke-width:4' }, bg);
+  el('line', { x1: mu, x2: mu, y1: base, y2: base - hgt, style: 'stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:6 5' }, bg);
+  el('path', { class: 'wire', d: `M${mu} ${base - hgt * 0.6}H${mu + sd}`, 'marker-end': 'url(#ah)', 'marker-start': 'url(#ah)' }, bg);
+  sub(bg, mu - 12, base - hgt - 12, 'μ', '1', { 'text-anchor': 'end', class: 'txs' });
+  sub(bg, mu + sd + 12, base - hgt * 0.6 + 8, 'σ', '1', { class: 'txs' });
+  el('text', { class: 'txs', x: 880, y: base - 8, text: 'z₁' }, bg);
+}
+
+function drawGan() {
+  const svg = document.getElementById('gan-svg');
+  const box = (g, x, y, w, t, cls = 'box') => { el('rect', { class: cls, x, y, width: w, height: 80, rx: 10 }, g); el('text', { class: 'txs', x: x + w / 2, y: y + 49, 'text-anchor': 'middle', text: t }, g); };
+  el('text', { class: 'ttl', x: 20, y: 60, text: '(a) variational autoencoder' }, svg);
+  const yA = 110;
+  [[20, 140, 'data x', 'box'], [220, 180, 'encoder', 'box-a'], [460, 140, 'code z', 'box-b'], [660, 180, 'decoder', 'box-a'], [900, 160, 'output', 'box']].forEach(([x, w, t, c], k, A) => {
+    box(svg, x, yA, w, t, c);
+    if (k + 1 < A.length) arrow(svg, x + w + 4, yA + 40, A[k + 1][0] - 6, yA + 40);
+  });
+  const g = el('g', { class: 'frag', 'data-step': 'g2' }, svg);
+  el('text', { class: 'ttl', x: 20, y: 320, text: '(b) generative adversarial network' }, g);
+  const yB = 370;
+  box(g, 20, yB, 140, 'noise z', 'box-b');
+  box(g, 220, yB, 180, 'generator', 'box-a');
+  box(g, 460, yB, 160, 'fake x', 'box');
+  box(g, 680, yB + 110, 200, 'judge', 'box-a');
+  box(g, 460, yB + 220, 160, 'real x', 'box');
+  arrow(g, 164, yB + 40, 214, yB + 40);
+  arrow(g, 404, yB + 40, 454, yB + 40);
+  arrow(g, 624, yB + 40, 700, yB + 104);
+  arrow(g, 624, yB + 260, 700, yB + 196);
+  arrow(g, 884, yB + 150, 930, yB + 150);
+  el('text', { class: 'txs', x: 940, y: yB + 140, text: 'real or' }, g);
+  el('text', { class: 'txs', x: 940, y: yB + 172, text: 'generated?' }, g);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.curve = (() => {
+  const svg = document.getElementById('curve-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 330, r: 30, t: 20, b: 80, x: [-1.6, 1.6], y: [-1.52, 1.52], xt: [-1, 0, 1], yt: [-1, 0, 1], xl: 'feature 1', yl: 'feature 2' });
+  const zs = ARC_X.map(encode), zmin = Math.min(...zs), zmax = Math.max(...zs);
+  const ps = ARC_X.map(pcaZ), pmin = Math.min(...ps), pmax = Math.max(...ps);
+  const recA = zs.map(decode), recP = ps.map(pcaX);
+  const errA = mean(ARC_X.map((x, i) => sq(x, recA[i]))), errP = mean(ARC_X.map((x, i) => sq(x, recP[i])));
+  document.getElementById('curve-e1').textContent = fmt(errP, 3);
+  document.getElementById('curve-e2').textContent = fmt(errA, 3);
+  const path = el('path', { class: 'curve-a', style: 'stroke-width:5' }, F.plot);
+  const segs = ARC_X.map(() => el('line', { style: 'stroke:var(--c-b);stroke-width:2;opacity:.75' }, F.plot));
+  ARC_X.forEach((p) => el('circle', { cx: F.sx(p[0]), cy: F.sy(p[1]), r: 8, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2.5' }, F.plot));
+  const dots = ARC_X.map(() => el('circle', { class: 'pt fb', r: 7 }, F.plot));
+  const mark = el('circle', { r: 15, style: 'fill:var(--myst-color-bg);stroke:var(--c-a);stroke-width:6' }, F.plot);
+  el('circle', { cx: 32, cy: 60, r: 8, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2.5' }, svg);
+  el('text', { class: 'txs', x: 58, y: 68, text: 'data' }, svg);
+  legend(svg, 20, 96, [['dot', 'fb', 'rebuilt'], ['line', 'curve-a', 'decoder']]);
+  const ttl = el('text', { class: 'ttl', x: 20, y: 240, text: '' }, svg);
+  const slider = document.getElementById('curve-z');
+  let mode = SHOW_ALL ? 'ae' : 'pca';
+  function draw() {
+    const ae = mode === 'ae';
+    const [z0, z1] = ae ? [zmin, zmax] : [pmin, pmax];
+    const dec = ae ? decode : pcaX, rec = ae ? recA : recP;
+    let d = '';
+    for (let k = 0; k <= 120; k++) { const p = dec(z0 + (z1 - z0) * (-0.04 + 1.08 * k / 120)); d += (k ? 'L' : 'M') + F.sx(p[0]).toFixed(1) + ' ' + F.sy(p[1]).toFixed(1); }
+    path.setAttribute('d', d);
+    rec.forEach((q, i) => {
+      dots[i].setAttribute('cx', F.sx(q[0])); dots[i].setAttribute('cy', F.sy(q[1]));
+      segs[i].setAttribute('x1', F.sx(ARC_X[i][0])); segs[i].setAttribute('y1', F.sy(ARC_X[i][1]));
+      segs[i].setAttribute('x2', F.sx(q[0])); segs[i].setAttribute('y2', F.sy(q[1]));
+    });
+    const z = z0 + (z1 - z0) * (+slider.value / 100), p = dec(z);
+    mark.setAttribute('cx', F.sx(p[0])); mark.setAttribute('cy', F.sy(p[1]));
+    document.getElementById('curve-z-val').textContent = fmt(z, 2);
+    ttl.textContent = ae ? 'autoencoder' : 'PCA line';
+    document.getElementById('curve-pca').style.outline = ae ? '' : '3px solid var(--c-a)';
+    document.getElementById('curve-ae').style.outline = ae ? '3px solid var(--c-a)' : '';
+  }
+  document.getElementById('curve-pca').addEventListener('click', () => { mode = 'pca'; draw(); });
+  document.getElementById('curve-ae').addEventListener('click', () => { mode = 'ae'; draw(); });
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.den = (() => {
+  const svg = document.getElementById('den-svg');
+  const S = 2, R = 7 * S, C = 5 * S, D = R * C, CELL = 22;
+  const T = Array.from({ length: 10 }, (_, k) => digit(k, S));
+  const G = T.map((a) => T.map((b) => a.reduce((s, v, i) => s + v * b[i], 0)));
+  const xs = [30, 460, 890], y0 = 100;
+  ['(a) clean', '(b) noisy input', '(c) rebuilt'].forEach((t, k) => el('text', { class: 'ttl', x: xs[k] + C * CELL / 2, y: y0 - 24, 'text-anchor': 'middle', text: t }, svg));
+  const P = xs.map((x) => pic(svg, x, y0, CELL, R, C));
+  arrow(svg, 255, y0 + 154, 450, y0 + 154);
+  el('text', { class: 'txs', x: 352, y: y0 + 136, 'text-anchor': 'middle', text: 'add noise' }, svg);
+  arrow(svg, 685, y0 + 154, 880, y0 + 154);
+  el('text', { class: 'txs', x: 782, y: y0 + 136, 'text-anchor': 'middle', text: 'encode,' }, svg);
+  el('text', { class: 'txs', x: 782, y: y0 + 196, 'text-anchor': 'middle', text: 'decode' }, svg);
+  /* code bars: how much of each clean digit the code uses */
+  const BX = 360, BW = 34, BG = 12, BASE = 610, BH = 90;
+  el('text', { class: 'ttl', x: BX - 16, y: 500, text: 'code z: weight of each clean digit' }, svg);
+  el('line', { class: 'ax', x1: BX - 10, x2: BX + 10 * (BW + BG), y1: BASE, y2: BASE }, svg);
+  const bars = T.map((_, k) => el('rect', { x: BX + k * (BW + BG), width: BW, class: 'fa', rx: 3 }, svg));
+  T.forEach((_, k) => el('text', { class: 'tk', x: BX + k * (BW + BG) + BW / 2, y: BASE + 70, 'text-anchor': 'middle', text: k }, svg));
+  const sl = document.getElementById('den-s'), sel = document.getElementById('den-d');
+  let seed = 5, noise = [];
+  const newNoise = () => { const r = rng(seed++); noise = Array.from({ length: D }, () => gauss(r)); };
+  newNoise();
+  function draw() {
+    const s = +sl.value, x = T[+sel.value];
+    const xt = x.map((v, i) => v + s * noise[i]);
+    const c = solve(G, T.map((t) => t.reduce((a, v, i) => a + v * xt[i], 0)));
+    const xh = x.map((_, i) => c.reduce((a, ck, k) => a + ck * T[k][i], 0));
+    setPic(P[0], x); setPic(P[1], xt); setPic(P[2], xh);
+    c.forEach((v, k) => {
+      const h = clamp(v, -0.4, 1.2) * BH;
+      bars[k].setAttribute('y', h >= 0 ? BASE - h : BASE);
+      bars[k].setAttribute('height', Math.max(1, Math.abs(h)));
+      bars[k].style.fill = k === +sel.value ? 'var(--c-b)' : 'var(--c-a)';
+    });
+    document.getElementById('den-s-val').textContent = s.toFixed(2);
+    document.getElementById('den-e1').textContent = fmt(mean(x.map((v, i) => (v - xt[i]) ** 2)), 3);
+    document.getElementById('den-e2').textContent = fmt(mean(x.map((v, i) => (v - xh[i]) ** 2)), 3);
+  }
+  sl.addEventListener('input', draw);
+  sel.addEventListener('change', draw);
+  document.getElementById('den-new').addEventListener('click', () => { newNoise(); draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.anom = (() => {
+  const svg = document.getElementById('anom-svg');
+  const F = frameAs(svg, '-a', { W: 1160, H: 620, l: 70, r: 610, t: 20, b: 90, x: [-1.8, 1.8], y: [-1.6, 2.15], xt: [-1, 0, 1], yt: [-1, 0, 1, 2], xl: 'feature 1', yl: 'feature 2' });
+  const H = frameAs(svg, '-h', { W: 1160, H: 620, l: 690, r: 20, t: 20, b: 90, x: [-4, 0], y: [0, 40], xt: [-4, -3, -2, -1, 0], yt: [0, 10, 20, 30, 40], fx: (v) => String(10 ** v), xl: 'score s(x), log scale', yl: 'count' });
+  const pts = ARC_N.map((p) => ({ p, odd: false })).concat(ARC_ODD.map((p) => ({ p, odd: true })));
+  pts.forEach((o) => { o.s = sq(o.p, decode(encode(o.p))); o.l = Math.log10(Math.max(o.s, 1e-4)); });
+  /* decoder path over the codes of the training data */
+  const zs = ARC_X.map(encode), z0 = Math.min(...zs), z1 = Math.max(...zs);
+  let d = '';
+  for (let k = 0; k <= 100; k++) { const q = decode(z0 + (z1 - z0) * k / 100); d += (k ? 'L' : 'M') + F.sx(q[0]).toFixed(1) + ' ' + F.sy(q[1]).toFixed(1); }
+  el('path', { class: 'curve-a', d, style: 'stroke-width:4;opacity:.6' }, F.plot);
+  pts.forEach((o) => el('circle', { class: 'pt ' + (o.odd ? 'fb' : 'fa'), cx: F.sx(o.p[0]), cy: F.sy(o.p[1]), r: o.odd ? 10 : 7 }, F.plot));
+  const rings = pts.map((o) => el('circle', { cx: F.sx(o.p[0]), cy: F.sy(o.p[1]), r: 17, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, F.plot));
+  legend(svg, 90, 46, [['dot', 'fa', 'normal'], ['dot', 'fb', 'odd']]);
+  /* histogram, stacked by kind */
+  const BW = 0.2, NB = 20, cnt = Array.from({ length: NB }, () => [0, 0]);
+  pts.forEach((o) => { cnt[clamp(Math.floor((o.l + 4) / BW), 0, NB - 1)][o.odd ? 1 : 0]++; });
+  cnt.forEach(([a, b], k) => {
+    const x = H.sx(-4 + k * BW) + 2, w = H.sx(BW) - H.sx(0) - 4;
+    if (a) el('rect', { class: 'fa', x, width: w, y: H.sy(a), height: H.sy(0) - H.sy(a) }, H.plot);
+    if (b) el('rect', { class: 'fb', x, width: w, y: H.sy(a + b), height: H.sy(a) - H.sy(a + b) }, H.plot);
+  });
+  const cut = el('line', { y1: H.T, y2: H.H - H.B, style: 'stroke:var(--myst-color-text);stroke-width:3;stroke-dasharray:8 6' }, H.plot);
+  const cutT = el('text', { class: 'txs', y: H.T + 30, text: 'flag →' }, svg);
+  const sl = document.getElementById('anom-t');
+  function draw() {
+    const v = +sl.value, tau = 10 ** v;
+    let hit = 0, fa = 0;
+    pts.forEach((o, i) => {
+      const f = o.s > tau;
+      rings[i].style.display = f ? '' : 'none';
+      if (f && o.odd) hit++;
+      if (f && !o.odd) fa++;
+    });
+    cut.setAttribute('x1', H.sx(v)); cut.setAttribute('x2', H.sx(v));
+    cutT.setAttribute('x', H.sx(v) + 10);
+    document.getElementById('anom-t-val').textContent = tau < 0.01 ? tau.toFixed(4) : tau < 0.1 ? tau.toFixed(3) : tau.toFixed(2);
+    document.getElementById('anom-hit').textContent = `${hit} of ${ARC_ODD.length}`;
+    document.getElementById('anom-fa').textContent = `${fa} of ${ARC_N.length}`;
+  }
+  sl.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.walk = (() => {
+  const svg = document.getElementById('walk-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 90, r: 600, t: 20, b: 200, x: [-3, 3], y: [-3, 3], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [-3, -2, -1, 0, 1, 2, 3], xl: 'z₁ (mouth)', yl: 'z₂ (eyes)' });
+  [1, 2].forEach((rad) => el('ellipse', { cx: F.sx(0), cy: F.sy(0), rx: F.sx(rad) - F.sx(0), ry: F.sy(0) - F.sy(rad), class: 'curve-t' }, F.plot));
+  const N = 24;
+  /* hand-built decoder: a face whose mouth and eyes depend on the two code numbers */
+  function face(z1, z2) {
+    const v = [], c = 1.5 * z1, ey = clamp(1.5 + 0.6 * z2, 0.25, 3.2);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x = j + 0.5, y = i + 0.5, dx = x - 12, dy = y - 12;
+      let s = Math.exp(-(((Math.hypot(dx, dy) - 10.2) / 0.8) ** 2));
+      [8, 16].forEach((ex) => { const q = Math.hypot((x - ex) / 1.7, (y - 9) / ey); s = Math.max(s, 1 / (1 + Math.exp((q - 1) * 6))); });
+      const u = (x - 12) / 5;
+      if (Math.abs(u) <= 1.05) { const ym = 16.3 - c * (u * u - 0.5); s = Math.max(s, Math.exp(-(((y - ym) / 0.75) ** 2))); }
+      v.push(s);
+    }
+    return v;
+  }
+  const BIG = 15, BX = 680, BY = 30;
+  el('text', { class: 'ttl', x: BX + N * BIG / 2, y: BY - 2, 'text-anchor': 'middle', text: '' }, svg);
+  const big = pic(svg, BX, BY, BIG, N, N);
+  const TH = 3.5, TW = N * TH, TG = 16, TX = 656, TY = 510;
+  const thumbs = Array.from({ length: 5 }, (_, k) => pic(svg, TX + k * (TW + TG), TY, TH, N, N));
+  el('text', { class: 'txs', x: TX + (5 * TW + 4 * TG) / 2, y: TY + TW + 40, 'text-anchor': 'middle', text: 'decoded at 5 steps along the path' }, svg);
+  el('text', { class: 'txs', x: BX + N * BIG / 2, y: BY + N * BIG + 40, 'text-anchor': 'middle', text: 'decoder output' }, svg);
+  const line = el('line', { class: 'curve-a', style: 'stroke-width:4' }, F.plot);
+  const ends = [0, 1].map(() => el('circle', { r: 8, style: 'fill:var(--c-a)' }, F.plot));
+  const mark = el('circle', { r: 14, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:6' }, F.plot);
+  const PATHS = { smile: [[-2.2, 0.4], [2.2, 0.4]], eyes: [[0.6, -2.2], [0.6, 2.2]], diag: [[-2, -2], [2, 2]] };
+  const sel = document.getElementById('walk-p'), sl = document.getElementById('walk-t');
+  const at = (A, B, t) => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t];
+  function draw() {
+    const [A, B] = PATHS[sel.value], t = +sl.value / 100, z = at(A, B, t);
+    line.setAttribute('x1', F.sx(A[0])); line.setAttribute('y1', F.sy(A[1]));
+    line.setAttribute('x2', F.sx(B[0])); line.setAttribute('y2', F.sy(B[1]));
+    [A, B].forEach((p, k) => { ends[k].setAttribute('cx', F.sx(p[0])); ends[k].setAttribute('cy', F.sy(p[1])); });
+    mark.setAttribute('cx', F.sx(z[0])); mark.setAttribute('cy', F.sy(z[1]));
+    setPic(big, face(z[0], z[1]));
+    thumbs.forEach((T, k) => { const q = at(A, B, k / 4); setPic(T, face(q[0], q[1])); });
+    document.getElementById('walk-t-val').textContent = sl.value + '%';
+    document.getElementById('walk-z').textContent = `(${fmt(z[0], 1)}, ${fmt(z[1], 1)})`;
+  }
+  sel.addEventListener('change', draw);
+  sl.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawHourglass(); drawNeck(); drawPcaLink(); drawMap(); drawVariants(); drawHoles(); drawVae(); drawGan();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neural networks</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+svg .tk{font-size:24px}
+.halo{paint-order:stroke;stroke:var(--myst-color-bg);stroke-width:8px;stroke-linejoin:round}
+.bt:disabled{opacity:.4;cursor:default}
+.side .tex-line{margin:0;font-size:26px;line-height:1.5}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 23</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Neural networks</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Neurons, layers and the forward pass, and how backpropagation learns the weights</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 23 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">The artificial neuron and the perceptron</li>
+<li class="an-up" style="--d:.15s">Layers, activations and the forward pass</li>
+<li class="an-up" style="--d:.25s">Loss, cost and gradient descent</li>
+<li class="an-up" style="--d:.35s">Backpropagation, by hand and in motion</li>
+<li class="an-up" style="--d:.45s">Training in practice: starts, depth and overfitting</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic and in the rest of the chapter.</p>
+<table class="tb">
+<colgroup><col style="width:44%"><col style="width:56%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathbf{x} \in \mathbb{R}^d, \ y, \ \hat{y}</span></td><td>Input with <span class="tex">d</span> features, target, network output</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">l = 1, \dots, L</span></td><td>Layers; layer <span class="tex">L</span> is the output layer</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">\mathbf{W}^{(l)}, \ w^{(l)}_{jk}, \ \mathbf{b}^{(l)}</span></td><td>Weights of layer <span class="tex">l</span>, one weight, biases</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{z}^{(l)} = \mathbf{W}^{(l)}\mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}</span></td><td>Weighted sums of layer <span class="tex">l</span></td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">\mathbf{a}^{(l)} = g(\mathbf{z}^{(l)}), \ \mathbf{a}^{(0)} = \mathbf{x}</span></td><td>Activations; <span class="tex">g</span> is the activation function</td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">L(y, \hat{y}), \ J(\boldsymbol{\theta})</span></td><td>Loss of one example, cost over all <span class="tex">n</span></td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">\boldsymbol{\theta}, \ \nabla_{\boldsymbol{\theta}} J, \ \alpha</span></td><td>All parameters, gradient, learning rate</td></tr>
+<tr class="an-up" style="--d:.54s"><td><span class="tex">\boldsymbol{\delta}^{(l)} = \partial J / \partial \mathbf{z}^{(l)}</span></td><td>Error term of layer <span class="tex">l</span></td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold lowercase letters are vectors, bold capitals are matrices.</p><p>The superscript <span class="tex">(l)</span> names a layer, not a power.</p><p><span class="tex">w^{(l)}_{jk}</span> goes from unit <span class="tex">k</span> of layer <span class="tex">l-1</span> to unit <span class="tex">j</span> of layer <span class="tex">l</span>.</p></aside>
+<aside class="am"><div class="t">Training words</div><p><span class="tex">B</span> is the batch size. An <strong>epoch</strong> is one full pass over the training data.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">From neuron to network</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">A weighted sum and a bend, repeated in layers.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The artificial neuron">
+<div class="hdr" data-s="Neurons"></div>
+<h2>The artificial neuron</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A neuron multiplies each input by a weight, adds them up with a bias <span class="tex">b</span>, and passes the sum through an <strong>activation function</strong> <span class="tex">g</span>:</p>
+<div class="eq"><div class="m tex-d">z = \sum_{k=1}^{d} w_k x_k + b = \mathbf{w}^\top \mathbf{x} + b</div><div class="n">(1)</div></div>
+<div class="eq"><div class="m tex-d">a = g(z)</div><div class="n">(2)</div></div>
+<div class="figbox" style="height:330px;flex:none"><svg id="neuron-svg" viewBox="0 0 1160 330"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{x} = (1, 2, -1)</span></p><p><span class="tex">\mathbf{w} = (0.8, 0.2, -0.5)</span>, <span class="tex">b = -0.3</span></p><p><span class="tex">z = 0.8 + 0.4 + 0.5 - 0.3</span></p><p><span class="tex">\phantom{z} = 1.4</span></p><p>Sigmoid: <span class="tex">\sigma(1.4) \approx 0.80</span></p></aside>
+<aside class="am frag up"><div class="t">Old friend</div><p>One neuron with <span class="tex">g = \sigma</span> is logistic regression (Topic 11).</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>The neuron of the example. Weights sit on the arrows.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The perceptron" data-demo="perc">
+<div class="hdr" data-s="Neurons"></div>
+<h2>The perceptron</h2>
+<div class="fr">
+<div class="figbox"><svg id="perc-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:10px">
+<p class="small" style="margin:0">Rosenblatt’s perceptron (1958): <span class="tex">\hat{y} = 1</span> when <span class="tex">\mathbf{w}^\top\mathbf{x} + b \ge 0</span>, else 0. Its boundary is a line.</p>
+<div class="btns"><button class="bt chip" id="perc-and">AND</button><button class="bt chip" id="perc-or">OR</button><button class="bt chip" id="perc-xor">XOR</button></div>
+<div class="ctl"><label><span>Weight <span class="tex">w_1</span></span><b id="perc-w1-val">1.0</b></label><input type="range" id="perc-w1" min="-2" max="2" step="0.1" value="1"></div>
+<div class="ctl"><label><span>Weight <span class="tex">w_2</span></span><b id="perc-w2-val">1.0</b></label><input type="range" id="perc-w2" min="-2" max="2" step="0.1" value="1"></div>
+<div class="ctl"><label><span>Bias <span class="tex">b</span></span><b id="perc-b-val">−1.5</b></label><input type="range" id="perc-b" min="-3" max="3" step="0.1" value="-1.5"></div>
+<div class="ro"><span>Points correct</span><b id="perc-ok" class="a">4 / 4</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>The inputs of a logic gate. No line gets XOR right.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Two layers solve XOR">
+<div class="hdr" data-s="Neurons"></div>
+<h2>Two layers solve XOR</h2>
+<div class="fr">
+<div class="figbox"><svg id="xor-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Hidden unit <span class="tex">h_1</span> computes OR, <span class="tex">h_2</span> computes AND. The output says 1 when <span class="tex">h_1</span> is on and <span class="tex">h_2</span> is off.</p>
+<p class="tex-line"><span class="tex">h_1 = \text{step}(x_1 + x_2 - 0.5)</span></p>
+<p class="tex-line"><span class="tex">h_2 = \text{step}(x_1 + x_2 - 1.5)</span></p>
+<p class="tex-line"><span class="tex">\hat{y} = \text{step}(h_1 - h_2 - 0.5)</span></p>
+<aside class="am frag up" data-step="x1"><div class="t">Example</div><p>Input <span class="tex">(1, 1)</span>: <span class="tex">h_1 = 1</span>, <span class="tex">h_2 = 1</span>, so <span class="tex">\hat{y} = \text{step}(-0.5) = 0</span>.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>(a) Weights on the arrows. (b) After the hidden layer, one line separates the classes.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Activation functions" data-demo="act">
+<div class="hdr" data-s="Neurons"></div>
+<h2>Activation functions</h2>
+<div class="fr">
+<div class="figbox"><svg id="act-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Without a bend, stacked layers stay one weighted sum.</p>
+<div class="btns"><button class="bt chip" id="act-sig">sigmoid</button><button class="bt chip" id="act-tanh">tanh</button><button class="bt chip" id="act-relu">ReLU</button><button class="bt chip" id="act-leaky">leaky</button></div>
+<div class="small" style="text-align:center;min-height:100px">
+<div class="act-f"><span class="tex">\sigma(z) = \dfrac{1}{1 + e^{-z}}</span><br><span class="tex">\sigma' = \sigma(1 - \sigma)</span></div>
+<div class="act-f" style="display:none"><span class="tex">\tanh z = \dfrac{e^{z} - e^{-z}}{e^{z} + e^{-z}}</span><br><span class="tex">\tanh' = 1 - \tanh^2</span></div>
+<div class="act-f" style="display:none"><span class="tex">\text{ReLU}(z) = \max(0, z)</span><br>slope 0 or 1</div>
+<div class="act-f" style="display:none"><span class="tex">\max(0.1 z, \ z)</span><br>slope 0.1 or 1</div>
+</div>
+<div class="ctl"><label><span>Input <span class="tex">z</span></span><b id="act-z-val">1.0</b></label><input type="range" id="act-z" min="-4" max="4" step="0.1" value="1"></div>
+<div class="ro"><span><span class="tex">g(z)</span></span><b id="act-g" class="a">0.73</b></div>
+<div class="ro"><span><span class="tex">g'(z)</span></span><b id="act-d" class="bb">0.20</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>The function and its slope.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Layers and the forward pass">
+<div class="hdr" data-s="Neurons"></div>
+<h2>Layers and the forward pass</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A layer is a row of neurons that read the same input. Each unit’s weights form one row of <span class="tex">\mathbf{W}^{(l)}</span>, so the layer works in one step:</p>
+<div class="eq"><div class="m tex-d">\mathbf{z}^{(l)} = \mathbf{W}^{(l)} \mathbf{a}^{(l-1)} + \mathbf{b}^{(l)}</div><div class="n">(3)</div></div>
+<div class="eq"><div class="m tex-d">\mathbf{a}^{(l)} = g(\mathbf{z}^{(l)}), \qquad \mathbf{a}^{(0)} = \mathbf{x}, \quad \hat{\mathbf{y}} = \mathbf{a}^{(L)}</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="l1" style="margin:0">The <strong>forward pass</strong> applies (3) and (4) for <span class="tex">l = 1, \dots, L</span>. Each layer’s output is the next layer’s input.</p>
+<div class="figbox frag" data-step="l1" style="height:230px;flex:none;margin-top:12px"><svg id="layers-svg" viewBox="0 0 1160 230"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example: sizes</div><p>784 pixels in, 10 hidden units, 4 outputs.</p><p><span class="tex">\mathbf{W}^{(1)}</span> is <span class="tex">10 \times 784</span>: 7&nbsp;840 weights.</p><p><span class="tex">\mathbf{W}^{(2)}</span> is <span class="tex">4 \times 10</span>: 40 weights.</p><p>With the biases: <span class="tex">7840 + 10 + 40 + 4 = 7894</span> parameters.</p></aside>
+<div class="grow"></div>
+<p class="cap frag" data-step="l1"><b>Figure 5:</b>The forward pass as a chain of layers.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A forward pass by hand">
+<div class="hdr" data-s="Neurons"></div>
+<h2>A forward pass by hand</h2>
+<div class="fr">
+<div class="figbox"><svg id="fwd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">ReLU hidden layer, sigmoid output. Input <span class="tex">\mathbf{x} = (1, 2)</span>, target <span class="tex">y = 1</span>.</p>
+<p class="tex-line frag up" data-step="f1"><span class="tex">z_1 = 0.5 - 0.5 + 0.5 = 0.5</span></p>
+<p class="tex-line frag up" data-step="f1"><span class="tex">z_2 = 0.25 + 1 + 0 = 1.25</span></p>
+<p class="tex-line frag up" data-step="f2"><span class="tex">\mathbf{a}^{(1)} = \text{ReLU}(\mathbf{z}^{(1)}) = (0.5, 1.25)</span></p>
+<p class="tex-line frag up" data-step="f3"><span class="tex">z^{(2)} = 0.5 - 1.25 + 0 = -0.75</span></p>
+<p class="tex-line frag up" data-step="f3"><span class="tex">\hat{y} = \sigma(-0.75) \approx 0.32</span></p>
+<p class="tex-line frag up" data-step="f4"><span class="tex">L = -\log 0.32 \approx 1.14</span></p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>A 2-2-1 network. Weights on the arrows, biases next to the units.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Output layers">
+<div class="hdr" data-s="Neurons"></div>
+<h2>Output layers</h2>
+<div class="fr">
+<div class="figbox"><svg id="out-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">The task decides the last layer. For <span class="tex">K</span> classes, <strong>softmax</strong> turns <span class="tex">K</span> scores into probabilities that add up to 1:</p>
+<div class="eq" style="margin:0"><div class="m tex-d">\hat{y}_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}}</div><div class="n">(5)</div></div>
+<aside class="am"><div class="t">Example</div><p><span class="tex">\mathbf{z} = (2, 1, 0)</span>: <span class="tex">e^{z} \approx (7.39, 2.72, 1)</span>, sum <span class="tex">11.11</span></p><p><span class="tex">\hat{\mathbf{y}} \approx (0.67, 0.24, 0.09)</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Three output layers. Hidden layers stay the same; only the last layer changes.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Learning the weights</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Measure the error, then send it back through the network to fix every weight.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Loss and cost">
+<div class="hdr" data-s="Learning"></div>
+<h2>Loss and cost</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A loss <span class="tex">L(y, \hat{y})</span> measures how wrong one prediction is. For a number, the <strong>squared error</strong>:</p>
+<div class="eq"><div class="m tex-d">L(y, \hat{y}) = (y - \hat{y})^2</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="c1" style="margin:0">For classes, the <strong>cross-entropy</strong>, with <span class="tex">y_k = 1</span> for the true class and 0 for the rest:</p>
+<div class="eq frag up" data-step="c1"><div class="m tex-d">L(\mathbf{y}, \hat{\mathbf{y}}) = -\sum_{k=1}^{K} y_k \log \hat{y}_k</div><div class="n">(7)</div></div>
+<p class="small frag up" data-step="c2" style="margin:0">The <strong>cost</strong> averages the loss over the <span class="tex">n</span> training examples. Training looks for the <span class="tex">\boldsymbol{\theta}</span> that makes it small:</p>
+<div class="eq frag up" data-step="c2"><div class="m tex-d">J(\boldsymbol{\theta}) = \frac{1}{n} \sum_{i=1}^{n} L(\mathbf{y}_i, \hat{\mathbf{y}}_i)</div><div class="n">(8)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>True answer <span class="tex">y = 1</span>, natural log.</p><p><span class="tex">\hat{y} = 0.8</span>: squared <span class="tex">0.04</span>, cross-entropy <span class="tex">0.22</span></p><p><span class="tex">\hat{y} = 0.1</span>: squared <span class="tex">0.81</span>, cross-entropy <span class="tex">2.30</span></p></aside>
+<aside class="am frag up" data-step="c1"><div class="t">In words</div><p>Only the true class counts in (7): the loss is <span class="tex">-\log</span> of its probability. With two classes it is the log-loss of Topic 11.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Gradient descent">
+<div class="hdr" data-s="Learning"></div>
+<h2>Gradient descent</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The gradient <span class="tex">\nabla_{\boldsymbol{\theta}} J</span> holds the slope of <span class="tex">J</span> along every parameter and points uphill. Gradient descent steps the other way:</p>
+<div class="eq"><div class="m tex-d">\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \alpha \, \nabla_{\boldsymbol{\theta}} J(\boldsymbol{\theta})</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="g1" style="margin:0">The learning rate <span class="tex">\alpha</span> sets the step size. Too small and training is slow; too large and the steps overshoot.</p>
+<div class="figbox frag" data-step="g1" style="height:350px;flex:none;margin-top:8px"><svg id="gd-svg" viewBox="0 0 1160 350"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">J(\theta) = \theta^2</span>, slope <span class="tex">2\theta</span>, start <span class="tex">\theta = 3</span>.</p><p><span class="tex">\alpha = 0.1</span>: <span class="tex">3 - 0.1 \cdot 6 = 2.4</span>, then <span class="tex">1.92</span>, then <span class="tex">1.54</span></p><p><span class="tex">\alpha = 0.9</span>: <span class="tex">3 - 5.4 = -2.4</span>, then <span class="tex">1.92</span>. It jumps across the bottom.</p></aside>
+<div class="grow"></div>
+<p class="cap frag" data-step="g1"><b>Figure 8:</b>Five steps on the curve of the example.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Batches and epochs">
+<div class="hdr" data-s="Learning"></div>
+<h2>Batches and epochs</h2>
+<div class="fr">
+<div class="figbox"><svg id="batch-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Each step of (9) averages the gradient over:</p>
+<p class="small" style="margin:0"><strong>Batch:</strong> all <span class="tex">n</span> examples. Smooth, slow.<br><strong>Mini-batch:</strong> <span class="tex">B</span> examples. Usual.<br><strong>Stochastic:</strong> one. Cheap, noisy.</p>
+<aside class="am frag up"><div class="t">Example</div><p>An <strong>epoch</strong> is one pass over the data. <span class="tex">n = 1000</span>, <span class="tex">B = 50</span>: 20 steps per epoch.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>Paths to the lowest cost. Rings: equal <span class="tex">J</span>.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="The chain rule">
+<div class="hdr" data-s="Learning"></div>
+<h2>The chain rule</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Take one neuron: <span class="tex">z = w \, a^{(l-1)} + b</span>, <span class="tex">a = \sigma(z)</span>, <span class="tex">L = (a - y)^2</span>. To see how <span class="tex">L</span> reacts to <span class="tex">w</span>, multiply the local slopes along the path:</p>
+<div class="eq"><div class="m tex-d">\frac{\partial L}{\partial w} = \frac{\partial z}{\partial w} \, \frac{\partial a}{\partial z} \, \frac{\partial L}{\partial a} = a^{(l-1)} \cdot \sigma(z)\big(1 - \sigma(z)\big) \cdot 2(a - y)</div><div class="n">(10)</div></div>
+<div class="figbox" style="height:380px;flex:none;margin-top:8px"><svg id="chain-svg" viewBox="0 0 1160 380"></svg></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">a^{(l-1)} = 1</span>, <span class="tex">w = 0.5</span>, <span class="tex">b = 0</span>, <span class="tex">y = 1</span></p><p><span class="tex">z = 0.5</span>, <span class="tex">a = \sigma(0.5) \approx 0.622</span></p><p><span class="tex">\partial L / \partial a \approx -0.755</span></p><p><span class="tex">\partial a / \partial z \approx 0.622 \cdot 0.378 \approx 0.235</span></p><p>Product: <span class="tex">1 \cdot 0.235 \cdot (-0.755)</span></p><p><span class="tex">\partial L / \partial w \approx -0.177</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>Values flow forward in gray, slopes flow back in orange.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Backpropagation">
+<div class="hdr" data-s="Learning"></div>
+<h2>Backpropagation</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0"><strong>Backpropagation</strong> applies the chain rule to all layers in one backward sweep. It starts with the error at the output:</p>
+<div class="eq"><div class="m tex-d">\boldsymbol{\delta}^{(L)} = \hat{\mathbf{y}} - \mathbf{y}</div><div class="n">(11)</div></div>
+<p class="small frag up" data-step="b1" style="margin:0">Each earlier layer receives the error back through the same weights, scaled by the slope of its activation:</p>
+<div class="eq frag up" data-step="b1"><div class="m tex-d">\boldsymbol{\delta}^{(l)} = \big(\mathbf{W}^{(l+1)}\big)^{\top} \boldsymbol{\delta}^{(l+1)} \odot g'(\mathbf{z}^{(l)})</div><div class="n">(12)</div></div>
+<p class="small frag up" data-step="b2" style="margin:0">Each gradient is an error term times the input of its layer:</p>
+<div class="eq frag up" data-step="b2"><div class="m tex-d">\frac{\partial J}{\partial \mathbf{W}^{(l)}} = \boldsymbol{\delta}^{(l)} \big(\mathbf{a}^{(l-1)}\big)^{\top}, \qquad \frac{\partial J}{\partial \mathbf{b}^{(l)}} = \boldsymbol{\delta}^{(l)}</div><div class="n">(13)</div></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Figure 6: <span class="tex">\hat{y} = 0.32</span>, <span class="tex">y = 1</span>.</p><p><span class="tex">\delta^{(2)} = 0.32 - 1 = -0.68</span></p><p>Negative: the output is too low, so the step in (9) raises it.</p></aside>
+<aside class="am"><div class="t">When (11) holds</div><p>For a sigmoid or softmax output with cross-entropy loss, one example at a time.</p></aside>
+<aside class="am frag up" data-step="b1"><div class="t">Symbol</div><p><span class="tex">\odot</span> multiplies two vectors entry by entry.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="A backward pass by hand">
+<div class="hdr" data-s="Learning"></div>
+<h2>A backward pass by hand</h2>
+<div class="fr">
+<div class="figbox"><svg id="bwd-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Network and input of Figure 6.</p>
+<p class="tex-line frag up" data-step="k1"><span class="tex">\delta^{(2)} = 0.32 - 1 = -0.68</span></p>
+<p class="tex-line frag up" data-step="k2"><span class="tex">\partial J / \partial \mathbf{W}^{(2)} = -0.68 \cdot (0.5, 1.25)</span><br><span class="tex">= (-0.34, -0.85)</span></p>
+<p class="tex-line frag up" data-step="k3"><span class="tex">\boldsymbol{\delta}^{(1)} = (1, -1) \cdot (-0.68) \odot (1, 1)</span><br><span class="tex">= (-0.68, 0.68)</span></p>
+<p class="tex-line frag up" data-step="k4"><span class="tex">\partial J / \partial w^{(1)}_{jk} = \delta^{(1)}_j \, x_k</span></p>
+<p class="tex-line frag up" data-step="k5">Step (9) with <span class="tex">\alpha = 0.1</span>, then forward again: <span class="tex">\hat{y} \approx 0.56</span>, <span class="tex">L \approx 0.58</span>.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>Error terms under the units, gradients in orange on the arrows.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Backpropagation in motion" data-demo="bp">
+<div class="hdr" data-s="Learning"></div>
+<h2>Backpropagation in motion</h2>
+<div class="fr">
+<div class="figbox"><svg id="bp-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:16px">
+<p class="small" style="margin:0">Run the forward pass, then send the error back, then update. Repeat and watch the loss fall.</p>
+<div class="btns"><button class="bt" id="bp-fwd">▶ Forward</button><button class="bt" id="bp-bwd">◀ Backward</button></div>
+<div class="btns"><button class="bt" id="bp-upd">Update</button><button class="bt chip" id="bp-y">Target y = 1</button><button class="bt chip" id="bp-reset">Reset</button></div>
+<div class="ro"><span>Updates</span><b id="bp-n">0</b></div>
+<div class="ro"><span>Output <span class="tex">\hat{y}</span></span><b id="bp-yh" class="a">?</b></div>
+<div class="ro"><span>Loss <span class="tex">L</span></span><b id="bp-L" class="bb">?</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 12:</b>A 2-3-1 network, ReLU hidden layer, sigmoid output, <span class="tex">\alpha = 0.5</span>. Line width shows the size of a weight; dashed lines are negative weights.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Training in practice</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Good starting weights, gradients that survive depth, and a model that does not memorize.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Training a network" data-demo="train">
+<div class="hdr" data-s="Training"></div>
+<h2>Training a network</h2>
+<div class="fr">
+<div class="figbox"><svg id="tr-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<div class="btns"><button class="bt chip" id="tr-moons">Two moons</button><button class="bt chip" id="tr-spiral">Spiral</button></div>
+<div class="ctl"><label><span>Hidden units</span><b id="tr-h-val">6</b></label><input type="range" id="tr-h" min="1" max="16" step="1" value="6"></div>
+<div class="ctl"><label><span>Learning rate <span class="tex">\alpha</span></span><b id="tr-a-val">1.0</b></label><input type="range" id="tr-a" min="0.1" max="4" step="0.1" value="1"></div>
+<div class="btns"><button class="bt" id="tr-go">Train</button><button class="bt chip" id="tr-pause">Pause</button><button class="bt chip" id="tr-reset">Reset</button></div>
+<div class="ro"><span>Epoch</span><b id="tr-ep">0</b></div>
+<div class="ro"><span>Cost <span class="tex">J</span></span><b id="tr-J" class="bb">0.00</b></div>
+<div class="ro"><span>Accuracy</span><b id="tr-acc" class="a">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 13:</b>200 synthetic points, one tanh hidden layer, sigmoid output, full batch. Shading: predicted class.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Starting weights and depth">
+<div class="hdr" data-s="Training"></div>
+<h2>Starting weights and depth</h2>
+<div class="fr">
+<div class="figbox"><svg id="init-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<aside class="am"><div class="t">Not all zeros</div><p>Equal weights keep all units identical. Start small and random, about <span class="tex">1/\sqrt{n_{\text{in}}}</span> (Glorot and Bengio, 2010).</p></aside>
+<aside class="am frag up" data-step="v1"><div class="t">Vanishing gradients</div><p>By (12), each layer multiplies the error by <span class="tex">g' \le 0.25</span> for the sigmoid. After 10 layers: <span class="tex">0.25^{10} \approx 10^{-6}</span>.</p></aside>
+<aside class="am frag up" data-step="v2"><div class="t">ReLU helps</div><p>Its slope is 1 on active units, so the error reaches the first layers.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>(a) Zero start. (b) Error per layer.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Overfitting and regularization">
+<div class="hdr" data-s="Training"></div>
+<h2>Overfitting and regularization</h2>
+<div class="fr">
+<div class="figbox"><svg id="reg-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0"><strong>Weight decay</strong> penalizes large weights:</p>
+<div class="eq" style="margin:0"><div class="m tex-d">J(\boldsymbol{\theta}) + \lambda \lVert \mathbf{W} \rVert^2</div><div class="n">(14)</div></div>
+<p class="small" style="margin:0"><strong>Dropout</strong> switches off random units at each step.</p><p class="small" style="margin:0"><strong>Early stopping</strong> keeps the weights with the lowest validation cost.</p>
+<aside class="am"><div class="t">Example</div><p>Weights <span class="tex">(3, -4)</span>, <span class="tex">\lambda = 0.01</span>: penalty <span class="tex">0.01 \cdot 25 = 0.25</span>.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 15:</b>(a) Illustrative costs. (b) Dropout.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Universal approximation" data-demo="ua">
+<div class="hdr" data-s="Training"></div>
+<h2>Universal approximation</h2>
+<div class="fr">
+<div class="figbox"><svg id="ua-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">With enough units, one hidden layer follows any smooth curve:</p>
+<div class="eq" style="margin:0;font-size:24px"><div class="m tex-d">\hat{y} = c + \textstyle\sum_{j} v_j \, g(w_j x + b_j)</div><div class="n">(15)</div></div>
+<div class="ctl"><label><span>Hidden units <span class="tex">N</span></span><b id="ua-n-val">3</b></label><input type="range" id="ua-n" min="1" max="20" step="1" value="3"></div>
+<div class="ro"><span>Mean squared error</span><b id="ua-mse" class="bb">0.00</b></div>
+<aside class="am"><div class="t">Example</div><p><span class="tex">v = 2</span>, <span class="tex">w = 1</span>, <span class="tex">b = -1</span> adds <span class="tex">2\max(0, x - 1)</span>: a bend at 1.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 16:</b>One bend (dot) per ReLU unit.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Training"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Neural networks at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Learn curved boundaries and features from raw inputs</td><td>Need many examples to fit many weights</td></tr>
+<tr class="an-up" style="--d:.15s"><td>One recipe for regression and any number of classes</td><td>Many choices: layers, units, activation, <span class="tex">\alpha</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td>Backpropagation gives all gradients in one sweep</td><td>The cost has many local minima; results depend on the start</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Layers stack into the deep models of the next topics</td><td>Weights are hard to read and explain</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Prediction is fast once trained</td><td>Training can be slow and overfits without regularization</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>When the data set is large and the pattern is too curved for linear models or simple features.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">A neuron is a weighted sum plus a bias, bent by an activation function.</li>
+<li class="an-up" style="--d:.15s">One neuron draws a line; hidden layers bend the space, so XOR and curved boundaries become possible.</li>
+<li class="an-up" style="--d:.25s">The forward pass repeats <span class="tex">\mathbf{a}^{(l)} = g(\mathbf{W}^{(l)}\mathbf{a}^{(l-1)} + \mathbf{b}^{(l)})</span> up to the output.</li>
+<li class="an-up" style="--d:.35s">Backpropagation sends the error back with the chain rule; gradient descent then updates every weight.</li>
+<li class="an-up" style="--d:.45s">Random starts, ReLU and regularization keep training stable and the model general.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The original papers behind the perceptron, backpropagation, initialization and dropout, and two books that cover them.</p>
+<section style="margin-top:40px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>, Chapters 6 and 8. MIT Press.</li>
+<li style="margin:.4em 0">Rumelhart, D. E., Hinton, G. E., &amp; Williams, R. J. (1986). Learning representations by back-propagating errors. <em>Nature</em>, 323, 533–536.</li>
+<li style="margin:.4em 0">Rosenblatt, F. (1958). The perceptron: A probabilistic model for information storage and organization in the brain. <em>Psychological Review</em>, 65(6), 386–408.</li>
+<li style="margin:.4em 0">Nielsen, M. A. (2015). <em>Neural Networks and Deep Learning</em>. Determination Press.</li>
+<li style="margin:.4em 0">Glorot, X., &amp; Bengio, Y. (2010). Understanding the difficulty of training deep feedforward neural networks. <em>Proceedings of AISTATS</em>, 9, 249–256.</li>
+<li style="margin:.4em 0">Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., &amp; Salakhutdinov, R. (2014). Dropout: A simple way to prevent neural networks from overfitting. <em>Journal of Machine Learning Research</em>, 15, 1929–1958.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 24: automatic differentiation.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, clamp, solve, curvePath, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const sig = (z) => 1 / (1 + Math.exp(-z));
+const relu = (z) => Math.max(0, z);
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const num = (v, d = 2) => (v < -1e-12 && Math.abs(v) >= 0.5 * 10 ** -d ? '−' : '') + Math.abs(v).toFixed(d);
+const pct = (v) => Math.round(v * 100) + '%';
+const MID = { 'text-anchor': 'middle' };
+function T(parent, x, y, s, cls = 'tx', attrs = {}) { return el('text', { class: cls, x, y, text: s, ...attrs }, parent); }
+const at = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+function unit(g, p, r, label, cls = 'box', fs) {
+  el('circle', { class: cls, cx: p[0], cy: p[1], r }, g);
+  if (label) T(g, p[0], p[1] + 10, label, 'tx', fs ? { ...MID, style: `font-size:${fs}px` } : MID);
+}
+/* straight arrow between two circles of radius ra and rb */
+function arrow(g, a, b, ra, rb, attrs = {}) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+  return el('line', { class: 'wire', x1: a[0] + ux * ra, y1: a[1] + uy * ra, x2: b[0] - ux * (rb + 4), y2: b[1] - uy * (rb + 4), 'marker-end': 'url(#ah)', ...attrs }, g);
+}
+function pick(btns, i) {
+  btns.forEach((b, k) => {
+    b.style.background = k === i ? 'var(--myst-color-primary)' : '';
+    b.style.color = k === i ? '#fff' : '';
+    b.setAttribute('aria-pressed', String(k === i));
+  });
+}
+/* Clip a polygon to the half-plane f >= 0 (f linear) */
+function clipHalf(poly, f) {
+  const out = [];
+  poly.forEach((a, i) => {
+    const b = poly[(i + 1) % poly.length], fa = f(a), fb = f(b);
+    if (fa >= 0) out.push(a);
+    if ((fa >= 0) !== (fb >= 0)) { const t = fa / (fa - fb); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]); }
+  });
+  return out;
+}
+const polyD = (F, poly) => (poly.length < 3 ? '' : poly.map(([x, y], i) => (i ? 'L' : 'M') + F.sx(x).toFixed(1) + ' ' + F.sy(y).toFixed(1)).join('') + 'Z');
+const sliceOf = (svg) => svg.closest('section');
+const isActive = (svg) => sliceOf(svg).hasAttribute('data-deck-active');
+
+/* ───────── the 2-2-1 network of the worked example ───────── */
+const EX = (() => {
+  const x = [1, 2], y = 1, W1 = [[0.5, -0.25], [0.25, 0.5]], b1 = [0.5, 0], W2 = [1, -1], b2 = 0;
+  const z1 = W1.map((r, j) => r[0] * x[0] + r[1] * x[1] + b1[j]), a1 = z1.map(relu);
+  const z2 = W2[0] * a1[0] + W2[1] * a1[1] + b2, yh = sig(z2), L = -Math.log(yh);
+  const d2 = yh - y, gW2 = a1.map((a) => d2 * a), d1 = W2.map((w, j) => w * d2 * (z1[j] > 0 ? 1 : 0));
+  const gW1 = d1.map((d) => x.map((v) => d * v));
+  const al = 0.1;
+  const W1n = W1.map((r, j) => r.map((w, k) => w - al * gW1[j][k])), b1n = b1.map((b, j) => b - al * d1[j]);
+  const W2n = W2.map((w, j) => w - al * gW2[j]), b2n = b2 - al * d2;
+  const a1n = W1n.map((r, j) => relu(r[0] * x[0] + r[1] * x[1] + b1n[j]));
+  const yhn = sig(W2n[0] * a1n[0] + W2n[1] * a1n[1] + b2n);
+  return { x, y, W1, b1, W2, b2, z1, a1, z2, yh, L, d2, gW2, d1, gW1, yhn, Ln: -Math.log(yhn) };
+})();
+const NP = { X: [[130, 200], [130, 500]], H: [[580, 200], [580, 500]], O: [1010, 350], r: 52 };
+
+function smallNet(svg) {
+  const g = el('g', {}, svg), lab = el('g', {}, svg);
+  NP.X.forEach((p, k) => NP.H.forEach((h, j) => {
+    arrow(g, p, h, NP.r, NP.r);
+    const q = at(p, h, 0.22);
+    T(lab, q[0], q[1] - 12, num(EX.W1[j][k], 2).replace(/0+$/, '').replace(/\.$/, ''), 'txs halo', MID);
+  }));
+  NP.H.forEach((h, j) => {
+    arrow(g, h, NP.O, NP.r, NP.r);
+    const q = at(h, NP.O, 0.45);
+    T(lab, q[0], q[1] + (j ? 40 : -14), num(EX.W2[j], 0), 'txs halo', MID);
+  });
+  NP.X.forEach((p, k) => {
+    unit(g, p, NP.r, String(EX.x[k]));
+    T(g, p[0] - NP.r - 14, p[1] + 9, 'x' + '₁₂'[k], 'tx', { 'text-anchor': 'end' });
+  });
+  NP.H.forEach((h, j) => unit(g, h, NP.r, 'h' + '₁₂'[j], 'box-a'));
+  unit(g, NP.O, NP.r, 'ŷ', 'box-b');
+  T(g, NP.H[0][0], NP.H[0][1] - NP.r - 20, 'b = 0.5', 'txs', MID);
+  T(g, NP.H[1][0], NP.H[1][1] + NP.r + 44, 'b = 0', 'txs', MID);
+  T(g, NP.O[0], NP.O[1] - NP.r - 20, 'b = 0', 'txs', MID);
+  T(g, NP.X[0][0], 60, 'input', 'ttl', MID);
+  T(g, NP.H[0][0], 60, 'hidden (ReLU)', 'ttl', MID);
+  T(g, NP.O[0], 60, 'output (sigmoid)', 'ttl', MID);
+  return lab;
+}
+/* annotation slots: below unit 1, above unit 2, below the output */
+const SLOT = {
+  h0: (i) => [NP.H[0][0], NP.H[0][1] + NP.r + 40 + i * 34],
+  h1: (i) => [NP.H[1][0], NP.H[1][1] - NP.r - 52 + i * 34],
+  o: (i) => [NP.O[0], NP.O[1] + NP.r + 40 + i * 34],
+};
+function note(svg, p, s, step, color) {
+  const g = el('g', step ? { class: 'frag', 'data-step': step } : {}, svg);
+  T(g, p[0], p[1], s, 'txs halo', { ...MID, style: color ? `fill:${color};font-weight:600` : 'font-weight:600' });
+  return g;
+}
+
+/* ───────── static figures ───────── */
+function drawNeuron() {
+  const svg = $('neuron-svg');
+  const X = [[150, 60], [150, 165], [150, 270]], S = [560, 165], xs = ['1', '2', '−1'], ws = ['0.8', '0.2', '−0.5'];
+  X.forEach((p, k) => {
+    arrow(svg, p, S, 38, 60);
+    unit(svg, p, 38, xs[k]);
+    T(svg, 90, p[1] + 9, 'x' + '₁₂₃'[k], 'tx', { 'text-anchor': 'end' });
+    const q = at(p, S, 0.5);
+    T(svg, q[0], q[1] - 12, 'w' + '₁₂₃'[k] + ' = ' + ws[k], 'txs halo', MID);
+  });
+  unit(svg, S, 60, 'Σ', 'box-a');
+  T(svg, S[0] + 80, 40, 'b = −0.3', 'txs');
+  el('path', { class: 'wire', d: `M${S[0] + 74} 50Q${S[0] + 30} 60 ${S[0] + 18} ${S[1] - 66}`, 'marker-end': 'url(#ah)' }, svg);
+  T(svg, S[0], S[1] + 104, 'z = 1.4', 'tx', { ...MID, 'font-weight': 600 });
+  el('rect', { class: 'box-b', x: 770, y: 120, width: 130, height: 90, rx: 8 }, svg);
+  T(svg, 835, 176, 'g = σ', 'tx', MID);
+  arrow(svg, [S[0] + 60, S[1]], [770, 165], 0, 0);
+  arrow(svg, [900, 165], [1000, 165], 0, 0);
+  T(svg, 1010, 175, 'a ≈ 0.80', 'tx', { 'font-weight': 700 });
+  const pulse = el('circle', { r: 7, class: 'dot' }, svg);
+  el('animateMotion', { dur: '2.6s', repeatCount: 'indefinite', path: `M190 165H${S[0] - 60}M${S[0] + 60} 165H1000` }, pulse);
+}
+
+function drawXor() {
+  const svg = $('xor-svg');
+  const X = [[80, 220], [80, 480]], H = [[340, 220], [340, 480]], O = [570, 350], r = 44;
+  const lab = el('g', {}, svg);
+  T(svg, 0, 40, '(a) the network', 'ttl');
+  X.forEach((p, k) => H.forEach((h) => {
+    arrow(svg, p, h, r, r);
+    const q = at(p, h, 0.3);
+    T(lab, q[0], q[1] - 12, '1', 'txs halo', MID);
+  }));
+  H.forEach((h, j) => {
+    arrow(svg, h, O, r, r);
+    const q = at(h, O, 0.5);
+    T(lab, q[0] + 14, q[1] + (j ? 36 : -14), j ? '−1' : '1', 'txs halo', MID);
+  });
+  X.forEach((p, k) => unit(svg, p, r, 'x' + '₁₂'[k]));
+  H.forEach((p, j) => unit(svg, p, r, 'h' + '₁₂'[j], 'box-a'));
+  unit(svg, O, r, 'ŷ', 'box-b');
+  T(svg, H[0][0], H[0][1] + r + 38, 'b = −0.5', 'txs', MID);
+  T(svg, H[1][0], H[1][1] + r + 38, 'b = −1.5', 'txs', MID);
+  T(svg, O[0], O[1] + r + 38, 'b = −0.5', 'txs', MID);
+  T(svg, H[0][0], H[0][1] - r - 16, 'OR', 'ttl', MID);
+  T(svg, H[1][0], H[1][1] - r - 16, 'AND', 'ttl', MID);
+  /* (b) the hidden space */
+  const g = el('g', { id: 'xor-b', class: 'frag', 'data-step': 'x0' }, svg);
+  T(g, 680, 40, '(b) inputs seen by the output', 'ttl');
+  const F = frame(g, { W: 1160, H: 680, l: 760, r: 20, t: 80, b: 100, x: [-0.35, 1.35], y: [-0.35, 1.35], xt: [0, 1], yt: [0, 1], xl: 'h₁', yl: 'h₂' });
+  const RECT = [[-0.35, -0.35], [1.35, -0.35], [1.35, 1.35], [-0.35, 1.35]];
+  el('path', { d: polyD(F, clipHalf(RECT, ([a, b]) => a - b - 0.5)), style: 'fill:var(--c-b);fill-opacity:.14' }, F.plot);
+  el('line', { x1: F.sx(0.15), y1: F.sy(-0.35), x2: F.sx(1.35), y2: F.sy(0.85), style: 'stroke:var(--myst-color-text);stroke-width:4' }, F.plot);
+  [[0, 0, 0, '(0,0)', 0, -30, 'middle'], [1, 0, 1, '(0,1), (1,0)', 0, 52, 'middle'], [1, 1, 0, '(1,1)', -26, 50, 'end']].forEach(([a, b, c, s, ox, oy, an]) => {
+    el('circle', { class: `pt ${c ? 'fb' : 'fa'}`, cx: F.sx(a), cy: F.sy(b), r: 16 }, F.plot);
+    T(g, F.sx(a) + ox, F.sy(b) + oy, s, 'txs halo', { 'text-anchor': an });
+  });
+}
+
+function drawLayers() {
+  const svg = $('layers-svg'), y = 100;
+  const circ = [[60, 'x'], [545, 'a⁽¹⁾'], [1080, 'ŷ']];
+  const boxes = [[180, 'layer 1', 'W⁽¹⁾, b⁽¹⁾, g'], [660, 'layer 2', 'W⁽²⁾, b⁽²⁾, g']];
+  const paths = [];
+  boxes.forEach(([x0, t1, t2]) => {
+    el('rect', { class: 'box-a', x: x0, y: y - 70, width: 260, height: 140, rx: 8 }, svg);
+    T(svg, x0 + 130, y - 12, t1, 'tx', { ...MID, 'font-weight': 600 });
+    T(svg, x0 + 130, y + 30, t2, 'txs', MID);
+  });
+  circ.forEach(([cx, s], i) => {
+    el('circle', { class: i === 2 ? 'box-b' : 'box', cx, cy: y, r: 46 }, svg);
+    T(svg, cx, y + 10, s, 'tx', MID);
+  });
+  T(svg, 60, y + 90, 'a⁽⁰⁾', 'txs', MID);
+  T(svg, 1080, y + 90, 'a⁽²⁾', 'txs', MID);
+  [[106, 176], [440, 495], [591, 656], [920, 1030]].forEach(([a, b]) => {
+    el('path', { class: 'wire', d: `M${a} ${y}H${b}`, 'marker-end': 'url(#ah)' }, svg);
+    paths.push(`M${a} ${y}H${b}`);
+  });
+  paths.forEach((d) => {
+    const dot = el('circle', { r: 7, class: 'dot' }, svg);
+    el('animateMotion', { dur: '2s', repeatCount: 'indefinite', path: d }, dot);
+  });
+}
+
+function drawForward() {
+  const svg = $('fwd-svg');
+  smallNet(svg);
+  const A = 'var(--c-a)';
+  note(svg, SLOT.h0(0), 'z = 0.5', 'f1', A);
+  note(svg, SLOT.h1(0), 'z = 1.25', 'f1', A);
+  note(svg, SLOT.h0(1), 'a = 0.5', 'f2', A);
+  note(svg, SLOT.h1(1), 'a = 1.25', 'f2', A);
+  note(svg, SLOT.o(0), 'z = ' + num(EX.z2, 2), 'f3', A);
+  note(svg, SLOT.o(1), 'ŷ = ' + num(EX.yh, 2), 'f3', A);
+  const g = el('g', { class: 'frag', 'data-step': 'f4' }, svg);
+  el('rect', { class: 'box-b', x: 870, y: 580, width: 280, height: 96, rx: 8 }, g);
+  T(g, 1010, 618, 'target y = 1', 'txs', MID);
+  T(g, 1010, 656, 'L = ' + num(EX.L, 2), 'tx', { ...MID, 'font-weight': 700 });
+}
+
+function drawBackward() {
+  const svg = $('bwd-svg');
+  smallNet(svg);
+  const A = 'var(--c-a)', B = 'var(--c-b)';
+  note(svg, SLOT.h0(0), 'a = 0.5', null, A);
+  note(svg, SLOT.h1(0), 'a = 1.25', null, A);
+  note(svg, SLOT.o(0), 'ŷ = ' + num(EX.yh, 2), null, A);
+  note(svg, SLOT.o(1), 'δ = ' + num(EX.d2, 2), 'k1', B);
+  note(svg, SLOT.h0(1), 'δ = ' + num(EX.d1[0], 2), 'k3', B);
+  note(svg, SLOT.h1(1), 'δ = ' + num(EX.d1[1], 2), 'k3', B);
+  NP.H.forEach((h, j) => {
+    const q = at(h, NP.O, 0.45);
+    note(svg, [q[0], q[1] + (j ? -14 : 40)], num(EX.gW2[j], 2), 'k2', B);
+  });
+  NP.X.forEach((p, k) => NP.H.forEach((h, j) => {
+    const q = at(p, h, 0.72);
+    note(svg, [q[0], q[1] - 12], num(EX.gW1[j][k], 2), 'k4', B);
+  }));
+  const g = el('g', { class: 'frag', 'data-step': 'k5' }, svg);
+  el('rect', { class: 'box-a', x: 300, y: 618, width: 560, height: 66, rx: 8 }, g);
+  T(g, 580, 662, `after one step: ŷ ${num(EX.yh, 2)} → ${num(EX.yhn, 2)}`, 'tx', { ...MID, 'font-weight': 600 });
+}
+
+function drawOut() {
+  const svg = $('out-svg');
+  const COLS = [
+    { x0: 0, t: '(a) two classes', foot: 'sigmoid' },
+    { x0: 400, t: '(b) K classes', foot: 'softmax' },
+    { x0: 800, t: '(c) a number', foot: 'linear' },
+  ];
+  const HID = [180, 280, 380];
+  COLS.forEach((C, c) => {
+    const g = el('g', { class: 'an-fade', style: `--d:${c * 0.2}s` }, svg), x0 = C.x0;
+    T(g, x0, 40, C.t, 'ttl');
+    const outs = c === 1 ? [180, 280, 380] : [280];
+    HID.forEach((hy) => outs.forEach((oy) => arrow(g, [x0 + 50, hy], [x0 + 220, oy], 24, 40)));
+    HID.forEach((hy) => unit(g, [x0 + 50, hy], 24, '', 'box'));
+    T(g, x0 + 50, 450, 'hidden', 'txs', MID);
+    const lbl = c === 0 ? ['σ'] : c === 1 ? ['2', '1', '0'] : ['z'];
+    outs.forEach((oy, i) => unit(g, [x0 + 220, oy], 40, lbl[i], c === 2 ? 'box-a' : 'box-b'));
+    T(g, x0 + 160, 680, C.foot, 'tx', { ...MID, 'font-weight': 700 });
+    if (c === 0) {
+      el('rect', { x: x0 + 20, y: 520, width: 300, height: 40, rx: 4, style: 'fill:var(--myst-color-surface);stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+      el('rect', { class: 'fb an-grow', x: x0 + 20, y: 520, width: 240, height: 40, rx: 4, style: '--d:.5s' }, g);
+      T(g, x0 + 20, 605, 'P(y = 1) = 0.80', 'txs');
+    } else if (c === 1) {
+      [0.665, 0.245, 0.09].forEach((p, i) => {
+        const bx = x0 + 40 + i * 100;
+        el('rect', { class: 'fb an-growy', x: bx, y: 620 - 120 * p, width: 60, height: 120 * p, style: `--d:${0.5 + i * 0.1}s` }, g);
+        T(g, bx + 30, 620 - 120 * p - 12, num(p, 2), 'txs', MID);
+      });
+      el('line', { x1: x0 + 20, x2: x0 + 340, y1: 620, y2: 620, class: 'ax' }, g);
+    } else {
+      T(g, x0 + 160, 560, 'ŷ = z, any value', 'txs', MID);
+      T(g, x0 + 160, 605, 'e.g. a price', 'txs', MID);
+    }
+  });
+}
+
+function drawGd() {
+  const svg = $('gd-svg');
+  const F = frame(svg, { W: 1160, H: 350, l: 96, t: 16, b: 70, x: [-3.5, 3.5], y: [0, 10.5], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [0, 5, 10], fx: (v) => (v < 0 ? '−' + -v : String(v)), xl: 'θ', yl: 'J(θ)' });
+  el('path', { d: curvePath((t) => t * t, -3.5, 3.5, F.sx, F.sy), style: 'fill:none;stroke:var(--myst-color-text-secondary);stroke-width:4' }, F.plot);
+  [[0.1, 'a', 'var(--c-a)'], [0.9, 'b', 'var(--c-b)']].forEach(([al, k, col], s) => {
+    let t = 3;
+    const pts = [t];
+    for (let i = 0; i < 5; i++) { t -= al * 2 * t; pts.push(t); }
+    const g = el('g', { class: 'an-fade', style: `--d:${0.3 + s * 0.4}s` }, F.plot);
+    pts.forEach((v, i) => {
+      if (i) el('line', { x1: F.sx(pts[i - 1]), y1: F.sy(pts[i - 1] ** 2), x2: F.sx(v), y2: F.sy(v * v), style: `stroke:${col};stroke-width:3` }, g);
+    });
+    pts.forEach((v) => el('circle', { class: `pt f${k}`, cx: F.sx(v), cy: F.sy(v * v), r: 9 }, g));
+  });
+  legend(svg, 360, 44, [['line', 'curve-a', 'α = 0.1']]);
+  legend(svg, 560, 44, [['line', 'curve-b', 'α = 0.9']]);
+}
+
+function drawBatch() {
+  const svg = $('batch-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 60, r: 24, t: 24, b: 70, x: [-3.6, 3.6], y: [-1.95, 2.05], xt: [], yt: [], xl: 'weight θ₁', yl: '' });
+  T(svg, 30, (24 + 630) / 2, 'weight θ₂', 'lb', { transform: `rotate(-90 30 ${(24 + 630) / 2})`, 'text-anchor': 'middle' });
+  const kx = (F.sx(1) - F.sx(0)), ky = (F.sy(0) - F.sy(1));
+  [0.08, 0.35, 0.8, 1.45, 2.3, 3.4].forEach((c) => el('ellipse', { cx: F.sx(0), cy: F.sy(0), rx: 2 * Math.sqrt(c) * kx, ry: Math.sqrt(c) * ky, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, F.plot));
+  el('circle', { cx: F.sx(0), cy: F.sy(0), r: 8, class: 'ink' }, F.plot);
+  const grad = ([a, b]) => [a / 2, 2 * b];
+  const RUNS = [
+    { col: 'var(--c-a)', al: 0.35, noise: 0, n: 22, seed: 1 },
+    { col: 'var(--c-c)', al: 0.35, noise: 0.45, n: 22, seed: 5 },
+    { col: 'var(--c-b)', al: 0.14, noise: 1.6, n: 60, seed: 9 },
+  ];
+  RUNS.forEach((R, i) => {
+    const r = rng(R.seed);
+    let p = [-3.1, 1.6];
+    const pts = [p];
+    for (let s = 0; s < R.n; s++) {
+      const g = grad(p);
+      p = [p[0] - R.al * (g[0] + R.noise * gauss(r)), p[1] - R.al * (g[1] + R.noise * gauss(r))];
+      pts.push(p);
+    }
+    const g = el('g', { class: 'an-fade', style: `--d:${0.2 + i * 0.35}s` }, F.plot);
+    el('path', { d: pts.map(([a, b], k) => (k ? 'L' : 'M') + F.sx(a).toFixed(1) + ' ' + F.sy(b).toFixed(1)).join(''), style: `fill:none;stroke:${R.col};stroke-width:3.5;stroke-linejoin:round` }, g);
+    pts.forEach(([a, b]) => el('circle', { cx: F.sx(a), cy: F.sy(b), r: 5, style: `fill:${R.col}` }, g));
+  });
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.L + 600, y: F.T + 14, width: 390, height: 132, rx: 6, style: 'fill:var(--myst-color-bg);opacity:.92' }, lg);
+  legend(lg, F.L + 616, F.T + 44, [['line', 'curve-a', 'batch: all n'], ['line', 'curve-c', 'mini-batch: B examples'], ['line', 'curve-b', 'stochastic: 1 example']]);
+  lg.querySelectorAll('line')[1].setAttribute('style', 'stroke:var(--c-c);stroke-width:5');
+}
+
+function drawChain() {
+  const svg = $('chain-svg'), y = 230, r = 44;
+  const W = [80, 110], A0 = [80, 230], Bb = [80, 350], Z = [400, y], A = [680, y], L = [960, y], Y = [960, 350];
+  [W, A0, Bb].forEach((p) => arrow(svg, p, Z, r, r));
+  arrow(svg, Z, A, r, r); arrow(svg, A, L, r, r); arrow(svg, Y, L, 34, r);
+  unit(svg, W, r, 'w', 'box-a');
+  unit(svg, A0, r, 'a⁽ˡ⁻¹⁾', 'box', 24);
+  unit(svg, Bb, r, 'b', 'box');
+  unit(svg, Z, r, 'z', 'box');
+  unit(svg, A, r, 'a', 'box');
+  unit(svg, L, r, 'L', 'box-b');
+  unit(svg, Y, 34, 'y', 'box');
+  T(svg, Z[0], y + r + 40, 'w a⁽ˡ⁻¹⁾ + b', 'txs', MID);
+  T(svg, A[0], y + r + 40, 'σ(z)', 'txs', MID);
+  T(svg, L[0] + r + 16, y + 9, '(a − y)²', 'txs');
+  const B = 'stroke:var(--c-b);stroke-width:3;fill:none;stroke-dasharray:8 6';
+  el('path', { d: `M${L[0] - 30} ${y - 36}Q${(L[0] + A[0]) / 2} ${y - 150} ${A[0] + 30} ${y - 38}`, style: B, 'marker-end': 'url(#ah-b)' }, svg);
+  el('path', { d: `M${A[0] - 30} ${y - 36}Q${(A[0] + Z[0]) / 2} ${y - 150} ${Z[0] + 30} ${y - 38}`, style: B, 'marker-end': 'url(#ah-b)' }, svg);
+  el('path', { d: `M${Z[0] - 36} ${y - 30}Q${Z[0] - 120} ${W[1] - 60} ${W[0] + 46} ${W[1] - 14}`, style: B, 'marker-end': 'url(#ah-b)' }, svg);
+  const O = 'fill:var(--c-b);font-weight:600';
+  T(svg, (L[0] + A[0]) / 2, y - 106, '∂L/∂a = 2(a − y)', 'txs halo', { ...MID, style: O });
+  T(svg, (A[0] + Z[0]) / 2, y - 106, '∂a/∂z = σ(z)(1 − σ(z))', 'txs halo', { ...MID, style: O });
+  T(svg, Z[0] - 150, 34, '∂z/∂w = a⁽ˡ⁻¹⁾', 'txs halo', { style: O });
+}
+
+function drawInit() {
+  const svg = $('init-svg');
+  /* (a) zero start */
+  T(svg, 0, 40, '(a) all weights start at 0', 'ttl');
+  const X = [[70, 230], [70, 450]], H = [[290, 170], [290, 340], [290, 510]], O = [480, 340];
+  X.forEach((p) => H.forEach((h) => arrow(svg, p, h, 36, 40)));
+  H.forEach((h) => arrow(svg, h, O, 40, 40));
+  X.forEach((p, k) => unit(svg, p, 36, 'x' + '₁₂'[k]));
+  H.forEach((h) => unit(svg, h, 40, '0.5', 'box-a', 24));
+  unit(svg, O, 40, 'ŷ', 'box-b');
+  T(svg, 0, 610, 'σ(0) = 0.5 in every unit,', 'txs');
+  T(svg, 0, 646, 'so every gradient is the same', 'txs');
+  /* (b) error that can reach each layer */
+  const g = el('g', { id: 'init-b' }, svg);
+  T(g, 600, 40, '(b) error reaching each layer', 'ttl');
+  const F = frame(g, { W: 1160, H: 680, l: 720, r: 10, t: 150, b: 90, x: [0.5, 8.5], y: [-5, 0.3], xt: [1, 2, 3, 4, 5, 6, 7, 8], yt: [-4, -2, 0], fy: (v) => (v ? '10' + (v === -4 ? '⁻⁴' : '⁻²') : '1'), xl: 'layer (8 = output)', grid: true });
+  const bw = (F.sx(1) - F.sx(0)) * 0.36;
+  const S = el('g', { class: 'frag', 'data-step': 'v1' }, F.plot), R = el('g', { class: 'frag', 'data-step': 'v2' }, F.plot);
+  for (let l = 1; l <= 8; l++) {
+    const vs = Math.log10(0.25 ** (8 - l)), x = F.sx(l);
+    el('rect', { class: 'fb', x: x - bw, y: F.sy(vs), width: bw, height: F.sy(-5) - F.sy(vs) }, S);
+    el('rect', { class: 'fc', x, y: F.sy(0), width: bw, height: F.sy(-5) - F.sy(0) }, R);
+  }
+  const lg1 = legend(g, 610, 84, [['dot', 'fb', 'sigmoid: × 0.25 per layer']]);
+  lg1.setAttribute('class', 'frag'); lg1.setAttribute('data-step', 'v1');
+  const lg2 = legend(g, 610, 120, [['dot', 'fc', 'ReLU: × 1 when active']]);
+  lg2.setAttribute('class', 'frag'); lg2.setAttribute('data-step', 'v2');
+}
+
+function drawReg() {
+  const svg = $('reg-svg');
+  const g = el('g', { id: 'reg-a' }, svg);
+  T(g, 0, 30, '(a) training and validation cost', 'ttl');
+  const F = frame(g, { W: 1160, H: 400, l: 96, t: 50, b: 80, x: [0, 100], y: [0, 0.8], xt: [0, 25, 50, 75, 100], yt: [0, 0.4, 0.8], xl: 'epoch', yl: 'cost J' });
+  const tr = (t) => 0.62 * Math.exp(-t / 14) + 0.03 + 0.03 * Math.exp(-t / 60);
+  const va = (t) => 0.62 * Math.exp(-t / 14) + 0.12 + 0.0012 * Math.max(0, t - 22) ** 1.35;
+  let best = 0;
+  for (let t = 0; t <= 100; t += 0.5) if (va(t) < va(best)) best = t;
+  el('path', { class: 'curve-a an-draw', pathLength: 1, d: curvePath(tr, 0, 100, F.sx, F.sy) }, F.plot);
+  el('path', { class: 'curve-b an-draw', pathLength: 1, style: '--d:.4s', d: curvePath(va, 0, 100, F.sx, F.sy) }, F.plot);
+  el('line', { class: 'curve-t', x1: F.sx(best), x2: F.sx(best), y1: F.T, y2: F.H - F.B }, F.plot);
+  T(g, F.sx(best) + 14, F.T + 34, 'stop early here', 'txs');
+  legend(g, 760, 90, [['line', 'curve-a', 'training'], ['line', 'curve-b', 'validation']]);
+  /* (b) dropout */
+  const d = el('g', {}, svg);
+  T(d, 0, 440, '(b) dropout', 'ttl');
+  const LAY = [[160, 3], [420, 5], [680, 5], [940, 1]], OFF = { '1,1': 1, '1,3': 1, '2,0': 1, '2,2': 1, '2,4': 1 };
+  const pos = LAY.map(([x, n]) => Array.from({ length: n }, (_, i) => [x, 570 + (i - (n - 1) / 2) * 52]));
+  const off = (l, i) => OFF[`${l},${i}`] === 1;
+  for (let l = 0; l < 3; l++) pos[l].forEach((p, i) => pos[l + 1].forEach((q, k) => {
+    if (off(l, i) || off(l + 1, k)) return;
+    el('line', { x1: p[0] + 20, y1: p[1], x2: q[0] - 20, y2: q[1], class: 'wire', style: 'stroke-width:2' }, d);
+  }));
+  pos.forEach((col, l) => col.forEach((p, i) => {
+    const o = off(l, i);
+    el('circle', { cx: p[0], cy: p[1], r: 20, class: l === 3 ? 'box-b' : o ? 'box' : 'box-a', style: o ? 'opacity:.45' : '' }, d);
+    if (o) el('path', { d: `M${p[0] - 12} ${p[1] - 12}l24 24m0 -24l-24 24`, style: 'stroke:var(--myst-color-text);stroke-width:3' }, d);
+  }));
+  T(d, 1000, 560, 'a new random', 'txs');
+  T(d, 1000, 594, 'set is switched', 'txs');
+  T(d, 1000, 628, 'off at each step', 'txs');
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.perc = (() => {
+  const svg = $('perc-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 96, r: 472, x: [-0.5, 1.5], y: [-0.5, 1.5], xt: [0, 1], yt: [0, 1], xl: 'x₁', yl: 'x₂' });
+  const RECT = [[-0.5, -0.5], [1.5, -0.5], [1.5, 1.5], [-0.5, 1.5]];
+  const zone = el('path', { style: 'fill:var(--c-b);fill-opacity:.16' }, F.plot);
+  const line = el('line', { style: 'stroke:var(--myst-color-text);stroke-width:4' }, F.plot);
+  const P = [[0, 0], [0, 1], [1, 0], [1, 1]];
+  const GATES = { and: [0, 0, 0, 1], or: [0, 1, 1, 1], xor: [0, 1, 1, 0] };
+  const dots = P.map(([a, b]) => el('circle', { class: 'pt', cx: F.sx(a), cy: F.sy(b), r: 18 }, F.plot));
+  const rings = P.map(([a, b]) => el('circle', { cx: F.sx(a), cy: F.sy(b), r: 30, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:4' }, F.plot));
+  /* truth table */
+  const TX = [740, 820, 930, 1050];
+  T(svg, 720, 60, 'truth table', 'ttl');
+  ['x₁', 'x₂', 'target', 'ŷ'].forEach((s, i) => T(svg, TX[i], 116, s, 'tx', { ...MID, 'font-weight': 700 }));
+  el('line', { x1: 710, x2: 1110, y1: 134, y2: 134, class: 'ax' }, svg);
+  const cells = P.map(([a, b], i) => {
+    const y = 180 + i * 56;
+    T(svg, TX[0], y, String(a), 'tx', MID); T(svg, TX[1], y, String(b), 'tx', MID);
+    return [T(svg, TX[2], y, '', 'tx', MID), T(svg, TX[3], y, '', 'tx', { ...MID, 'font-weight': 700 })];
+  });
+  legend(svg, 720, 450, [['dot', 'fb', 'target 1'], ['dot', 'fa', 'target 0']]);
+  const ring = el('g', {}, svg);
+  el('circle', { cx: 732, cy: 522, r: 11, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, ring);
+  T(ring, 758, 530, 'mistake', 'txs');
+  T(svg, 720, 590, 'shaded: perceptron says 1', 'txs');
+  const s1 = $('perc-w1'), s2 = $('perc-w2'), sb = $('perc-b');
+  const btns = [$('perc-and'), $('perc-or'), $('perc-xor')];
+  let gate = 'and';
+  function draw() {
+    const w1 = +s1.value, w2 = +s2.value, b = +sb.value, f = ([a, c]) => w1 * a + w2 * c + b;
+    zone.setAttribute('d', polyD(F, clipHalf(RECT, f)));
+    if (Math.abs(w1) < 1e-9 && Math.abs(w2) < 1e-9) line.style.display = 'none';
+    else {
+      line.style.display = '';
+      let p, q;
+      if (Math.abs(w2) >= Math.abs(w1)) { p = [-1, (-b + w1) / w2]; q = [2, (-b - 2 * w1) / w2]; }
+      else { p = [(-b + w2) / w1, -1]; q = [(-b - 2 * w2) / w1, 2]; }
+      line.setAttribute('x1', F.sx(p[0])); line.setAttribute('y1', F.sy(p[1]));
+      line.setAttribute('x2', F.sx(q[0])); line.setAttribute('y2', F.sy(q[1]));
+    }
+    let ok = 0;
+    P.forEach((p, i) => {
+      const t = GATES[gate][i], out = f(p) >= 0 ? 1 : 0;
+      dots[i].setAttribute('class', `pt ${t ? 'fb' : 'fa'}`);
+      rings[i].style.display = out === t ? 'none' : '';
+      cells[i][0].textContent = t;
+      cells[i][1].textContent = out + (out === t ? '' : ' ✗');
+      if (out === t) ok++;
+    });
+    $('perc-w1-val').textContent = num(w1, 1);
+    $('perc-w2-val').textContent = num(w2, 1);
+    $('perc-b-val').textContent = num(b, 1);
+    $('perc-ok').textContent = `${ok} / 4`;
+  }
+  ['and', 'or', 'xor'].forEach((k, i) => btns[i].addEventListener('click', () => { gate = k; pick(btns, i); draw(); }));
+  [s1, s2, sb].forEach((s) => s.addEventListener('input', draw));
+  pick(btns, 0);
+  draw();
+  return {};
+})();
+
+DEMOS.act = (() => {
+  const svg = $('act-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 96, x: [-4, 4], y: [-1.4, 2.4], xt: [-4, -2, 0, 2, 4], yt: [-1, 0, 1, 2], fx: (v) => (v < 0 ? '−' + -v : String(v)), fy: (v) => (v < 0 ? '−' + -v : String(v)), xl: 'z', yl: '' });
+  el('line', { x1: F.L, x2: F.W - F.R, y1: F.sy(0), y2: F.sy(0), style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, F.plot);
+  el('line', { x1: F.sx(0), x2: F.sx(0), y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, F.plot);
+  const FN = [
+    { g: sig, d: (z) => sig(z) * (1 - sig(z)) },
+    { g: Math.tanh, d: (z) => 1 - Math.tanh(z) ** 2 },
+    { g: relu, d: (z) => (z > 0 ? 1 : 0) },
+    { g: (z) => (z > 0 ? z : 0.1 * z), d: (z) => (z > 0 ? 1 : 0.1) },
+  ];
+  const cd = el('path', { class: 'curve-b', style: 'stroke-dasharray:14 8' }, F.plot);
+  const cg = el('path', { class: 'curve-a' }, F.plot);
+  const mark = el('line', { y1: F.T, y2: F.H - F.B, class: 'curve-t' }, F.plot);
+  const dg = el('circle', { r: 11, style: 'fill:var(--myst-color-bg);stroke:var(--c-a);stroke-width:4' }, F.plot);
+  const dd = el('circle', { r: 11, style: 'fill:var(--myst-color-bg);stroke:var(--c-b);stroke-width:4' }, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.L + 14, y: F.T + 10, width: 290, height: 92, rx: 6, style: 'fill:var(--myst-color-bg);opacity:.9' }, lg);
+  legend(lg, F.L + 28, F.T + 38, [['line', 'curve-a', 'g(z)'], ['line', 'curve-b', 'slope g′(z)']]);
+  const btns = [$('act-sig'), $('act-tanh'), $('act-relu'), $('act-leaky')];
+  const forms = [...document.querySelectorAll('.act-f')];
+  const zs = $('act-z');
+  let k = 0;
+  function draw() {
+    const f = FN[k], z = +zs.value;
+    cg.setAttribute('d', curvePath(f.g, -4, 4, F.sx, F.sy, 400));
+    cd.setAttribute('d', curvePath(f.d, -4, 4, F.sx, F.sy, 400));
+    mark.setAttribute('x1', F.sx(z)); mark.setAttribute('x2', F.sx(z));
+    dg.setAttribute('cx', F.sx(z)); dg.setAttribute('cy', F.sy(f.g(z)));
+    dd.setAttribute('cx', F.sx(z)); dd.setAttribute('cy', F.sy(f.d(z)));
+    forms.forEach((e, i) => { e.style.display = i === k ? '' : 'none'; });
+    $('act-z-val').textContent = num(z, 1);
+    $('act-g').textContent = num(f.g(z), 2);
+    $('act-d').textContent = num(f.d(z), 2);
+  }
+  btns.forEach((b, i) => b.addEventListener('click', () => { k = i; pick(btns, i); draw(); }));
+  zs.addEventListener('input', draw);
+  pick(btns, 0);
+  draw();
+  return {};
+})();
+
+DEMOS.bp = (() => {
+  const svg = $('bp-svg');
+  const IN = [[140, 230], [140, 470]], HID = [[580, 140], [580, 350], [580, 560]], OUT = [1000, 350], r = 46;
+  const x = [1, 0.5], AL = 0.5;
+  const START = { W1: [[0.6, -0.4], [-0.3, 0.8], [0.5, 0.5]], b1: [0.1, 0, -0.2], W2: [0.7, -0.6, 0.4], b2: -0.1 };
+  let N, y = 1, n = 0, st = 'idle', fw = null, bw = null, anim = 0;
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const eg = el('g', {}, svg), pg = el('g', {}, svg), ng = el('g', {}, svg);
+  const edges = [];
+  IN.forEach((p, k) => HID.forEach((h, j) => edges.push({ a: p, b: h, get: () => N.W1[j][k] })));
+  HID.forEach((h, j) => edges.push({ a: h, b: OUT, get: () => N.W2[j] }));
+  edges.forEach((e) => { e.node = el('line', { x1: e.a[0], y1: e.a[1], x2: e.b[0], y2: e.b[1], style: 'stroke:var(--myst-color-text-tertiary);fill:none' }, eg); });
+  IN.forEach((p, k) => unit(ng, p, r, 'x' + '₁₂'[k]));
+  HID.forEach((p, j) => unit(ng, p, r, 'h' + '₁₂₃'[j], 'box-a'));
+  unit(ng, OUT, r, 'ŷ', 'box-b');
+  const val = (p, dy, color) => T(ng, p[0], p[1] + r + dy, '', 'txs halo', { ...MID, style: `fill:${color};font-weight:600` });
+  const A = 'var(--c-a)', B = 'var(--c-b)';
+  const inV = IN.map((p) => val(p, 32, A)), hV = HID.map((p) => val(p, 32, A)), hD = HID.map((p) => val(p, 62, B));
+  const oV = val(OUT, 32, A), oD = val(OUT, 62, B);
+  const tgt = T(ng, OUT[0], OUT[1] - r - 22, '', 'txs', MID);
+  const msg = T(svg, 580, 40, '', 'tx', MID);
+  T(svg, 140, 100, 'input', 'ttl', MID);
+  const bF = $('bp-fwd'), bB = $('bp-bwd'), bU = $('bp-upd');
+  function paintEdges() {
+    edges.forEach((e) => {
+      const w = e.get();
+      e.node.style.strokeWidth = (2 + 5 * Math.min(Math.abs(w), 2)).toFixed(1);
+      e.node.style.strokeDasharray = w < 0 ? '12 8' : '';
+    });
+  }
+  function buttons() {
+    const busy = st.endsWith('ing');
+    bF.disabled = busy;
+    bB.disabled = busy || st !== 'fwd';
+    bU.disabled = busy || st !== 'bwd';
+  }
+  function forward() {
+    const z1 = N.W1.map((row, j) => row[0] * x[0] + row[1] * x[1] + N.b1[j]), a1 = z1.map(relu);
+    const yh = sig(N.W2.reduce((s, w, j) => s + w * a1[j], N.b2));
+    return { z1, a1, yh, L: y ? -Math.log(yh) : -Math.log(1 - yh) };
+  }
+  function backward() {
+    const d2 = fw.yh - y, d1 = N.W2.map((w, j) => w * d2 * (fw.z1[j] > 0 ? 1 : 0));
+    return { d2, d1, gW2: fw.a1.map((a) => d2 * a), gW1: d1.map((d) => x.map((v) => d * v)) };
+  }
+  /* move pulses along a set of edges, then call done */
+  function pulse(list, color, rev, done) {
+    cancelAnimationFrame(anim);
+    clear(pg);
+    const dots = list.map(() => el('circle', { r: 10, style: `fill:${color}` }, pg));
+    const t0 = performance.now(), dur = REDUCED || !isActive(svg) ? 0 : 650;
+    const tick = (t) => {
+      const u = dur ? clamp((t - t0) / dur, 0, 1) : 1;
+      list.forEach((e, i) => {
+        const p = rev ? at(e.b, e.a, u) : at(e.a, e.b, u);
+        dots[i].setAttribute('cx', p[0]); dots[i].setAttribute('cy', p[1]);
+      });
+      if (u < 1) anim = requestAnimationFrame(tick); else { clear(pg); done(); }
+    };
+    anim = requestAnimationFrame(tick);
+  }
+  const L1 = edges.slice(0, 6), L2 = edges.slice(6);
+  function showInputs() { inV.forEach((t, k) => { t.textContent = num(x[k], 1); }); tgt.textContent = `target y = ${y}`; }
+  function blank() {
+    hV.forEach((t) => { t.textContent = '?'; }); hD.forEach((t) => { t.textContent = ''; });
+    oV.textContent = '?'; oD.textContent = '';
+  }
+  function runForward() {
+    fw = forward(); bw = null; st = 'fwding'; buttons(); blank();
+    msg.textContent = 'Forward: values flow to the right';
+    pulse(L1, A, false, () => {
+      hV.forEach((t, j) => { t.textContent = 'a = ' + num(fw.a1[j], 2); });
+      pulse(L2, A, false, () => {
+        oV.textContent = 'ŷ = ' + num(fw.yh, 2);
+        $('bp-yh').textContent = num(fw.yh, 2);
+        $('bp-L').textContent = num(fw.L, 3);
+        msg.textContent = `Output ${num(fw.yh, 2)}, target ${y}: loss ${num(fw.L, 3)}`;
+        st = 'fwd'; buttons();
+      });
+    });
+  }
+  function runBackward() {
+    bw = backward(); st = 'bwding'; buttons();
+    oD.textContent = 'δ = ' + num(bw.d2, 2);
+    msg.textContent = 'Backward: the error flows to the left';
+    pulse(L2, B, true, () => {
+      hD.forEach((t, j) => { t.textContent = 'δ = ' + num(bw.d1[j], 2); });
+      pulse(L1, B, true, () => {
+        msg.textContent = 'Every gradient is δ times the input of its arrow';
+        st = 'bwd'; buttons();
+      });
+    });
+  }
+  function runUpdate() {
+    const from = copy(N);
+    const to = copy(N);
+    to.W1 = N.W1.map((row, j) => row.map((w, k) => w - AL * bw.gW1[j][k]));
+    to.b1 = N.b1.map((b, j) => b - AL * bw.d1[j]);
+    to.W2 = N.W2.map((w, j) => w - AL * bw.gW2[j]);
+    to.b2 = N.b2 - AL * bw.d2;
+    st = 'upding'; buttons();
+    cancelAnimationFrame(anim);
+    const t0 = performance.now(), dur = REDUCED || !isActive(svg) ? 0 : 500;
+    const mix = (a, b, u) => a + (b - a) * u;
+    const tick = (t) => {
+      const u = dur ? clamp((t - t0) / dur, 0, 1) : 1;
+      N.W1 = from.W1.map((row, j) => row.map((w, k) => mix(w, to.W1[j][k], u)));
+      N.W2 = from.W2.map((w, j) => mix(w, to.W2[j], u));
+      paintEdges();
+      if (u < 1) { anim = requestAnimationFrame(tick); return; }
+      N = to; n++; paintEdges(); blank();
+      $('bp-n').textContent = n;
+      msg.textContent = 'Weights moved against their gradients';
+      st = 'idle'; buttons();
+    };
+    anim = requestAnimationFrame(tick);
+  }
+  function reset() {
+    cancelAnimationFrame(anim); clear(pg);
+    N = copy(START); n = 0; st = 'idle'; fw = bw = null;
+    paintEdges(); showInputs(); blank();
+    $('bp-n').textContent = 0; $('bp-yh').textContent = '?'; $('bp-L').textContent = '?';
+    msg.textContent = 'Press Forward to compute the output';
+    buttons();
+  }
+  bF.addEventListener('click', runForward);
+  bB.addEventListener('click', runBackward);
+  bU.addEventListener('click', runUpdate);
+  $('bp-y').addEventListener('click', () => {
+    if (st.endsWith('ing')) return;
+    y = 1 - y; $('bp-y').textContent = `Target y = ${y}`;
+    st = 'idle'; showInputs(); blank(); buttons();
+    $('bp-yh').textContent = '?'; $('bp-L').textContent = '?';
+    msg.textContent = 'New target: press Forward';
+  });
+  $('bp-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+DEMOS.train = (() => {
+  const svg = $('tr-svg');
+  const BOX = [-2.6, 2.6, -2.1, 2.1], PX = [10, 650], PY = [56, 573];
+  const sx = (v) => PX[0] + ((v - BOX[0]) / (BOX[1] - BOX[0])) * (PX[1] - PX[0]);
+  const sy = (v) => PY[1] - ((v - BOX[2]) / (BOX[3] - BOX[2])) * (PY[1] - PY[0]);
+  const DATA = {
+    moons: (() => {
+      const r = rng(3), P = [];
+      for (let i = 0; i < 200; i++) {
+        const c = i % 2, t = Math.PI * r();
+        const x = (c ? 1 - Math.cos(t) : Math.cos(t)) + 0.16 * gauss(r), y = (c ? 0.5 - Math.sin(t) : Math.sin(t)) + 0.16 * gauss(r);
+        P.push({ x: (x - 0.5) * 1.35, y: (y - 0.25) * 1.35, c });
+      }
+      return P;
+    })(),
+    spiral: (() => {
+      const r = rng(4), P = [];
+      for (let i = 0; i < 200; i++) {
+        const c = i % 2, t = (Math.floor(i / 2) / 100) * 3.2 + 0.35, rad = (t / 3.6) * 1.9, a = t * 1.85 + c * Math.PI;
+        P.push({ x: rad * Math.cos(a) + 0.07 * gauss(r), y: rad * Math.sin(a) + 0.07 * gauss(r), c });
+      }
+      return P;
+    })(),
+  };
+  T(svg, PX[0], 36, '(a) predicted class', 'ttl');
+  const shade = el('g', {}, svg);
+  const BANDS = ['fill:var(--c-a);fill-opacity:.32', 'fill:var(--c-a);fill-opacity:.14', 'fill:var(--c-b);fill-opacity:.14', 'fill:var(--c-b);fill-opacity:.32'];
+  const bandPaths = BANDS.map((s) => el('path', { style: s }, shade));
+  el('rect', { x: PX[0], y: PY[0], width: PX[1] - PX[0], height: PY[1] - PY[0], style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, svg);
+  const ptG = el('g', {}, svg);
+  const status = T(svg, PX[0], 630, '', 'txs');
+  legend(svg, PX[0] + 10, 672, [['dot', 'fa', 'class 0']]);
+  legend(svg, PX[0] + 200, 672, [['dot', 'fb', 'class 1']]);
+  const lossG = el('g', { id: 'tr-loss' }, svg);
+  T(lossG, 700, 36, '(b) cost J', 'ttl');
+  const LF = frame(lossG, { W: 1160, H: 573, l: 790, r: 20, t: 56, b: 84, x: [0, 3000], y: [0, 0.8], xt: [0, 1500, 3000], yt: [0, 0.2, 0.4, 0.6, 0.8], xl: 'epoch', yl: 'cost' });
+  const lossPath = el('path', { class: 'curve-b' }, LF.plot);
+  const NX = 64, NY = 51, dx = (BOX[1] - BOX[0]) / NX, dy = (BOX[3] - BOX[2]) / NY;
+  let P = DATA.moons, net = null, epoch = 0, hist = [], running = false, seed = 7, raf = 0, last = { loss: 0, acc: 0 };
+  const btnD = [$('tr-moons'), $('tr-spiral')], hS = $('tr-h'), aS = $('tr-a');
+  function init() {
+    const H = +hS.value, r = rng(seed);
+    net = { H, W1: [], b1: new Array(H).fill(0), W2: [], b2: 0 };
+    for (let j = 0; j < H; j++) { net.W1.push([gauss(r) / Math.SQRT2, gauss(r) / Math.SQRT2]); net.W2.push((0.5 * gauss(r)) / Math.sqrt(H)); }
+    epoch = 0; hist = [];
+    last = evalAll();
+    hist.push([0, last.loss]);
+  }
+  function predict(px, py) {
+    let z = net.b2;
+    for (let j = 0; j < net.H; j++) z += net.W2[j] * Math.tanh(net.W1[j][0] * px + net.W1[j][1] * py + net.b1[j]);
+    return sig(z);
+  }
+  function evalAll() {
+    let loss = 0, acc = 0;
+    P.forEach((p) => { const q = predict(p.x, p.y); loss -= Math.log(Math.max(p.c ? q : 1 - q, 1e-12)); if ((q >= 0.5) === (p.c === 1)) acc++; });
+    return { loss: loss / P.length, acc: acc / P.length };
+  }
+  /* one epoch of full-batch gradient descent, backpropagation by (11)-(13) */
+  function step(al) {
+    const H = net.H, gW1 = net.W1.map(() => [0, 0]), gb1 = new Array(H).fill(0), gW2 = new Array(H).fill(0), a = new Array(H);
+    let gb2 = 0, loss = 0, acc = 0;
+    for (const p of P) {
+      let z2 = net.b2;
+      for (let j = 0; j < H; j++) { a[j] = Math.tanh(net.W1[j][0] * p.x + net.W1[j][1] * p.y + net.b1[j]); z2 += net.W2[j] * a[j]; }
+      const yh = sig(z2), d2 = yh - p.c;
+      loss -= Math.log(Math.max(p.c ? yh : 1 - yh, 1e-12));
+      if ((yh >= 0.5) === (p.c === 1)) acc++;
+      gb2 += d2;
+      for (let j = 0; j < H; j++) {
+        gW2[j] += d2 * a[j];
+        const d1 = net.W2[j] * d2 * (1 - a[j] * a[j]);
+        gW1[j][0] += d1 * p.x; gW1[j][1] += d1 * p.y; gb1[j] += d1;
+      }
+    }
+    const n = P.length;
+    for (let j = 0; j < H; j++) {
+      net.W1[j][0] -= (al * gW1[j][0]) / n; net.W1[j][1] -= (al * gW1[j][1]) / n;
+      net.b1[j] -= (al * gb1[j]) / n; net.W2[j] -= (al * gW2[j]) / n;
+    }
+    net.b2 -= (al * gb2) / n;
+    epoch++;
+    return { loss: loss / n, acc: acc / n };
+  }
+  function drawPoints() {
+    clear(ptG);
+    P.forEach((p) => el('circle', { class: `pt ${p.c ? 'fb' : 'fa'}`, cx: sx(p.x), cy: sy(p.y), r: 7 }, ptG));
+  }
+  function draw() {
+    const parts = BANDS.map(() => []);
+    const cw = sx(BOX[0] + dx) - sx(BOX[0]), ch = sy(BOX[2]) - sy(BOX[2] + dy);
+    for (let i = 0; i < NX; i++) for (let k = 0; k < NY; k++) {
+      const q = predict(BOX[0] + (i + 0.5) * dx, BOX[2] + (k + 0.5) * dy);
+      const b = q < 0.25 ? 0 : q < 0.5 ? 1 : q < 0.75 ? 2 : 3;
+      parts[b].push(`M${sx(BOX[0] + i * dx).toFixed(1)} ${sy(BOX[2] + (k + 1) * dy).toFixed(1)}h${(cw + 0.6).toFixed(1)}v${(ch + 0.6).toFixed(1)}h${-(cw + 0.6).toFixed(1)}z`);
+    }
+    bandPaths.forEach((pa, b) => pa.setAttribute('d', parts[b].join('')));
+    lossPath.setAttribute('d', hist.map(([e, l], i) => (i ? 'L' : 'M') + LF.sx(e).toFixed(1) + ' ' + clamp(LF.sy(Math.min(l, 0.8)), 0, 1000).toFixed(1)).join(''));
+    $('tr-ep').textContent = epoch;
+    $('tr-J').textContent = num(last.loss, 3);
+    $('tr-acc').textContent = pct(last.acc);
+    status.textContent = epoch ? (running ? 'training…' : epoch >= 3000 ? 'done: 3000 epochs' : 'paused') : 'random start: press Train';
+  }
+  function tick() {
+    raf = 0;
+    if (!running) return;
+    if (!isActive(svg)) { running = false; draw(); return; }
+    const al = +aS.value;
+    for (let k = 0; k < 10 && epoch < 3000; k++) {
+      last = step(al);
+      if (epoch % 10 === 0) hist.push([epoch, last.loss]);
+    }
+    if (epoch >= 3000) running = false;
+    draw();
+    if (running) raf = requestAnimationFrame(tick);
+  }
+  function go() {
+    if (running) return;
+    if (epoch >= 3000) { seed++; init(); }
+    running = true;
+    if (REDUCED) { while (epoch < 3000) { last = step(+aS.value); if (epoch % 10 === 0) hist.push([epoch, last.loss]); } running = false; draw(); return; }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  function stop() { running = false; draw(); }
+  function reset() { running = false; seed++; init(); draw(); }
+  $('tr-go').addEventListener('click', go);
+  $('tr-pause').addEventListener('click', stop);
+  $('tr-reset').addEventListener('click', reset);
+  hS.addEventListener('input', () => { $('tr-h-val').textContent = hS.value; reset(); });
+  aS.addEventListener('input', () => { $('tr-a-val').textContent = num(+aS.value, 1); });
+  ['moons', 'spiral'].forEach((k, i) => btnD[i].addEventListener('click', () => { P = DATA[k]; pick(btnD, i); drawPoints(); reset(); }));
+  pick(btnD, 0);
+  drawPoints();
+  init();
+  draw();
+  return {};
+})();
+
+DEMOS.ua = (() => {
+  const svg = $('ua-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 96, x: [-3, 3], y: [-2.6, 2.6], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [-2, -1, 0, 1, 2], fx: (v) => (v < 0 ? '−' + -v : String(v)), fy: (v) => (v < 0 ? '−' + -v : String(v)), xl: 'x', yl: 'y' });
+  const f = (x) => Math.sin(1.6 * x) + 0.3 * x;
+  el('path', { class: 'curve-t', d: curvePath(f, -3, 3, F.sx, F.sy) }, F.plot);
+  const fit = el('path', { class: 'curve-a' }, F.plot);
+  const bends = el('g', {}, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: F.L + 14, y: F.T + 10, width: 330, height: 92, rx: 6, style: 'fill:var(--myst-color-bg);opacity:.9' }, lg);
+  legend(lg, F.L + 28, F.T + 38, [['line', 'curve-t', 'target curve'], ['line', 'curve-a', 'network, eq. (15)']]);
+  const XS = Array.from({ length: 121 }, (_, i) => -3 + i * 0.05);
+  const sN = $('ua-n');
+  function draw() {
+    const N = +sN.value, C = Array.from({ length: N }, (_, j) => -3 + (6 * j) / N);
+    const feat = (x) => [1, ...C.map((c) => relu(x - c))];
+    const m = N + 1, A = Array.from({ length: m }, () => new Array(m).fill(0)), b = new Array(m).fill(0);
+    XS.forEach((x) => { const v = feat(x), y = f(x); for (let i = 0; i < m; i++) { b[i] += v[i] * y; for (let k = 0; k < m; k++) A[i][k] += v[i] * v[k]; } });
+    for (let i = 0; i < m; i++) A[i][i] += 1e-8;
+    const w = solve(A, b), g = (x) => feat(x).reduce((s, v, i) => s + v * w[i], 0);
+    fit.setAttribute('d', curvePath(g, -3, 3, F.sx, F.sy, 300));
+    clear(bends);
+    C.forEach((c) => el('circle', { class: 'pt fb', cx: F.sx(c), cy: F.sy(g(c)), r: 9 }, bends));
+    const mse = XS.reduce((s, x) => s + (g(x) - f(x)) ** 2, 0) / XS.length;
+    $('ua-n-val').textContent = N;
+    $('ua-mse').textContent = num(mse, 3);
+  }
+  sN.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+drawNeuron(); drawXor(); drawLayers(); drawForward(); drawBackward(); drawOut(); drawGd(); drawBatch(); drawChain(); drawInit(); drawReg();
+})();
+</script>
+</body>
+</html>

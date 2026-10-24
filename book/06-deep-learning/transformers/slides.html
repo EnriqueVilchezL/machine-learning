@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformers</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+<style>
+.tk{font-size:24px}
+.ats-prose table.tb.cmp{font-size:26px}
+.ats-prose table.tb.cmp td,.ats-prose table.tb.cmp th{padding:.26em .6em}
+.tokbtn{cursor:pointer;outline:none}
+.tokbtn:hover rect{stroke-width:3}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-o" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="22" markerHeight="22" orient="auto-start-reverse"><path style="fill:var(--c-b)" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 31</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Transformers</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">How attention lets every word look at every other word, and how that idea became today's language models</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 31 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">Where recurrent networks struggle</li>
+<li class="an-up" style="--d:.15s">Tokens and embeddings</li>
+<li class="an-up" style="--d:.25s">Attention: queries, keys and values</li>
+<li class="an-up" style="--d:.35s">Many heads and word order</li>
+<li class="an-up" style="--d:.45s">The transformer block and language models</li>
+<li class="an-up" style="--d:.55s">Scale, limits and uses beyond text</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks, buttons and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb cmp">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">t = 1, \dots, T</span></td><td>Position of a token; <span class="tex">T</span> tokens in the text</td></tr>
+<tr class="an-up" style="--d:.10s"><td><span class="tex">\mathbf{x}_t \in \mathbb{R}^{d_{\text{model}}}, \ \mathbf{X}</span></td><td>Embedding of token <span class="tex">t</span>; the rows of <span class="tex">\mathbf{X}</span> (<span class="tex">T \times d_{\text{model}}</span>)</td></tr>
+<tr class="an-up" style="--d:.15s"><td><span class="tex">\mathbf{W}_Q, \ \mathbf{W}_K, \ \mathbf{W}_V</span></td><td>Learned matrices for queries, keys, values</td></tr>
+<tr class="an-up" style="--d:.20s"><td><span class="tex">\mathbf{Q}, \mathbf{K}, \mathbf{V}; \ \mathbf{q}_t, \mathbf{k}_t, \mathbf{v}_t</span></td><td>Queries, keys, values and their rows; key size <span class="tex">d_k</span></td></tr>
+<tr class="an-up" style="--d:.25s"><td><span class="tex">\mathbf{A}, \ a_{tj}</span></td><td>Attention weights: how much token <span class="tex">t</span> looks at token <span class="tex">j</span></td></tr>
+<tr class="an-up" style="--d:.30s"><td><span class="tex">h, \ \mathbf{W}_O</span></td><td>Number of heads, and the matrix that mixes them</td></tr>
+<tr class="an-up" style="--d:.35s"><td><span class="tex">\mathbf{p}_t</span></td><td>Positional encoding added to <span class="tex">\mathbf{x}_t</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">|\mathcal{V}|</span></td><td>Vocabulary size: number of different tokens</td></tr>
+<tr class="an-up" style="--d:.45s"><td><span class="tex">L, \ J, \ \boldsymbol{\theta}</span></td><td>Loss of one prediction, average cost, all parameters</td></tr>
+<tr class="an-up" style="--d:.50s"><td><span class="tex">\tau</span></td><td>Temperature: how sharp the probabilities are</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold lowercase letters are vectors, bold capitals are matrices.</p><p>Subscript <span class="tex">t</span> is the token that looks; subscript <span class="tex">j</span> is the token being looked at.</p><p>Softmax and ReLU are the activations <span class="tex">g</span> of Topic 23.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">From words to vectors</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Text becomes a list of vectors, and each word asks which others matter.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="RNN limits">
+<div class="hdr" data-s="Words to vectors"></div>
+<h2>Where recurrent networks struggle</h2>
+<div class="fr">
+<div class="figbox"><svg id="rnn-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">A recurrent network (Topic 26) reads one token per step and keeps a memory <span class="tex">\mathbf{h}_t</span>.</p>
+<p class="small frag up" data-step="r1" style="margin:0">Two problems: steps cannot run in parallel, and the memory of an early word fades over many steps.</p>
+<p class="small frag up" data-step="r2" style="margin:0"><strong>Attention</strong> links every pair of tokens directly, in one step.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>(a) “animal” reaches “it” only through five memory updates. (b) With attention, “it” looks at every word at once.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Tokens and embeddings">
+<div class="hdr" data-s="Words to vectors"></div>
+<h2>Tokens and embeddings</h2>
+<div class="fr">
+<div class="figbox"><svg id="tok-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Text is split into <strong>tokens</strong>: whole words or common pieces of words. Each token has a number in a fixed vocabulary.</p>
+<p class="small frag up" data-step="t1" style="margin:0">Each token number is replaced by a learned vector, its <strong>embedding</strong> <span class="tex">\mathbf{x}_t</span>.</p>
+<p class="small frag up" data-step="t2" style="margin:0">Training places words used in similar ways close together.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>(a) A sentence cut into tokens, each mapped to a vector. (b) Made-up 2-D embeddings; real ones have hundreds of numbers.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Which words matter">
+<div class="hdr" data-s="Words to vectors"></div>
+<h2>Which words matter?</h2>
+<div class="fr">
+<div class="figbox"><svg id="which-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">To understand “it”, a reader must find what “it” refers to: the animal, not the street.</p>
+<p class="small frag up" data-step="w1" style="margin:0">Attention gives each word a set of <strong>weights</strong> over all words. A large weight means “this word matters for me”.</p>
+<p class="small frag up" data-step="w2" style="margin:0">The new vector for “it” mixes in mostly the vector of “animal”.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 3:</b>Line width shows the weight from “it” to each word. Weights from the small made-up vectors of Figure 5.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Attention</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Compare, turn scores into weights, and take a weighted average.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Queries keys values">
+<div class="hdr" data-s="Attention"></div>
+<h2>Queries, keys and values</h2>
+<div class="fr">
+<div class="figbox"><svg id="qkv-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Each token makes three vectors from its embedding, with three learned matrices.</p>
+<p class="small frag up" data-step="q1" style="margin:0">A token compares its <strong>query</strong> with the <strong>key</strong> of every token. A good match means a large weight.</p>
+<p class="small frag up" data-step="q2" style="margin:0">It then collects the <strong>values</strong> of the tokens, using those weights.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>The token “it” and its three vectors. Made-up numbers with 4 entries each.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Scores to weights">
+<div class="hdr" data-s="Attention"></div>
+<h2>From scores to weights</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The query of token <span class="tex">t</span> meets the key of token <span class="tex">j</span>. Their dot product is large when the two vectors point the same way:</p>
+<div class="eq"><div class="m tex-d">s_{tj} = \mathbf{q}_t^\top \mathbf{k}_j = \sum_{m=1}^{d_k} q_{tm}\, k_{jm}</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="s1" style="margin:0">Softmax turns the <span class="tex">T</span> scores into positive weights that add up to 1:</p>
+<div class="eq frag up" data-step="s1"><div class="m tex-d">a_{tj} = \frac{e^{s_{tj}}}{\sum_{j'=1}^{T} e^{s_{tj'}}}</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="s2" style="margin:0">The output for token <span class="tex">t</span> is the weighted average of the values:</p>
+<div class="eq frag up" data-step="s2"><div class="m tex-d">\mathbf{o}_t = \sum_{j=1}^{T} a_{tj}\, \mathbf{v}_j</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Tokens “the cat it”. Query of “it”: <span class="tex">(1, 0)</span>.</p><p>Keys <span class="tex">(0, 1)</span>, <span class="tex">(2, 1)</span>, <span class="tex">(1, 0)</span> give scores <span class="tex">0, 2, 1</span>.</p><p><span class="tex">e^0 + e^2 + e^1 \approx 11.11</span></p><p>Weights: <span class="tex">0.090, \ 0.665, \ 0.245</span></p></aside>
+<aside class="am frag up" data-step="s2"><div class="t">Output</div><p>Values <span class="tex">(0, 1)</span>, <span class="tex">(1, 0)</span>, <span class="tex">(0, 1)</span>.</p><p>First entry: <span class="tex">0.665</span>. Second: <span class="tex">0.090 + 0.245 = 0.335</span>.</p><p><span class="tex">\mathbf{o} = (0.665, \ 0.335)</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Scaled attention">
+<div class="hdr" data-s="Attention"></div>
+<h2>Scaled dot-product attention</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">The queries, keys and values of all tokens come from the embeddings through three learned matrices:</p>
+<div class="eq"><div class="m tex-d">\mathbf{Q} = \mathbf{X}\mathbf{W}_Q, \qquad \mathbf{K} = \mathbf{X}\mathbf{W}_K, \qquad \mathbf{V} = \mathbf{X}\mathbf{W}_V</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="a1" style="margin:0">Equations (1) to (3) for all tokens at once, with softmax applied to each row:</p>
+<div class="eq frag up" data-step="a1"><div class="m tex-d">\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \underbrace{\text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right)}_{\mathbf{A}} \mathbf{V}</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="a2" style="margin:0">Why <span class="tex">\sqrt{d_k}</span>: a dot product adds <span class="tex">d_k</span> terms, so scores grow with the key size. Large scores push softmax to all-or-nothing weights, and learning slows down.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>With <span class="tex">d_k = 64</span>, scores <span class="tex">(0, 16, 8)</span> give weights</p><p><span class="tex">(0.000, \ 0.9997, \ 0.0003)</span>.</p><p>Divided by <span class="tex">\sqrt{64} = 8</span>: scores <span class="tex">(0, 2, 1)</span>, weights</p><p><span class="tex">(0.090, \ 0.665, \ 0.245)</span>.</p></aside>
+<aside class="am frag up" data-step="a1"><div class="t">Shapes</div><p><span class="tex">\mathbf{Q}\mathbf{K}^\top</span> is <span class="tex">T \times T</span>: one row of weights for each token.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Attention demo" data-demo="att">
+<div class="hdr" data-s="Attention"></div>
+<h2>Attention in action</h2>
+<div class="fr">
+<div class="figbox"><svg id="att-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Click a token. Arrows and bars show its weights <span class="tex">a_{tj}</span>. Scaling divides the scores by <span class="tex">\sqrt{d_k} = 2</span>.</p>
+<div class="ctl"><label><span>Temperature <span class="tex">\tau</span> (divides the scores)</span><b id="att-tau-val">1.00</b></label><input type="range" id="att-tau" min="0.25" max="3" step="0.05" value="1"></div>
+<div class="btns"><button class="bt chip" id="att-scale">Scaling: on</button><button class="bt chip" id="att-reset">Reset</button></div>
+<div class="ro"><span>Query token</span><b id="att-q">it</b></div>
+<div class="ro"><span>Looks most at</span><b id="att-top" class="bb">animal</b></div>
+<div class="ro"><span>Largest weight</span><b id="att-max" class="a">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 5:</b>Weights computed live from small made-up 4-number queries and keys (<span class="tex">d_k = 4</span>), as if <span class="tex">\mathbf{W}_Q</span> and <span class="tex">\mathbf{W}_K</span> were learned. Bars add up to 100%.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Self and cross attention">
+<div class="hdr" data-s="Attention"></div>
+<h2>Self and cross attention</h2>
+<div class="fr">
+<div class="figbox"><svg id="cross-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0"><strong>Self-attention:</strong> queries, keys and values all come from the same sentence.</p>
+<p class="small frag up" data-step="c1" style="margin:0"><strong>Encoder–decoder attention:</strong> queries come from the sentence being written, keys and values from the input sentence.</p>
+<p class="small frag up" data-step="c2" style="margin:0">This second kind first appeared in translation with recurrent networks (Bahdanau et al., 2015).</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>(a) A sentence attends to itself. (b) Spanish words being written attend to the English input. Illustrative weights.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Multi-head attention">
+<div class="hdr" data-s="Attention"></div>
+<h2>Multi-head attention</h2>
+<div class="fr">
+<div class="col">
+<div class="figbox"><svg id="mh-svg" viewBox="0 0 1160 500"></svg></div>
+<div class="eq" style="font-size:28px;margin:.3em 0 0"><div class="m tex-d">\text{head}_i = \text{Attention}\big(\mathbf{X}\mathbf{W}_Q^{(i)}, \ \mathbf{X}\mathbf{W}_K^{(i)}, \ \mathbf{X}\mathbf{W}_V^{(i)}\big), \quad i = 1, \dots, h</div><div class="n">(6)</div></div>
+<div class="eq" style="font-size:28px;margin:0"><div class="m tex-d">\text{MultiHead}(\mathbf{X}) = \big[\text{head}_1, \dots, \text{head}_h\big]\, \mathbf{W}_O</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">One set of weights captures one kind of relation. A model runs <span class="tex">h</span> <strong>heads</strong> side by side, each with its own matrices.</p>
+<p class="small frag up" style="margin:0">The outputs are placed side by side and mixed by <span class="tex">\mathbf{W}_O</span>.</p>
+<aside class="am frag up"><div class="t">Example</div><p><span class="tex">d_{\text{model}} = 512</span> and <span class="tex">h = 8</span>.</p><p>Each head: <span class="tex">d_k = 512 / 8 = 64</span></p><p>Side by side: <span class="tex">8 \cdot 64 = 512</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>Three of <span class="tex">h</span> heads on “the cat sat on mat”. Darker cell: larger weight. Illustrative patterns.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Word order">
+<div class="hdr" data-s="Attention"></div>
+<h2>Adding word order</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Attention compares pairs and ignores where tokens sit: “dog bites man” and “man bites dog” give the same weights. So a position vector is added to each embedding:</p>
+<div class="eq"><div class="m tex-d">\mathbf{x}_t \;\leftarrow\; \mathbf{x}_t + \mathbf{p}_t</div><div class="n">(8)</div></div>
+<p class="small frag up" data-step="p1" style="margin:0">The original transformer uses waves of different speeds, with <span class="tex">i = 0, 1, \dots, d_{\text{model}}/2 - 1</span>:</p>
+<div class="eq frag up" data-step="p1"><div class="m tex-d">p_{t,2i} = \sin\!\left(\frac{t}{10000^{2i/d_{\text{model}}}}\right), \qquad p_{t,2i+1} = \cos\!\left(\frac{t}{10000^{2i/d_{\text{model}}}}\right)</div><div class="n">(9)</div></div>
+<p class="small frag up" data-step="p2" style="margin:0">Early entries change fast and later ones slowly, like the hands of a clock. Each position gets its own pattern.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p><span class="tex">d_{\text{model}} = 4</span>, position <span class="tex">t = 1</span>. For <span class="tex">i = 1</span>: <span class="tex">10000^{2/4} = 100</span>.</p><p><span class="tex">p_{1,0} = \sin 1 \approx 0.841</span><br><span class="tex">p_{1,1} = \cos 1 \approx 0.540</span><br><span class="tex">p_{1,2} = \sin 0.01 \approx 0.010</span><br><span class="tex">p_{1,3} = \cos 0.01 \approx 1.000</span></p></aside>
+<aside class="am frag up" data-step="p2"><div class="t">Learned positions</div><p>Many later models learn <span class="tex">\mathbf{p}_t</span> as parameters instead.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Position patterns" data-demo="pe">
+<div class="hdr" data-s="Attention"></div>
+<h2>Position patterns</h2>
+<div class="fr">
+<div class="figbox"><svg id="pe-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:14px">
+<p class="small" style="margin:0">Each column of the map is one vector <span class="tex">\mathbf{p}_t</span>. Move the slider to pick a position.</p>
+<div class="ctl"><label><span>Position <span class="tex">t</span></span><b id="pe-t-val">5</b></label><input type="range" id="pe-t" min="0" max="49" step="1" value="5"></div>
+<div class="ro"><span>Entry 0: sin(t)</span><b id="pe-v0" class="a">0</b></div>
+<div class="ro"><span>Entry 1: cos(t)</span><b id="pe-v1">0</b></div>
+<div class="ro"><span>Entry 6: sin(t / 31.6)</span><b id="pe-v6" class="bb">0</b></div>
+<p class="small" style="margin:0">Entry 0 repeats every 6.3 positions; entry 6 every 199.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>Sinusoidal encoding (9) with <span class="tex">d_{\text{model}} = 16</span> for positions 0 to 49. Orange: positive, blue: negative.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The transformer and language models</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Stack attention into blocks, then learn to predict the next token.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Transformer block">
+<div class="hdr" data-s="Transformers"></div>
+<h2>The transformer block</h2>
+<div class="fr">
+<div class="col">
+<div class="figbox"><svg id="blk-svg" viewBox="0 0 1160 520"></svg></div>
+<div class="eq" style="font-size:28px;margin:.3em 0 0"><div class="m tex-d">\mathbf{Z} = \text{Norm}\big(\mathbf{X} + \text{MultiHead}(\mathbf{X})\big)</div><div class="n">(10)</div></div>
+<div class="eq" style="font-size:28px;margin:0"><div class="m tex-d">\mathbf{Y} = \text{Norm}\big(\mathbf{Z} + \text{FFN}(\mathbf{Z})\big), \quad \text{FFN}(\mathbf{z}) = \text{ReLU}(\mathbf{z}\mathbf{W}_1 + \mathbf{b}_1)\,\mathbf{W}_2 + \mathbf{b}_2</div><div class="n">(11)</div></div>
+</div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0"><strong>Residual connection:</strong> the input skips around each part and is added back.</p>
+<p class="small frag up" data-step="b1" style="margin:0"><strong>Normalize:</strong> rescale each token's vector to mean 0, spread 1.</p>
+<aside class="am frag up" data-step="b2"><div class="t">Example</div><p><span class="tex">(1, 2) + (0.5, -1) = (1.5, 1)</span></p><p>Mean 1.25, spread 0.25: <span class="tex">(1, -1)</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 9:</b>One block; models stack <span class="tex">N</span> of them.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Causal mask" data-demo="mask">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Encoder, decoder and mask</h2>
+<div class="fr">
+<div class="col">
+<div class="figbox"><svg id="mask-svg" viewBox="0 0 1160 540"></svg></div>
+<div class="eq" style="font-size:28px;margin:.2em 0 0"><div class="m tex-d">\mathbf{A} = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}} + \mathbf{M}\right), \qquad M_{tj} = \begin{cases} 0 & j \le t \\ -\infty & j > t \end{cases}</div><div class="n">(12)</div></div>
+</div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">An <strong>encoder</strong> reads the whole input, so every token sees every token. A <strong>decoder</strong> writes text and must not look ahead.</p>
+<div class="btns"><button class="bt chip" id="mask-enc">Encoder</button><button class="bt" id="mask-dec">Decoder</button></div>
+<div class="ro"><span>Row (query)</span><b id="mask-row">on</b></div>
+<div class="ro"><span>Tokens it can see</span><b id="mask-vis" class="a">4 of 6</b></div>
+<aside class="am"><div class="t">Example</div><p>Row 2, scores <span class="tex">(1, 2, 5)</span>. Masked: <span class="tex">(1, 2, -\infty)</span>. Weights <span class="tex">(0.27, 0.73, 0)</span>, since <span class="tex">e^{-\infty} = 0</span>.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 10:</b>Weights from seeded random scores. Click a row. Gray cells are blocked.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Next token">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Predicting the next token</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">A decoder reads tokens <span class="tex">1</span> to <span class="tex">t</span>. Its last vector <span class="tex">\mathbf{h}_t</span> gets one score per vocabulary token, and softmax turns the <span class="tex">|\mathcal{V}|</span> scores into probabilities:</p>
+<div class="eq"><div class="m tex-d">P(x_{t+1} = w \mid x_1, \dots, x_t) = \text{softmax}\big(\mathbf{h}_t \mathbf{W} + \mathbf{b}\big)_w</div><div class="n">(13)</div></div>
+<p class="small frag up" data-step="n1" style="margin:0">Training uses cross-entropy (Topic 23): minus the log of the probability given to the real next token, averaged over all positions.</p>
+<div class="eq frag up" data-step="n1"><div class="m tex-d">\begin{gathered} L_t = -\log P(x_{t+1} = \text{real token} \mid x_1, \dots, x_t) \\ J(\boldsymbol{\theta}) = \frac{1}{T-1} \sum_{t=1}^{T-1} L_t \end{gathered}</div><div class="n">(14)</div></div>
+<p class="small frag up" data-step="n2" style="margin:0">Every position of every text is one training example. No one has to write labels: the text itself is the answer key.</p>
+</div>
+<div class="side" style="gap:24px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>“the cat sat on the”, real next token “mat”, natural log:</p><p><span class="tex">P = 0.6: \ -\log 0.6 \approx 0.51</span></p><p><span class="tex">P = 0.05: \ -\log 0.05 \approx 3.00</span></p></aside>
+<aside class="am frag up" data-step="n1"><div class="t">Size</div><p><span class="tex">\mathbf{W}</span> has one column per token, so <span class="tex">|\mathcal{V}|</span> columns, often tens of thousands.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Generating text" data-demo="gen">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Generating text</h2>
+<div class="fr">
+<div class="col">
+<div class="figbox"><svg id="gen-svg" viewBox="0 0 1160 600"></svg></div>
+<div class="eq" style="font-size:28px;margin:.2em 0 0"><div class="m tex-d">P(w) = \frac{e^{z_w / \tau}}{\sum_{v \in \mathcal{V}} e^{z_v / \tau}}</div><div class="n">(15)</div></div>
+</div>
+<div class="side" style="gap:12px">
+<p class="small" style="margin:0">Pick a token, add it, predict again. <span class="tex">\tau</span> divides each score <span class="tex">z_w</span>.</p>
+<div class="ctl"><label><span>Temperature <span class="tex">\tau</span></span><b id="gen-tau-val">1.00</b></label><input type="range" id="gen-tau" min="0.1" max="3" step="0.05" value="1"></div>
+<div class="btns"><button class="bt" id="gen-sample">Sample</button><button class="bt chip" id="gen-clear">Clear</button></div>
+<div class="ro"><span>Chance of “mat”</span><b id="gen-top" class="a">0%</b></div>
+<aside class="am"><div class="t">Example: scores (2, 1, 0)</div><p><span class="tex">\tau{=}0.5\colon (0.867, 0.117, 0.016)</span><br><span class="tex">\tau{=}1\colon (0.665, 0.245, 0.090)</span><br><span class="tex">\tau{=}2\colon (0.506, 0.307, 0.186)</span></p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 11:</b>Hand-made scores. Low <span class="tex">\tau</span>: safe; high <span class="tex">\tau</span>: odd.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Three families">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Three families</h2>
+<div class="figbox"><svg id="fam-svg" viewBox="0 0 1680 620"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 12:</b>(a) Encoder-only models see the whole text and are trained to fill in hidden words. (b) Decoder-only models use the causal mask and predict the next token. (c) Encoder–decoder models read one text and write another.</p>
+</section>
+
+<section class="s ats-prose" data-label="Pretraining at scale">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Pretraining at scale</h2>
+<div class="fr">
+<div class="figbox"><svg id="pre-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">Topic 29: pretrain on a large general task, then fine-tune on your own small task.</p>
+<p class="small frag up" data-step="g1" style="margin:0">For language the general task is predicting words in raw text: no labels needed.</p>
+<p class="small frag up" data-step="g2" style="margin:0">Parameters grew about 2&nbsp;700 times in three years. Larger models did better, at a higher cost.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 13:</b>Top: pretrain once, fine-tune often. Bottom: published parameter counts.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Limits">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Limits and responsibility</h2>
+<div class="fr">
+<div class="figbox"><svg id="lim-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:12px">
+<aside class="am"><div class="t">Cost</div><p><span class="tex">T^2</span> pairs: twice the text, four times the work.</p></aside>
+<aside class="am frag up" data-step="l1"><div class="t">Made-up facts</div><p>Likely words are not always true.</p></aside>
+<aside class="am frag up" data-step="l1"><div class="t">Bias</div><p>It repeats patterns in its data, unfair ones too.</p></aside>
+<aside class="am frag up" data-step="l1"><div class="t">Energy</div><p>Large models use much electricity and hardware.</p></aside>
+<div class="grow"></div>
+<p class="cap"><b>Figure 14:</b>One attention score per pair of tokens.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Beyond text">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Beyond text</h2>
+<div class="figbox"><svg id="beyond-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 15:</b>Anything that can be cut into a sequence of pieces can be fed to a transformer. (a) An image cut into patches, as in the Vision Transformer. (b) Sound cut into short slices. (c) A protein as a chain of amino acids.</p>
+</section>
+
+<section class="s ats-prose" data-label="Strengths and weaknesses">
+<div class="hdr" data-s="Transformers"></div>
+<h2>Strengths and weaknesses</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>Transformers at a glance.</p>
+<table class="tb" style="max-width:1680px">
+<colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+<thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td>Every token reaches every other in one step</td><td>Cost grows as <span class="tex">T^2</span>: long texts are expensive</td></tr>
+<tr class="an-up" style="--d:.15s"><td>All positions are trained in parallel</td><td>Pretraining needs huge data and computing power</td></tr>
+<tr class="an-up" style="--d:.25s"><td>One design for text, images, sound and proteins</td><td>Can state made-up facts with confidence</td></tr>
+<tr class="an-up" style="--d:.35s"><td>Pretrain once, fine-tune for many tasks</td><td>Learns the biases of its training data</td></tr>
+<tr class="an-up" style="--d:.45s"><td>Raw text is its own training signal</td><td>Hard to explain what drives a given answer</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:32px;max-width:1300px"><div class="h"><i data-i="note"></i><span>When to use it</span></div><div class="b"><p>Sequences with long-range links, above all when a pretrained model exists for your kind of data.</p></div></aside>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1400px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:34px">
+<li class="an-up" style="--d:.05s">Text becomes tokens, and each token becomes a learned vector.</li>
+<li class="an-up" style="--d:.15s">Attention scores each query against every key, turns the scores into weights with softmax and averages the values.</li>
+<li class="an-up" style="--d:.25s">Dividing by <span class="tex">\sqrt{d_k}</span>, several heads and position vectors make attention work in practice.</li>
+<li class="an-up" style="--d:.35s">A block is attention plus a feed-forward layer, each with a residual connection and normalization.</li>
+<li class="an-up" style="--d:.45s">Language models learn to predict the next token from raw text, then are fine-tuned for a task.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="Course in one picture">
+<div class="hdr" data-s="Closing"></div>
+<h2>The course in one picture</h2>
+<div class="figbox"><svg id="course-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 16:</b>The six chapters and 31 topics of the course. Transformers combine ideas from all of them: vectors, softmax, gradient descent, careful evaluation and pretraining.</p>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The original paper (reference 1) is short and readable.</p>
+<section style="margin-top:32px">
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.5;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.3em 0">Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., &amp; Polosukhin, I. (2017). Attention is all you need. <em>Advances in Neural Information Processing Systems</em>, 30.</li>
+<li style="margin:.3em 0">Bahdanau, D., Cho, K., &amp; Bengio, Y. (2015). Neural machine translation by jointly learning to align and translate. <em>International Conference on Learning Representations</em>.</li>
+<li style="margin:.3em 0">Devlin, J., Chang, M.-W., Lee, K., &amp; Toutanova, K. (2019). BERT: Pre-training of deep bidirectional transformers for language understanding. <em>Proceedings of NAACL-HLT</em>, 4171-4186.</li>
+<li style="margin:.3em 0">Radford, A., Wu, J., Child, R., Luan, D., Amodei, D., &amp; Sutskever, I. (2019). Language models are unsupervised multitask learners. Technical report.</li>
+<li style="margin:.3em 0">Brown, T. B., Mann, B., Ryder, N., Subbiah, M., et al. (2020). Language models are few-shot learners. <em>Advances in Neural Information Processing Systems</em>, 33, 1877-1901.</li>
+<li style="margin:.3em 0">Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., et al. (2021). An image is worth 16x16 words: Transformers for image recognition at scale. <em>International Conference on Learning Representations</em>.</li>
+<li style="margin:.3em 0">Jurafsky, D., &amp; Martin, J. H. <em>Speech and Language Processing</em> (3rd ed. draft), chapter on transformers.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">End of the course</div><p>This was the last of 31 topics: the habits of clean data, simple baselines and honest evaluation apply to every method that comes next.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { REDUCED, el, rng, gauss, clamp, fmt, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const $ = (id) => document.getElementById(id);
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+/* softmax that treats -Infinity as weight 0 */
+function softmax(z) {
+  const m = Math.max(...z.filter(isFinite));
+  const e = z.map((v) => (isFinite(v) ? Math.exp(v - m) : 0));
+  const s = e.reduce((a, b) => a + b, 0);
+  return e.map((v) => v / s);
+}
+/* Lay tokens out between x0 and x1, widths from the word length */
+function layoutTokens(words, x0, x1, fs = 26) {
+  const ws = words.map((w) => w.length * fs * 0.56 + 28);
+  const total = ws.reduce((a, b) => a + b, 0);
+  const gap = words.length > 1 ? (x1 - x0 - total) / (words.length - 1) : 0;
+  let x = x0;
+  return ws.map((w) => { const it = { x, w, cx: x + w / 2 }; x += w + gap; return it; });
+}
+function chip(g, it, y, h, word, cls = 'box', fs = 26) {
+  const r = el('rect', { class: cls, x: it.x, y, width: it.w, height: h, rx: 8 }, g);
+  const t = el('text', { class: 'tx', x: it.cx, y: y + h / 2 + fs * 0.36, 'text-anchor': 'middle', style: `font-size:${fs}px`, text: word }, g);
+  return { r, t };
+}
+const txt = (g, x, y, s, cls = 'txs', extra = {}) => el('text', Object.assign({ class: cls, x, y, text: s }, extra), g);
+const lines = (g, x, y, arr, cls = 'txs', dy = 32, extra = {}) => arr.forEach((s, i) => txt(g, x, y + i * dy, s, cls, extra));
+const arrow = (g, d, cls = 'wire', mk = 'ah') => el('path', { class: cls, d, 'marker-end': `url(#${mk})` }, g);
+/* Bold italic symbol with a subscript, e.g. q with t */
+function sym(g, x, y, base, sub, extra = {}) {
+  const t = el('text', Object.assign({ class: 'tx', x, y, 'font-weight': 700, 'font-style': 'italic' }, extra), g);
+  el('tspan', { text: base }, t);
+  if (sub) el('tspan', { dy: 9, style: 'font-size:24px;font-style:normal', text: sub }, t);
+  return t;
+}
+/* A row of vector cells */
+function cells(g, x, y, vals, size, color, showNum = true) {
+  vals.forEach((v, i) => {
+    el('rect', { x: x + i * size, y, width: size, height: size, style: `fill:${color};fill-opacity:${0.12 + 0.6 * Math.min(1, Math.abs(v) / 2)};stroke:${color};stroke-width:2` }, g);
+    if (showNum) txt(g, x + i * size + size / 2, y + size / 2 + 9, String(v), 'txs', { 'text-anchor': 'middle' });
+  });
+}
+function wrap(s, n) {
+  const out = [];
+  let cur = '';
+  s.split(' ').forEach((w) => {
+    if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+  });
+  if (cur) out.push(cur);
+  return out;
+}
+
+/* Hand-set attention model for the sentence of Figures 3 and 5.
+   4 features: animal, place, action, small word. Keys say what a token offers, queries what it looks for. */
+const ATT_W = ['the', 'animal', "didn't", 'cross', 'the', 'street', 'because', 'it', 'was', 'too', 'tired'];
+const ATT_K = [[0, 0, 0, 2], [3, 0, 0, 0], [0, 0, 1, 1], [0, 1, 3, 0], [0, 0, 0, 2], [0, 3, 1, 0], [0, 0, 0, 2], [1, 0, 0, 1], [0, 0, 1, 1], [0, 0, 0, 2], [2, 0, 1, 0]];
+const ATT_Q = [[1, 1, 0, 0], [0, 0, 2, 0], [0, 0, 1.5, 0], [1, 2, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0], [0, 0, 1, 1], [2, 0, 0, 0], [1, 0, 1, 0], [0, 0, 1, 0], [2, 0, 0, 0]];
+const attWeights = (t, tau = 1, scaled = true) => softmax(ATT_K.map((k) => dot(ATT_Q[t], k) / ((scaled ? 2 : 1) * tau)));
+const IT = 7;
+
+/* Arc from token a to token b above a row whose top is at y */
+function arcPath(xa, xb, y, k = 0.5) {
+  const d = Math.abs(xb - xa), cy = y - 30 - k * d;
+  return `M${xa.toFixed(1)} ${y}Q${((xa + xb) / 2).toFixed(1)} ${cy.toFixed(1)} ${xb.toFixed(1)} ${y}`;
+}
+
+/* ───────── static figures ───────── */
+function drawRnn() {
+  const svg = $('rnn-svg');
+  const W = ['the', 'animal', 'crossed', 'the', 'street', 'because', 'it'];
+  const cx = (i) => 80 + i * 166;
+  txt(svg, 0, 30, '(a) recurrent network: one step at a time', 'ttl');
+  W.forEach((w, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.05 + i * 0.08}s` }, svg);
+    el('rect', { class: i === 1 ? 'box-a' : i === 6 ? 'box-b' : 'box', x: cx(i) - 56, y: 70, width: 112, height: 80, rx: 8 }, g);
+    sym(g, cx(i) - 14, 118, 'h', String(i + 1));
+    txt(g, cx(i), 196, w, 'tx', { 'text-anchor': 'middle', style: 'font-size:26px' });
+    el('path', { class: 'wire', d: `M${cx(i)} 168V156`, 'marker-end': 'url(#ah)' }, g);
+    if (i < W.length - 1) el('path', { class: i >= 1 ? 'wire-a' : 'wire', d: `M${cx(i) + 58} 110H${cx(i + 1) - 62}`, 'marker-end': i >= 1 ? 'url(#ah-a)' : 'url(#ah)' }, svg);
+  });
+  txt(svg, cx(3.5), 250, '“animal” must survive 5 memory updates to reach “it”', 'txs', { 'text-anchor': 'middle', style: 'fill:var(--c-a)' });
+
+  const g = el('g', { class: 'frag', 'data-step': 'r2' }, svg);
+  txt(g, 0, 340, '(b) attention: every word in one step', 'ttl');
+  const L = layoutTokens(W, 20, 1140), Y = 580;
+  const w = [0.04, 0.55, 0.06, 0.03, 0.08, 0.04, 0.2];
+  L.forEach((it, j) => {
+    if (j !== 6) el('path', { d: arcPath(L[6].cx, it.cx, Y - 4, 0.36), style: `fill:none;stroke:var(--c-b);stroke-width:${2 + 26 * w[j]};stroke-opacity:${0.4 + 0.6 * w[j]};stroke-linecap:round` }, g);
+  });
+  L.forEach((it, j) => chip(g, it, Y, 54, W[j], j === 6 ? 'box-b' : j === 1 ? 'box-a' : 'box'));
+  txt(g, 580, 680, 'all pairs at once: no long chain, and work in parallel', 'txs', { 'text-anchor': 'middle' });
+}
+
+function drawTokens() {
+  const svg = $('tok-svg');
+  txt(svg, 0, 30, '(a) text → tokens → vectors', 'ttl');
+  txt(svg, 0, 84, '“Transformers read unbelievable text”', 'tx', { style: 'font-size:26px' });
+  const TOK = [['Transform', 5021], ['ers', 364], ['read', 1100], ['un', 403], ['believ', 6243], ['able', 540], ['text', 2420]];
+  const r = rng(12);
+  TOK.forEach(([w, id], i) => {
+    const y = 120 + i * 74, g = el('g', { class: 'an-up', style: `--d:${0.05 + i * 0.07}s` }, svg);
+    el('rect', { class: 'box', x: 0, y, width: 150, height: 54, rx: 8 }, g);
+    txt(g, 75, y + 36, w, 'tx', { 'text-anchor': 'middle', style: 'font-size:26px' });
+    txt(g, 220, y + 36, '#' + id, 'txs', { 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)' });
+    el('path', { class: 'wire', d: `M272 ${y + 27}H300`, 'marker-end': 'url(#ah)' }, g);
+    const vg = el('g', { class: 'frag', 'data-step': 't1' }, g);
+    for (let k = 0; k < 6; k++) {
+      const v = gauss(r);
+      el('rect', { x: 310 + k * 34, y: y + 10, width: 34, height: 34, style: `fill:${v >= 0 ? 'var(--c-b)' : 'var(--c-a)'};fill-opacity:${Math.min(0.85, 0.15 + 0.4 * Math.abs(v))};stroke:var(--myst-color-border-strong);stroke-width:1` }, vg);
+    }
+  });
+  txt(svg, 0, 690, 'token number', 'txs', { x: 220, 'text-anchor': 'middle', style: 'fill:var(--myst-color-text-tertiary)' });
+  txt(svg, 412, 690, 'embedding', 'txs', { 'text-anchor': 'middle', class: 'txs frag', 'data-step': 't1' });
+
+  const g2 = el('g', { class: 'frag', 'data-step': 't2' }, svg);
+  txt(g2, 600, 30, '(b) embeddings in 2-D', 'ttl');
+  const F = frame(g2, { W: 1160, H: 700, l: 620, r: 10, t: 60, b: 60, x: [0, 10], y: [0, 10], xt: [], yt: [], grid: false });
+  const PTS = [
+    ['cat', 2, 8.1, 'fa'], ['dog', 3.3, 8.5, 'fa'], ['kitten', 1.6, 6.9, 'fa'], ['puppy', 3.3, 7.1, 'fa'],
+    ['car', 7.2, 8.4, 'fb'], ['bus', 8.6, 8.0, 'fb'], ['truck', 7.6, 6.9, 'fb'],
+    ['apple', 6.8, 2.9, 'fc'], ['banana', 8.0, 1.9, 'fc'], ['mango', 6.6, 1.4, 'fc'],
+    ['run', 2.0, 3.2, 'fd'], ['walk', 3.2, 2.2, 'fd'], ['jump', 1.6, 1.6, 'fd'],
+  ];
+  PTS.forEach(([w, x, y, c]) => {
+    el('circle', { class: `pt ${c}`, cx: F.sx(x), cy: F.sy(y), r: 10 }, g2);
+    txt(g2, F.sx(x) + 16, F.sy(y) + 8, w, 'txs');
+  });
+  txt(g2, 890, 680, 'dimension 1', 'lb', { 'text-anchor': 'middle' });
+  el('text', { class: 'lb', transform: 'translate(600 350) rotate(-90)', 'text-anchor': 'middle', text: 'dimension 2' }, g2);
+}
+
+function drawWhich() {
+  const svg = $('which-svg');
+  const L = layoutTokens(ATT_W, 10, 1150), Y = 440, w = attWeights(IT);
+  const ag = el('g', { class: 'frag', 'data-step': 'w1' }, svg);
+  L.forEach((it, j) => {
+    if (j === IT) return;
+    el('path', { d: arcPath(L[IT].cx, it.cx, Y - 6), 'marker-end': 'url(#ah-o)', style: `fill:none;stroke:var(--c-b);stroke-width:${2 + 36 * w[j]};stroke-opacity:${0.35 + 0.65 * w[j]};stroke-linecap:round` }, ag);
+  });
+  [1, 10].forEach((j) => {
+    const d = Math.abs(L[j].cx - L[IT].cx), peak = Y - 6 - 15 - 0.25 * d;
+    txt(ag, (L[j].cx + L[IT].cx) / 2, peak - 18, pct(w[j]), 'tx', { 'text-anchor': 'middle', 'font-weight': 700, style: 'fill:var(--c-b)' });
+  });
+  L.forEach((it, j) => chip(svg, it, Y, 56, ATT_W[j], j === IT ? 'box-b' : j === 1 ? 'box-a' : 'box'));
+  txt(svg, 580, 570, 'line width: how much “it” attends to each word', 'txs', { 'text-anchor': 'middle' });
+  const g2 = el('g', { class: 'frag', 'data-step': 'w2' }, svg);
+  txt(g2, 580, 640, `new “it” ≈ ${pct(w[1])} animal + ${pct(w[10])} tired + small parts of the rest`, 'tx', { 'text-anchor': 'middle', style: 'font-size:26px' });
+}
+
+function drawQkv() {
+  const svg = $('qkv-svg');
+  const S = 48, YC = [150, 350, 550];
+  el('rect', { class: 'box-b', x: 0, y: 322, width: 100, height: 56, rx: 8 }, svg);
+  txt(svg, 50, 360, 'it', 'tx', { 'text-anchor': 'middle' });
+  arrow(svg, 'M104 350H140');
+  sym(svg, 220, 310, 'x', 't');
+  cells(svg, 150, 326, [0.9, 0.1, 0.4, 0.7], S, 'var(--myst-color-text-tertiary)');
+  txt(svg, 246, 410, 'embedding', 'txs', { 'text-anchor': 'middle' });
+  const ROWS = [
+    { m: 'Q', v: [2, 0, 0, 0], c: 'var(--c-b)', s: 'q', n: 'query', d: 'what am I looking for?', step: '' },
+    { m: 'K', v: [1, 0, 0, 1], c: 'var(--c-a)', s: 'k', n: 'key', d: 'what do I offer?', step: 'q1' },
+    { m: 'V', v: [0.6, 0.2, 0.1, 0.8], c: 'var(--c-c)', s: 'v', n: 'value', d: 'what do I pass on?', step: 'q2' },
+  ];
+  ROWS.forEach((R, i) => {
+    const y = YC[i], g = el('g', { class: i ? 'an-up' : 'an-up', style: `--d:${0.1 + i * 0.15}s` }, svg);
+    el('path', { class: 'wire', d: `M346 350C372 350 372 ${y} 396 ${y}`, 'marker-end': 'url(#ah)' }, g);
+    el('rect', { class: 'box', x: 400, y: y - 36, width: 140, height: 72, rx: 8 }, g);
+    const t = txt(g, 448, y + 10, '× ', 'tx', { 'text-anchor': 'middle' });
+    t.textContent = '';
+    el('tspan', { text: '× ' }, t);
+    el('tspan', { 'font-weight': 700, text: 'W' }, t);
+    el('tspan', { dy: 9, style: 'font-size:24px', text: R.m }, t);
+    arrow(g, `M544 ${y}H592`);
+    sym(g, 680, y - 34, R.s, 't', { style: `fill:${R.c}` });
+    cells(g, 600, y - 24, R.v, S, R.c);
+    txt(g, 830, y - 6, R.n, 'tx', { 'font-weight': 700, style: `fill:${R.c}` });
+    txt(g, 830, y + 30, R.d, 'txs');
+  });
+}
+
+function drawCross() {
+  const svg = $('cross-svg');
+  const P = [
+    { x0: 0, title: '(a) self-attention', top: ['the', 'cat', 'sleeps'], bot: ['the', 'cat', 'sleeps'], tl: 'keys and values: same sentence', bl: 'queries: same sentence', W: [[0.5, 0.4, 0.1], [0.2, 0.5, 0.3], [0.1, 0.6, 0.3]], cls: '' },
+    { x0: 610, title: '(b) encoder–decoder', top: ['the', 'cat', 'sleeps'], bot: ['el', 'gato', 'duerme'], tl: 'keys, values: English input', bl: 'queries: Spanish output', W: [[0.85, 0.1, 0.05], [0.1, 0.85, 0.05], [0.05, 0.1, 0.85]], cls: 'frag' },
+  ];
+  P.forEach((p) => {
+    const g = el('g', p.cls ? { class: p.cls, 'data-step': 'c1' } : {}, svg);
+    txt(g, p.x0, 30, p.title, 'ttl');
+    const LT = layoutTokens(p.top, p.x0 + 10, p.x0 + 540), LB = layoutTokens(p.bot, p.x0 + 10, p.x0 + 540);
+    txt(g, p.x0, 130, p.tl, 'txs');
+    txt(g, p.x0, 640, p.bl, 'txs');
+    p.W.forEach((row, i) => row.forEach((w, j) => {
+      el('line', { x1: LB[i].cx, y1: 510, x2: LT[j].cx, y2: 236, style: `stroke:var(--c-b);stroke-width:${2 + 18 * w};stroke-opacity:${0.3 + 0.7 * w};stroke-linecap:round` }, g);
+    }));
+    LT.forEach((it, j) => chip(g, it, 180, 56, p.top[j], 'box-a'));
+    LB.forEach((it, j) => chip(g, it, 510, 56, p.bot[j], 'box-b'));
+  });
+  el('line', { x1: 580, x2: 580, y1: 60, y2: 660, style: 'stroke:var(--myst-color-border);stroke-width:2' }, svg);
+}
+
+function drawMultiHead() {
+  const svg = $('mh-svg');
+  el('rect', { class: 'box', x: 0, y: 155, width: 120, height: 160, rx: 8 }, svg);
+  for (let k = 1; k < 5; k++) el('line', { x1: 12, x2: 108, y1: 155 + k * 32, y2: 155 + k * 32, style: 'stroke:var(--myst-color-border-strong);stroke-width:1.5' }, svg);
+  sym(svg, 46, 245, 'X', '', { style: 'font-size:34px' });
+  txt(svg, 60, 350, '5 tokens', 'txs', { 'text-anchor': 'middle' });
+  const YC = [75, 235, 395], C = 26, n = 5;
+  const PAT = [
+    (t, j) => (t === 0 ? (j === 0 ? 1 : 0) : j === t - 1 ? 0.9 : j === t ? 0.1 : 0),
+    (t, j) => (j === 1 ? 0.8 : j === t ? 0.2 : 0),
+    (t, j) => Math.max(0, 1 - Math.abs(t - j) * 0.5) / 2,
+  ];
+  const NAME = ['previous word', 'the subject', 'nearby words'], COL = ['var(--c-a)', 'var(--c-b)', 'var(--c-c)'];
+  YC.forEach((y, h) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + h * 0.15}s` }, svg);
+    el('path', { class: 'wire', d: `M124 235C160 235 160 ${y} 192 ${y}`, 'marker-end': 'url(#ah)' }, g);
+    const x0 = 200, y0 = y - 65;
+    for (let t = 0; t < n; t++) for (let j = 0; j < n; j++) {
+      el('rect', { x: x0 + j * C, y: y0 + t * C, width: C, height: C, style: `fill:${COL[h]};fill-opacity:${0.06 + 0.9 * PAT[h](t, j)};stroke:var(--myst-color-border);stroke-width:1` }, g);
+    }
+    txt(g, 350, y - 12, `head ${h + 1}`, 'ttl');
+    txt(g, 350, y + 24, NAME[h], 'txs');
+    arrow(g, `M545 ${y}H596`);
+    el('rect', { x: 600, y: y - 58, width: 50, height: 116, style: `fill:${COL[h]};fill-opacity:.35;stroke:${COL[h]};stroke-width:2` }, svg);
+  });
+  txt(svg, 625, 492, 'side by side', 'ttl', { 'text-anchor': 'middle' });
+  arrow(svg, 'M654 235H716');
+  el('rect', { class: 'box', x: 720, y: 195, width: 150, height: 80, rx: 8 }, svg);
+  const t = txt(svg, 772, 247, '', 'tx', { 'text-anchor': 'middle' });
+  el('tspan', { text: '× ' }, t);
+  el('tspan', { 'font-weight': 700, text: 'W' }, t);
+  el('tspan', { dy: 9, style: 'font-size:24px', text: 'O' }, t);
+  arrow(svg, 'M874 235H936');
+  el('rect', { class: 'box-a', x: 940, y: 195, width: 200, height: 80, rx: 8 }, svg);
+  txt(svg, 1040, 245, 'output', 'tx', { 'text-anchor': 'middle' });
+  txt(svg, 1040, 320, 'one vector', 'txs', { 'text-anchor': 'middle' });
+  txt(svg, 1040, 352, 'per token', 'txs', { 'text-anchor': 'middle' });
+}
+
+function drawBlock() {
+  const svg = $('blk-svg');
+  const X0 = 140, BW = 400, CX = X0 + BW / 2;
+  const B = [
+    { y: 380, h: 64, cls: 'box-a', t: 'multi-head attention', note: 'tokens share information' },
+    { y: 290, h: 52, cls: 'box', t: 'add & normalize', note: 'input + change, then rescale' },
+    { y: 190, h: 64, cls: 'box-b', t: 'feed-forward (ReLU)', note: 'each token on its own' },
+    { y: 100, h: 52, cls: 'box', t: 'add & normalize', note: 'input + change, then rescale' },
+  ];
+  txt(svg, CX, 512, 'embeddings + positions', 'txs', { 'text-anchor': 'middle' });
+  arrow(svg, `M${CX} 486V${B[0].y + B[0].h + 4}`);
+  B.forEach((b, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + i * 0.12}s` }, svg);
+    el('rect', { class: b.cls, x: X0, y: b.y, width: BW, height: b.h, rx: 8 }, g);
+    txt(g, CX, b.y + b.h / 2 + 10, b.t, 'tx', { 'text-anchor': 'middle' });
+    el('line', { x1: X0 + BW + 8, x2: 680, y1: b.y + b.h / 2, y2: b.y + b.h / 2, style: 'stroke:var(--myst-color-border);stroke-width:1.5;stroke-dasharray:4 5' }, g);
+    txt(g, 690, b.y + b.h / 2 + 8, b.note, 'txs');
+    if (i < B.length - 1) arrow(g, `M${CX} ${b.y - 2}V${B[i + 1].y + B[i + 1].h + 4}`);
+  });
+  arrow(svg, `M${CX} ${B[3].y - 2}V30`);
+  txt(svg, CX + 16, 30, 'to the next block', 'txs');
+  /* residual paths */
+  const res = (yFrom, yTo) => {
+    const g = el('g', { class: 'frag', 'data-step': 'b1' }, svg);
+    el('circle', { cx: CX, cy: yFrom, r: 6, style: 'fill:var(--c-a)' }, g);
+    el('path', { class: 'wire-a', d: `M${CX} ${yFrom}H${X0 - 60}V${yTo}H${X0 - 4}`, 'marker-end': 'url(#ah-a)' }, g);
+  };
+  res(466, 316);
+  res(272, 126);
+  txt(svg, X0 - 70, 400, 'skip', 'txs', { 'text-anchor': 'end', style: 'fill:var(--c-a)', class: 'txs frag', 'data-step': 'b1' });
+  /* × N bracket */
+  el('path', { d: `M${X0 - 100} 92H${X0 - 116}V452H${X0 - 100}`, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:2.5' }, svg);
+  txt(svg, X0 - 126, 280, '× N', 'tx', { 'text-anchor': 'end', 'font-weight': 700 });
+}
+
+function drawFamilies() {
+  const svg = $('fam-svg');
+  const P = [
+    { x0: 0, title: '(a) encoder-only', model: 'e.g. BERT', use: 'understand: classify, search, fill blanks' },
+    { x0: 580, title: '(b) decoder-only', model: 'e.g. GPT', use: 'generate text, one token at a time' },
+    { x0: 1160, title: '(c) encoder–decoder', model: 'e.g. the original transformer', use: 'translate, summarize' },
+  ];
+  P.forEach((p, k) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.1 + k * 0.2}s` }, svg);
+    txt(g, p.x0, 30, p.title, 'ttl');
+    txt(g, p.x0, 76, p.model, 'tx', { 'font-weight': 600 });
+    txt(g, p.x0, 600, p.use, 'txs');
+    const x0 = p.x0;
+    if (k < 2) {
+      const IN = k === 0 ? ['the', '[blank]', 'sat', 'down'] : ['the', 'cat', 'sat', 'on'];
+      const OUT = k === 0 ? [null, 'cat', null, null] : ['cat', 'sat', 'on', 'the'];
+      const L = layoutTokens(IN, x0 + 10, x0 + 510);
+      el('rect', { class: k ? 'box-b' : 'box-a', x: x0 + 10, y: 250, width: 500, height: 150, rx: 8 }, g);
+      txt(g, x0 + 260, 318, k ? 'decoder blocks' : 'encoder blocks', 'tx', { 'text-anchor': 'middle' });
+      txt(g, x0 + 260, 358, k ? 'each token sees only the left' : 'each token sees all tokens', 'txs', { 'text-anchor': 'middle' });
+      L.forEach((it, j) => {
+        chip(g, it, 470, 52, IN[j], 'box');
+        arrow(g, `M${it.cx} 466V406`);
+        if (OUT[j]) { arrow(g, `M${it.cx} 246V186`); chip(g, it, 130, 52, OUT[j], 'box-b'); }
+      });
+    } else {
+      el('rect', { class: 'box-a', x: x0 + 10, y: 250, width: 220, height: 150, rx: 8 }, g);
+      txt(g, x0 + 120, 330, 'encoder', 'tx', { 'text-anchor': 'middle' });
+      el('rect', { class: 'box-b', x: x0 + 290, y: 250, width: 220, height: 150, rx: 8 }, g);
+      txt(g, x0 + 400, 330, 'decoder', 'tx', { 'text-anchor': 'middle' });
+      arrow(g, `M${x0 + 234} 325H${x0 + 286}`, 'wire-a', 'ah-a');
+      const LE = layoutTokens(['the', 'cat'], x0 + 20, x0 + 220), LD = layoutTokens(['start', 'el'], x0 + 300, x0 + 500);
+      LE.forEach((it, j) => { chip(g, it, 470, 52, ['the', 'cat'][j]); arrow(g, `M${it.cx} 466V406`); });
+      LD.forEach((it, j) => {
+        chip(g, it, 470, 52, ['start', 'el'][j]); arrow(g, `M${it.cx} 466V406`);
+        arrow(g, `M${it.cx} 246V186`); chip(g, it, 130, 52, ['el', 'gato'][j], 'box-b');
+      });
+    }
+  });
+}
+
+function drawPretrain() {
+  const svg = $('pre-svg');
+  const STEPS = [
+    { t: ['billions of', 'words of', 'raw text'], cls: 'box' },
+    { t: ['pretrain:', 'predict the', 'next word'], cls: 'box' },
+    { t: ['general', 'language', 'model'], cls: 'box-a' },
+    { t: ['fine-tune:', 'small labeled', 'data set'], cls: 'box' },
+    { t: ['your task:', 'reviews,', 'questions'], cls: 'box-b' },
+  ];
+  STEPS.forEach((s, i) => {
+    const x = i * 236, g = el('g', { class: 'an-up', style: `--d:${0.05 + i * 0.1}s` }, svg);
+    el('rect', { class: s.cls, x, y: 20, width: 200, height: 150, rx: 8 }, g);
+    lines(g, x + 100, 64, s.t, 'txs', 40, { 'text-anchor': 'middle' });
+    if (i < 4) arrow(g, `M${x + 204} 95H${x + 232}`);
+  });
+  el('path', { d: 'M0 196H436', style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:2' }, svg);
+  txt(svg, 218, 232, 'costly, done once', 'txs', { 'text-anchor': 'middle' });
+  el('path', { d: 'M708 196H1144', style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:2' }, svg);
+  txt(svg, 926, 232, 'cheap, done many times', 'txs', { 'text-anchor': 'middle' });
+
+  const g = el('g', { class: 'frag', 'data-step': 'g2' }, svg);
+  const sx = (v) => 300 + (v - 7) * 160;
+  const M = [['2017', 'Transformer', 65e6, '65 million'], ['2018', 'BERT', 340e6, '340 million'], ['2019', 'GPT-2', 1.5e9, '1.5 billion'], ['2020', 'GPT-3', 175e9, '175 billion']];
+  txt(g, 0, 300, 'parameters (log scale)', 'ttl');
+  [7, 8, 9, 10, 11, 12].forEach((v, i) => {
+    el('line', { class: 'gl', x1: sx(v), x2: sx(v), y1: 320, y2: 610 }, g);
+    txt(g, sx(v), 646, ['10M', '100M', '1B', '10B', '100B', '1T'][i], 'tk', { 'text-anchor': 'middle' });
+  });
+  M.forEach(([yr, name, n, lab], i) => {
+    const y = 336 + i * 68, x1 = sx(Math.log10(n));
+    txt(g, 0, y + 34, yr, 'txs', { style: 'fill:var(--myst-color-text-tertiary)' });
+    txt(g, 80, y + 34, name, 'tx', { style: 'font-size:26px' });
+    el('rect', { class: (i === 3 ? 'fb' : 'fa') + ' an-grow', x: sx(7), y: y + 6, width: x1 - sx(7), height: 40, rx: 3 }, g);
+    txt(g, x1 + 12, y + 36, lab, 'txs', { 'font-weight': 600 });
+  });
+  el('path', { class: 'ax', d: `M${sx(7)} 320V610` }, g);
+}
+
+function drawLimits() {
+  const svg = $('lim-svg');
+  const C = 13, BASE = 560, TS = [4, 8, 16, 32];
+  txt(svg, 0, 40, 'twice the tokens, four times the scores', 'ttl');
+  let x = 10;
+  TS.forEach((T, k) => {
+    const s = T * C, g = el('g', { class: 'an-up', style: `--d:${0.1 + k * 0.15}s` }, svg);
+    el('rect', { x, y: BASE - s, width: s, height: s, style: `fill:var(--c-a);fill-opacity:${0.1 + k * 0.06};stroke:var(--c-a);stroke-width:2` }, g);
+    let d = '';
+    for (let i = 1; i < T; i++) d += `M${x + i * C} ${BASE - s}V${BASE}M${x} ${BASE - s + i * C}H${x + s}`;
+    el('path', { d, style: 'stroke:var(--c-a);stroke-opacity:.45;stroke-width:1' }, g);
+    txt(g, x + s / 2, BASE + 46, `T = ${T}`, 'tx', { 'text-anchor': 'middle' });
+    txt(g, x + s / 2, BASE + 84, `${fmt(T * T, 0)} scores`, 'txs', { 'text-anchor': 'middle' });
+    x += s + 60;
+  });
+}
+
+function drawBeyond() {
+  const svg = $('beyond-svg');
+  const r = rng(3);
+  /* (a) image patches */
+  const ga = el('g', { class: 'an-up', style: '--d:.05s' }, svg);
+  txt(ga, 0, 30, '(a) images', 'ttl');
+  const IMG = (i, j) => (i < 2 ? 'var(--c-a)' : i === 2 && j > 0 && j < 3 ? 'var(--c-b)' : 'var(--c-c)');
+  const P = 60;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    el('rect', { x: 140 + j * P, y: 70 + i * P, width: P - 4, height: P - 4, style: `fill:${IMG(i, j)};fill-opacity:${0.3 + 0.4 * r()}` }, ga);
+  }
+  el('circle', { cx: 330, cy: 110, r: 24, style: 'fill:var(--c-b);fill-opacity:.85' }, ga);
+  arrow(ga, 'M260 330V380');
+  for (let k = 0; k < 16; k++) {
+    const i = Math.floor(k / 4), j = k % 4;
+    el('rect', { x: k * 32, y: 400, width: 28, height: 28, style: `fill:${IMG(i, j)};fill-opacity:.6;stroke:var(--myst-color-border-strong);stroke-width:1` }, ga);
+  }
+  txt(ga, 256, 480, '16 patches → 16 tokens', 'txs', { 'text-anchor': 'middle' });
+
+  /* (b) audio */
+  const gb = el('g', { class: 'an-up', style: '--d:.25s' }, svg);
+  txt(gb, 580, 30, '(b) sound', 'ttl');
+  let d = '';
+  for (let k = 0; k <= 480; k++) {
+    const x = 600 + k, env = 0.4 + 0.6 * Math.abs(Math.sin(k / 70));
+    d += (k ? 'L' : 'M') + x + ' ' + (190 + 90 * env * Math.sin(k / 3.2) * Math.sin(k / 23)).toFixed(1);
+  }
+  el('path', { d, style: 'fill:none;stroke:var(--c-d);stroke-width:2.5' }, gb);
+  for (let k = 1; k < 8; k++) el('line', { x1: 600 + k * 60, x2: 600 + k * 60, y1: 80, y2: 300, style: 'stroke:var(--myst-color-text-tertiary);stroke-width:2;stroke-dasharray:6 6' }, gb);
+  arrow(gb, 'M840 330V380');
+  for (let k = 0; k < 8; k++) el('rect', { x: 600 + k * 60 + 6, y: 400, width: 48, height: 28, style: 'fill:var(--c-d);fill-opacity:.35;stroke:var(--c-d);stroke-width:2' }, gb);
+  txt(gb, 840, 480, 'short slices of sound → tokens', 'txs', { 'text-anchor': 'middle' });
+
+  /* (c) protein */
+  const gc = el('g', { class: 'an-up', style: '--d:.45s' }, svg);
+  txt(gc, 1160, 30, '(c) proteins', 'ttl');
+  const AA = 'MKTAYIAKQR'.split('');
+  const pos = AA.map((_, k) => [1190 + k * 50, 190 + 60 * Math.sin(k * 0.9)]);
+  el('path', { d: pos.map(([x, y], k) => (k ? 'L' : 'M') + x + ' ' + y.toFixed(1)).join(''), style: 'fill:none;stroke:var(--myst-color-text-tertiary);stroke-width:3' }, gc);
+  pos.forEach(([x, y], k) => {
+    el('circle', { cx: x, cy: y, r: 22, style: 'fill:var(--c-c-soft);stroke:var(--c-c);stroke-width:2.5' }, gc);
+    txt(gc, x, y + 9, AA[k], 'txs', { 'text-anchor': 'middle', 'font-weight': 700 });
+  });
+  arrow(gc, 'M1415 330V380');
+  AA.forEach((a, k) => {
+    el('rect', { x: 1170 + k * 50, y: 400, width: 44, height: 40, rx: 4, style: 'fill:var(--c-c);fill-opacity:.25;stroke:var(--c-c);stroke-width:2' }, gc);
+    txt(gc, 1192 + k * 50, 429, a, 'txs', { 'text-anchor': 'middle' });
+  });
+  txt(gc, 1415, 480, 'amino acids → tokens', 'txs', { 'text-anchor': 'middle' });
+}
+
+function drawCourse() {
+  const svg = $('course-svg');
+  const CH = [
+    { n: ['Introduction'], t: 'Topic 1', s: 'Learn from data instead of writing rules by hand.' },
+    { n: ['Data', 'preparation'], t: 'Topics 2 to 6', s: 'Clean, encode, scale and split the data, then validate honestly.' },
+    { n: ['Supervised'], t: 'Topics 7 to 14', s: 'Learn from labeled examples to predict a number or a class.' },
+    { n: ['Unsupervised'], t: 'Topics 15 to 18', s: 'Find groups and simpler structure in data without labels.' },
+    { n: ['Reinforcement'], t: 'Topics 19 to 21', s: 'Learn which actions earn the most reward by trial and error.' },
+    { n: ['Deep', 'learning'], t: 'Topics 22 to 31', s: 'Stack layers that learn their own features, up to transformers.' },
+  ];
+  const BW = 252, GAP = 33.6;
+  CH.forEach((c, i) => {
+    const x = i * (BW + GAP), g = el('g', { class: 'an-up', style: `--d:${0.05 + i * 0.12}s` }, svg);
+    el('rect', { class: i === 5 ? 'box-a' : 'box', x, y: 40, width: BW, height: 200, rx: 10 }, g);
+    txt(g, x + 20, 80, `chapter ${i + 1}`, 'ttl');
+    lines(g, x + 20, c.n.length > 1 ? 130 : 148, c.n, 'tx', 36, { 'font-weight': 700, style: 'font-size:30px' });
+    txt(g, x + 20, 218, c.t, 'txs', { style: 'fill:var(--myst-color-text-tertiary)' });
+    lines(g, x + 4, 300, wrap(c.s, 19), 'txs', 34);
+    if (i < 5) arrow(svg, `M${x + BW + 3} 140H${x + BW + GAP - 3}`);
+  });
+  const g = el('g', { class: 'an-fade', style: '--d:.9s' }, svg);
+  el('path', { d: 'M0 500H1680', style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+  txt(g, 840, 552, 'Every chapter: learn from data, then check on data the model has not seen.', 'tx', { 'text-anchor': 'middle' });
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.att = (() => {
+  const svg = $('att-svg');
+  const L = layoutTokens(ATT_W, 10, 1150), CY = 320, CH = 56, BASE = 650, BMAX = 210;
+  const arcG = el('g', {}, svg);
+  el('line', { x1: 0, x2: 1160, y1: BASE, y2: BASE, class: 'ax' }, svg);
+  let sel = IT, tau = 1, scaled = true;
+  const chips = L.map((it, j) => {
+    const g = el('g', { class: 'tokbtn', role: 'button', tabindex: 0, 'aria-label': ATT_W[j] }, svg);
+    const c = chip(g, it, CY, CH, ATT_W[j]);
+    const pick = () => { sel = j; draw(); };
+    g.addEventListener('click', pick);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(); } });
+    return c;
+  });
+  const bars = L.map((it) => el('rect', { x: it.cx - 22, width: 44, rx: 3 }, svg));
+  const labs = L.map((it) => txt(svg, it.cx, 0, '', 'txs', { 'text-anchor': 'middle', 'font-weight': 600 }));
+  txt(svg, 0, BASE + 40, 'bars: attention weights of the selected token', 'txs', { style: 'fill:var(--myst-color-text-tertiary)' });
+  const tauIn = $('att-tau'), scBtn = $('att-scale');
+  function draw() {
+    const w = attWeights(sel, tau, scaled);
+    clear(arcG);
+    L.forEach((it, j) => {
+      if (j === sel) return;
+      el('path', { d: arcPath(L[sel].cx, it.cx, CY - 6), 'marker-end': 'url(#ah-o)', style: `fill:none;stroke:var(--c-b);stroke-width:${1.5 + 34 * w[j]};stroke-opacity:${0.25 + 0.75 * w[j]};stroke-linecap:round` }, arcG);
+    });
+    let top = 0;
+    w.forEach((v, j) => { if (v > w[top]) top = j; });
+    w.forEach((v, j) => {
+      const h = BMAX * v;
+      bars[j].setAttribute('y', BASE - h);
+      bars[j].setAttribute('height', Math.max(0, h));
+      bars[j].setAttribute('class', j === top ? 'fb' : 'fa');
+      labs[j].setAttribute('y', BASE - h - 10);
+      labs[j].textContent = pct(v);
+      chips[j].r.setAttribute('class', j === sel ? 'box-b' : 'box');
+    });
+    $('att-q').textContent = ATT_W[sel];
+    $('att-top').textContent = ATT_W[top];
+    $('att-max').textContent = pct(w[top]);
+    $('att-tau-val').textContent = tau.toFixed(2);
+    scBtn.textContent = `Scaling: ${scaled ? 'on' : 'off'}`;
+  }
+  tauIn.addEventListener('input', () => { tau = +tauIn.value; draw(); });
+  scBtn.addEventListener('click', () => { scaled = !scaled; draw(); });
+  $('att-reset').addEventListener('click', () => { sel = IT; tau = 1; scaled = true; tauIn.value = 1; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.pe = (() => {
+  const svg = $('pe-svg');
+  const D = 16, N = 50;
+  const pe = (t, k) => { const a = t / Math.pow(10000, (2 * Math.floor(k / 2)) / D); return k % 2 ? Math.cos(a) : Math.sin(a); };
+  const X0 = 150, X1 = 1140, CW = (X1 - X0) / N, Y0 = 20, RH = 20;
+  for (let t = 0; t < N; t++) for (let k = 0; k < D; k++) {
+    const v = pe(t, k);
+    el('rect', { x: X0 + t * CW, y: Y0 + k * RH, width: CW + 0.5, height: RH + 0.5, style: `fill:${v >= 0 ? 'var(--c-b)' : 'var(--c-a)'};fill-opacity:${(0.05 + 0.85 * Math.abs(v)).toFixed(3)}` }, svg);
+  }
+  el('rect', { x: X0, y: Y0, width: X1 - X0, height: D * RH, style: 'fill:none;stroke:var(--myst-color-border-strong);stroke-width:1.5' }, svg);
+  txt(svg, X0 - 12, Y0 + RH - 2, '0', 'tk', { 'text-anchor': 'end' });
+  txt(svg, X0 - 12, Y0 + 6 * RH + RH - 2, '6', 'tk', { 'text-anchor': 'end' });
+  txt(svg, X0 - 12, Y0 + D * RH - 2, '15', 'tk', { 'text-anchor': 'end' });
+  el('text', { class: 'lb', transform: `translate(${X0 - 66} ${Y0 + (D * RH) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'entry' }, svg);
+  const selBox = el('rect', { y: Y0 - 3, width: CW, height: D * RH + 6, style: 'fill:none;stroke:var(--myst-color-text);stroke-width:3' }, svg);
+
+  const F = frame(svg, { W: 1160, H: 700, l: X0, r: 20, t: 420, b: 84, x: [-0.5, N - 0.5], y: [-1.15, 1.15], xt: [0, 10, 20, 30, 40], yt: [-1, 0, 1], xl: 'position t' });
+  const f0 = (t) => Math.sin(t), f6 = (t) => Math.sin(t / Math.pow(10000, 6 / D));
+  const path = (f) => { let d = ''; for (let i = 0; i <= 600; i++) { const t = -0.5 + (N * i) / 600; d += (i ? 'L' : 'M') + F.sx(t).toFixed(1) + ' ' + F.sy(f(t)).toFixed(1); } return d; };
+  el('path', { class: 'curve-a', d: path(f0), style: 'stroke-width:3.5' }, F.plot);
+  el('path', { class: 'curve-b', d: path(f6) }, F.plot);
+  const vline = el('line', { y1: F.T, y2: F.H - F.B, style: 'stroke:var(--myst-color-text);stroke-width:2;stroke-dasharray:6 6' }, F.plot);
+  const d0 = el('circle', { r: 10, class: 'pt fa' }, F.plot), d6 = el('circle', { r: 10, class: 'pt fb' }, F.plot);
+  const lg = el('g', {}, svg);
+  el('rect', { x: 860, y: 372, width: 280, height: 40, style: 'fill:var(--myst-color-bg)' }, lg);
+  legend(lg, 870, 392, [['line', 'curve-a', 'entry 0']]);
+  legend(lg, 1010, 392, [['line', 'curve-b', 'entry 6']]);
+  const tIn = $('pe-t');
+  function draw() {
+    const t = +tIn.value;
+    selBox.setAttribute('x', X0 + t * CW);
+    vline.setAttribute('x1', F.sx(t)); vline.setAttribute('x2', F.sx(t));
+    d0.setAttribute('cx', F.sx(t)); d0.setAttribute('cy', F.sy(f0(t)));
+    d6.setAttribute('cx', F.sx(t)); d6.setAttribute('cy', F.sy(f6(t)));
+    $('pe-t-val').textContent = t;
+    $('pe-v0').textContent = fmt(pe(t, 0), 3);
+    $('pe-v1').textContent = fmt(pe(t, 1), 3);
+    $('pe-v6').textContent = fmt(pe(t, 6), 3);
+  }
+  tIn.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.mask = (() => {
+  const svg = $('mask-svg');
+  const W6 = ['the', 'cat', 'sat', 'on', 'the', 'mat'], n = 6;
+  const r = rng(7);
+  const S = W6.map((_, t) => W6.map((__, j) => 1.2 * gauss(r) + (j === t ? 0.8 : 0)));
+  const GX = 300, GY = 80, C = 72;
+  txt(svg, GX + (n * C) / 2, 24, 'tokens looked at (keys)', 'ttl', { 'text-anchor': 'middle' });
+  el('text', { class: 'ttl', transform: `translate(${GX - 120} ${GY + (n * C) / 2}) rotate(-90)`, 'text-anchor': 'middle', text: 'tokens looking (queries)' }, svg);
+  W6.forEach((w, j) => txt(svg, GX + j * C + C / 2, GY - 12, w, 'txs', { 'text-anchor': 'middle' }));
+  let mode = 1, sel = 3;
+  const rows = W6.map((w, t) => {
+    const g = el('g', { class: 'tokbtn', role: 'button', tabindex: 0, 'aria-label': 'row ' + w }, svg);
+    const lab = txt(g, GX - 14, GY + t * C + C / 2 + 9, w, 'txs', { 'text-anchor': 'end' });
+    const rc = [], tc = [];
+    for (let j = 0; j < n; j++) {
+      rc.push(el('rect', { x: GX + j * C, y: GY + t * C, width: C, height: C, style: 'stroke:var(--myst-color-bg);stroke-width:2' }, g));
+      tc.push(txt(g, GX + j * C + C / 2, GY + t * C + C / 2 + 9, '', 'txs', { 'text-anchor': 'middle' }));
+    }
+    const pick = () => { sel = t; draw(); };
+    g.addEventListener('click', pick);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(); } });
+    return { lab, rc, tc };
+  });
+  const hl = el('rect', { x: GX - 3, width: n * C + 6, height: C, style: 'fill:none;stroke:var(--c-b);stroke-width:4;pointer-events:none' }, svg);
+  const NX = GX + n * C + 50;
+  const note = [txt(svg, NX, 180, '', 'tx', { 'font-weight': 700 }), txt(svg, NX, 222, '', 'txs'), txt(svg, NX, 256, '', 'txs'), txt(svg, NX, 330, '', 'txs'), txt(svg, NX, 364, '', 'txs')];
+  el('rect', { x: NX, y: 420, width: 30, height: 30, style: 'fill:var(--c-a);fill-opacity:.7' }, svg);
+  txt(svg, NX + 44, 444, 'weight', 'txs');
+  el('rect', { x: NX, y: 466, width: 30, height: 30, style: 'fill:var(--myst-color-surface);stroke:var(--myst-color-border-strong)' }, svg);
+  txt(svg, NX + 44, 490, 'blocked', 'txs');
+  const bEnc = $('mask-enc'), bDec = $('mask-dec');
+  function draw() {
+    rows.forEach((row, t) => {
+      const s = S[t].map((v, j) => (mode && j > t ? -Infinity : v));
+      const w = softmax(s);
+      for (let j = 0; j < n; j++) {
+        const blocked = !isFinite(s[j]);
+        row.rc[j].style.fill = blocked ? 'var(--myst-color-surface)' : 'var(--c-a)';
+        row.rc[j].style.fillOpacity = blocked ? 1 : (0.06 + 0.9 * w[j]).toFixed(3);
+        row.tc[j].textContent = blocked ? '' : w[j].toFixed(2).replace(/^0/, '');
+        row.tc[j].style.fill = !blocked && w[j] > 0.5 ? '#fff' : '';
+      }
+      row.lab.style.fontWeight = t === sel ? 700 : 400;
+    });
+    hl.setAttribute('y', GY + sel * C);
+    const vis = mode ? sel + 1 : n;
+    note[0].textContent = `row “${W6[sel]}”`;
+    note[1].textContent = mode ? 'sees itself and' : 'sees the whole';
+    note[2].textContent = mode ? 'the tokens before it' : 'sentence';
+    note[3].textContent = mode ? 'future tokens get' : 'no cell is blocked';
+    note[4].textContent = mode ? 'weight exactly 0' : '';
+    $('mask-row').textContent = W6[sel];
+    $('mask-vis').textContent = `${vis} of ${n}`;
+    bEnc.className = mode ? 'bt chip' : 'bt';
+    bDec.className = mode ? 'bt' : 'bt chip';
+  }
+  bEnc.addEventListener('click', () => { mode = 0; draw(); });
+  bDec.addEventListener('click', () => { mode = 1; draw(); });
+  draw();
+  return {};
+})();
+
+DEMOS.gen = (() => {
+  const svg = $('gen-svg');
+  const WORDS = ['mat', 'floor', 'sofa', 'bed', 'roof', 'moon', 'idea'];
+  const Z = [3.0, 2.2, 1.8, 1.2, 0.6, -0.8, -1.6];
+  const BX = 190, BW = 760, Y0 = 84, RH = 56;
+  const head = txt(svg, 0, 40, 'The cat sat on the ___', 'tx', { 'font-weight': 600, style: 'font-size:30px' });
+  const bars = [], labs = [];
+  WORDS.forEach((w, i) => {
+    const y = Y0 + i * RH;
+    txt(svg, BX - 16, y + 34, w, 'tx', { 'text-anchor': 'end', style: 'font-size:26px' });
+    el('rect', { x: BX, y: y + 8, width: BW, height: 38, rx: 3, style: 'fill:var(--myst-color-surface)' }, svg);
+    bars.push(el('rect', { x: BX, y: y + 8, height: 38, rx: 3, class: 'fa' }, svg));
+    labs.push(txt(svg, 0, y + 36, '', 'txs', { 'font-weight': 600 }));
+  });
+  txt(svg, 0, 530, 'samples', 'ttl');
+  const sg = el('g', {}, svg);
+  const R = rng(2026), tIn = $('gen-tau');
+  let tau = 1, samples = [];
+  const probs = () => softmax(Z.map((z) => z / tau));
+  function draw() {
+    const p = probs();
+    p.forEach((v, i) => {
+      bars[i].setAttribute('width', Math.max(0, BW * v));
+      bars[i].setAttribute('class', i === 0 ? 'fb' : 'fa');
+      labs[i].setAttribute('x', BX + BW * v + 12);
+      labs[i].textContent = (v * 100).toFixed(1) + '%';
+    });
+    clear(sg);
+    let x = 120;
+    samples.forEach((w, k) => {
+      const it = { x, w: w.length * 14.6 + 28, cx: 0 };
+      it.cx = it.x + it.w / 2;
+      chip(sg, it, 500, 48, w, k === samples.length - 1 ? 'box-b' : 'box');
+      x += it.w + 12;
+    });
+    if (!samples.length) txt(sg, 120, 532, 'press Sample', 'txs', { style: 'fill:var(--myst-color-text-tertiary)' });
+    head.textContent = 'The cat sat on the ' + (samples.length ? samples[samples.length - 1] : '___');
+    $('gen-tau-val').textContent = tau.toFixed(2);
+    $('gen-top').textContent = pct(p[0]);
+  }
+  function sample() {
+    const p = probs(), u = R();
+    let acc = 0, k = 0;
+    for (; k < p.length - 1; k++) { acc += p[k]; if (u < acc) break; }
+    samples.push(WORDS[k]);
+    let tot = 0;
+    samples = samples.filter((w, i, a) => { tot = a.slice(i).reduce((s, v) => s + v.length * 14.6 + 40, 0); return tot <= 1000; });
+    draw();
+  }
+  tIn.addEventListener('input', () => { tau = +tIn.value; draw(); });
+  $('gen-sample').addEventListener('click', sample);
+  $('gen-clear').addEventListener('click', () => { samples = []; draw(); });
+  draw();
+  return {};
+})();
+
+drawRnn(); drawTokens(); drawWhich(); drawQkv(); drawCross(); drawMultiHead(); drawBlock();
+drawFamilies(); drawPretrain(); drawLimits(); drawBeyond(); drawCourse();
+})();
+</script>
+</body>
+</html>

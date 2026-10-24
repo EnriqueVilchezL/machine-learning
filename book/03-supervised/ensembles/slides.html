@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ensemble methods</title>
+<link rel="stylesheet" href="../../assets/article-slides/ds.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="../../assets/article-slides/deck.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+<marker id="ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="ah-a" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+</svg>
+<deck-stage width="1920" height="1080" no-rail>
+
+<!-- ═══════════ Opening ═══════════ -->
+<section class="s ats-prose" data-label="Title">
+<div style="display:flex;align-items:center;height:36px;font-size:24px;font-weight:300">
+<div style="padding-right:12px;margin-right:12px;border-right:1px solid var(--myst-color-border);font-variant:small-caps">Topic 14</div>
+<div style="font-weight:600;font-variant:small-caps">Machine Learning</div>
+<div style="padding-left:12px;margin-left:12px;border-left:1px solid var(--myst-color-border)"></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:1400px">
+<h1 style="margin:0;font-size:88px;line-height:1.1">Ensemble methods</h1>
+<p class="lead" style="margin:28px 0 0;color:var(--myst-color-text-tertiary)">Why many imperfect models, combined well, beat any one of them</p>
+<div style="display:grid;grid-template-columns:560px 1fr;row-gap:8px;margin-top:72px">
+<div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Author</div><div style="padding-bottom:12px;font-size:24px;font-weight:100;text-transform:uppercase">Affiliation</div>
+<div style="font-size:28px;font-weight:600;color:var(--myst-color-text)">Enrique Vílchez Lizano</div><div style="font-size:28px"></div>
+</div>
+</div>
+<div style="display:flex;gap:12px;font-size:24px;font-weight:300"><span>Topic 14 of 31</span></div>
+</section>
+
+<section class="s ats-prose" data-label="Outline">
+<div class="hdr" data-s="Opening"></div>
+<div class="bm">
+<div>
+<h2>Outline</h2>
+<ol style="font-size:40px;line-height:1.6">
+<li class="an-up" style="--d:.05s">The wisdom of the crowd</li>
+<li class="an-up" style="--d:.15s">Bagging and random forests</li>
+<li class="an-up" style="--d:.25s">Boosting, and how it compares with bagging</li>
+</ol>
+</div>
+<div class="side" style="gap:40px;padding-top:8px">
+<aside class="am"><div class="t">Navigation</div><p>Arrow keys move forward and back. Figures with controls respond to clicks and sliders. Press <kbd>D</kbd> for dark mode.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Notation">
+<div class="hdr" data-s="Opening"></div>
+<h2>Notation</h2>
+<div class="bm">
+<div>
+<p class="cap" style="margin-bottom:16px"><b>Table 1:</b>Symbols used in this topic.</p>
+<table class="tb">
+<colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><span class="tex">\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}</span></td><td>Training set with <span class="tex">n</span> labeled examples</td></tr>
+<tr class="an-up" style="--d:.12s"><td><span class="tex">\mathbf{x}_i = (x_{i1}, \dots, x_{id})</span></td><td>Features of example <span class="tex">i</span>, one number per feature</td></tr>
+<tr class="an-up" style="--d:.19s"><td><span class="tex">y_i</span></td><td>Its label: a class or a number</td></tr>
+<tr class="an-up" style="--d:.26s"><td><span class="tex">\mathbf{x}, \ \hat{y}</span></td><td>A new example and its prediction</td></tr>
+<tr class="an-up" style="--d:.33s"><td><span class="tex">B, \ \hat{f}_b(\mathbf{x})</span></td><td>Number of models, and the prediction of model <span class="tex">b</span></td></tr>
+<tr class="an-up" style="--d:.40s"><td><span class="tex">h_m, \ \alpha_m</span></td><td>Simple model added in boosting round <span class="tex">m</span>, and its say in the vote</td></tr>
+<tr class="an-up" style="--d:.47s"><td><span class="tex">w_i</span></td><td>Weight of example <span class="tex">i</span> during boosting</td></tr>
+</tbody>
+</table>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Reading the symbols</div><p>Bold letters are vectors: a whole row of the data table.</p><p>Subscript <span class="tex">i</span> picks an example, <span class="tex">b</span> or <span class="tex">m</span> picks a model.</p><p>A hat marks a prediction: <span class="tex">\hat{y}</span> is the model's guess for <span class="tex">y</span>.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 1 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 1">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 1</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">The wisdom of the crowd</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Many rough guesses, averaged, can be better than the best single guess.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Galton's ox">
+<div class="hdr" data-s="Crowds"></div>
+<h2>Guessing the weight of an ox</h2>
+<div class="fr">
+<div class="figbox"><svg id="ox-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Plymouth, England, 1906: about 800 visitors to a fair guessed the weight of an ox. Francis Galton studied the tickets.</p>
+<div class="ro"><span>True weight</span><b>1198 lb</b></div>
+<div class="ro"><span>Average of all guesses</span><b class="a">1197 lb</b></div>
+<div class="ro"><span>Typical single guess off by</span><b id="ox-err" class="bb">0 lb</b></div>
+<p class="small frag up" style="margin:0">The errors point in different directions, so they cancel in the average.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 1:</b>200 simulated guesses shaped like Galton's data. The two weights are the real ones.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Majority vote" data-demo="vote">
+<div class="hdr" data-s="Crowds"></div>
+<h2>Why combining works</h2>
+<div class="fr">
+<div class="figbox"><svg id="vote-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each voter answers a yes/no question correctly 65% of the time. The group answers by majority vote.</p>
+<div class="ctl"><label><span>Number of voters</span><b id="vote-n-val">11</b></label><input type="range" id="vote-n" min="1" max="101" step="2" value="11"></div>
+<div class="ctl"><label><span>Shared mistakes</span><b id="vote-c-val">0%</b></label><input type="range" id="vote-c" min="0" max="100" step="5" value="0"></div>
+<div class="ro"><span>One voter</span><b>65%</b></div>
+<div class="ro"><span>Majority vote</span><b id="vote-acc" class="a">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 2:</b>Exact accuracy of the majority. Shared mistakes is how often all voters copy one opinion instead of thinking alone.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Voting and averaging">
+<div class="hdr" data-s="Crowds"></div>
+<h2>Voting and averaging models</h2>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;column-gap:96px;row-gap:8px">
+<div class="figbox"><svg id="vot-svg" viewBox="0 0 792 560"></svg></div>
+<div class="figbox"><svg id="avg-svg" viewBox="0 0 792 560"></svg></div>
+<div class="subcap">(a) Classification: each model votes for a class</div>
+<div class="subcap">(b) Regression: the predictions are averaged</div>
+</div>
+<p class="cap" style="margin-top:16px"><b>Figure 3:</b>An ensemble is a group of models whose answers are combined. It helps when the models are good and make different mistakes, as in Figure 2.</p>
+</section>
+
+<section class="s ats-prose" data-label="Combining formulas">
+<div class="hdr" data-s="Crowds"></div>
+<h2>Combining as a formula</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Regression: the ensemble predicts the average of the <span class="tex">B</span> models.</p>
+<div class="eq"><div class="m tex-d">\hat{f}(\mathbf{x}) = \frac{1}{B} \sum_{b=1}^{B} \hat{f}_b(\mathbf{x})</div><div class="n">(1)</div></div>
+<p class="small frag up" data-step="c1" style="margin:0">Classification: each model votes and the class with the most votes wins.</p>
+<div class="eq frag up" data-step="c1"><div class="m tex-d">\hat{y} = \underset{c}{\arg\max} \sum_{b=1}^{B} \mathbb{I}\big(\hat{f}_b(\mathbf{x}) = c\big)</div><div class="n">(2)</div></div>
+<p class="small frag up" data-step="c2" style="margin:0">If each model has variance <span class="tex">\sigma^2</span> and their errors are independent, the average has a much smaller variance:</p>
+<div class="eq frag up" data-step="c2"><div class="m tex-d">\operatorname{Var}\big(\hat{f}(\mathbf{x})\big) = \frac{\sigma^2}{B}</div><div class="n">(3)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>Three models predict 200, 210 and 230:</p><p><span class="tex">\hat{f} = \tfrac{200 + 210 + 230}{3} \approx 213.3</span></p><p>With <span class="tex">\sigma = 30</span> and <span class="tex">B = 9</span>:</p><p><span class="tex">\tfrac{30^2}{9} = \tfrac{900}{9} = 100 = 10^2</span></p><p>The spread drops from 30 to 10.</p></aside>
+<aside class="am"><div class="t">Only if independent</div><p>Shared mistakes do not cancel, as in Figure 2.</p></aside>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 2 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 2">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 2</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Bagging and random forests</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">One dataset, many slightly different copies, many trees.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bootstrap samples" data-demo="boot">
+<div class="hdr" data-s="Bagging"></div>
+<h2>Bootstrap samples</h2>
+<div class="fr">
+<div class="figbox"><svg id="boot-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">We only have one dataset. To get a new one, draw 12 examples from the 12 at random, putting each one back after drawing it.</p>
+<div class="btns"><button class="bt" id="boot-draw">Draw sample</button></div>
+<div class="ro"><span>Different examples used</span><b id="boot-uniq" class="a">0</b></div>
+<div class="ro"><span>Left out</span><b id="boot-out" class="bb">0</b></div>
+<div class="ro"><span>Left out, on average</span><b id="boot-avg">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 4:</b>Some examples repeat and about a third are left out. The left-out ones can serve as a free test set.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bootstrap formula">
+<div class="hdr" data-s="Bagging"></div>
+<h2>Who is left out</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">One draw misses a given example with chance <span class="tex">1 - 1/n</span>. A bootstrap sample makes <span class="tex">n</span> independent draws, so the example is left out of the whole sample with chance</p>
+<div class="eq"><div class="m tex-d">\Big(1 - \frac{1}{n}\Big)^{n} \approx e^{-1} \approx 0.368</div><div class="n">(4)</div></div>
+<p class="small frag up" data-step="b1" style="margin:0">The approximation is good once <span class="tex">n</span> is more than a few dozen. About 37% of the data is left out of each sample and about 63% is used.</p>
+<p class="small frag up" data-step="b2" style="margin:16px 0 0">Bagging trains model <span class="tex">\hat{f}_b</span> on sample <span class="tex">b</span> and combines the <span class="tex">B</span> models with equation (1) or (2).</p>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>For the 12 examples of Figure 4:</p><p><span class="tex">(11/12)^{12} \approx 0.352</span></p><p><span class="tex">12 \cdot 0.352 \approx 4.2</span> examples left out on average.</p><p>For <span class="tex">n = 1000</span>:</p><p><span class="tex">0.999^{1000} \approx 0.368</span></p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bagging">
+<div class="hdr" data-s="Bagging"></div>
+<h2>Bagging: resample, train, vote</h2>
+<div class="figbox"><svg id="bag-svg" viewBox="0 0 1680 600"></svg></div>
+<p class="cap" style="margin-top:16px"><b>Figure 5:</b>Bagging (bootstrap aggregating) trains one tree on each bootstrap sample. The trees are built independently, so they can be trained at the same time.</p>
+</section>
+
+<section class="s ats-prose" data-label="Random forests">
+<div class="hdr" data-s="Bagging"></div>
+<h2>Random forests</h2>
+<div class="fr">
+<div class="figbox"><svg id="rf-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:20px">
+<p class="small" style="margin:0">With bagging alone the trees still look alike: the strongest feature, here the area, wins the top split in almost every tree.</p>
+<p class="small frag up" data-step="t1" style="margin:0">A random forest lets each split choose only from a few features picked at random. With <span class="tex">d</span> features, a common choice is about <span class="tex">\sqrt{d}</span>.</p>
+<p class="small frag up" data-step="t3" style="margin:0">The trees become more different, so their mistakes cancel better.</p>
+<div class="grow"></div>
+<p class="cap"><b>Figure 6:</b>Top split of three trees that predict house prices. Each tree may only use the features shown under it.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="More trees" data-demo="forest">
+<div class="hdr" data-s="Bagging"></div>
+<h2>More trees, smoother boundary</h2>
+<div class="fr">
+<div class="figbox"><svg id="forest-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">One deep tree follows every noisy point. A vote over many trees keeps the shape and drops the noise.</p>
+<div class="ctl"><label><span>Number of trees</span><b id="forest-n-val">1</b></label><input type="range" id="forest-n" min="1" max="60" step="1" value="1"></div>
+<div class="ro"><span>Test accuracy, one tree</span><b id="forest-one" class="bb">0%</b></div>
+<div class="ro"><span>Test accuracy, forest</span><b id="forest-acc" class="a">0%</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 7:</b>150 training points with 10% wrong labels. Shading shows the vote; paler means the trees disagree.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Part 3 ═══════════ -->
+<section class="s sec ats-prose" data-label="Part 3">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+<div style="font-size:32px;font-weight:300;font-variant:small-caps;color:var(--myst-color-text-tertiary)">Part 3</div>
+<h1 style="margin:16px 0 0;font-size:88px;line-height:1.1">Boosting</h1>
+<p class="lead" style="margin:24px 0 0;max-width:1160px">Models trained one after another, each one fixing what the last ones got wrong.</p>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Boosting rounds" data-demo="boost">
+<div class="hdr" data-s="Boosting"></div>
+<h2>Learning from mistakes</h2>
+<div class="fr">
+<div class="figbox"><svg id="boost-svg" viewBox="0 0 1160 700"></svg></div>
+<div class="side" style="gap:18px">
+<p class="small" style="margin:0">Each round adds one very simple model: a single straight cut. Points it gets wrong become heavier, so the next cut pays more attention to them.</p>
+<div class="btns"><button class="bt" id="boost-next">Next round</button><button class="bt chip" id="boost-reset">Reset</button></div>
+<div class="ro"><span>Round</span><b id="boost-round">0</b></div>
+<div class="ro"><span>Combined accuracy</span><b id="boost-acc" class="a">—</b></div>
+<div class="grow"></div>
+<p class="cap"><b>Figure 8:</b>AdaBoost on 50 points. Dot size is the weight; the dashed line is the newest cut and the shading is the weighted vote of all cuts.</p>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="AdaBoost formulas">
+<div class="hdr" data-s="Boosting"></div>
+<h2>AdaBoost formulas</h2>
+<div class="bm">
+<div>
+<p class="small" style="margin:0">Labels are <span class="tex">y_i \in \{-1, +1\}</span>. After <span class="tex">M</span> rounds, the cuts vote with weights <span class="tex">\alpha_m</span>:</p>
+<div class="eq"><div class="m tex-d">F(\mathbf{x}) = \sum_{m=1}^{M} \alpha_m \, h_m(\mathbf{x}), \qquad \hat{y} = \operatorname{sign}\big(F(\mathbf{x})\big)</div><div class="n">(5)</div></div>
+<p class="small frag up" data-step="a1" style="margin:0">A cut with weighted error <span class="tex">\varepsilon_m</span> gets a larger say the fewer mistakes it makes:</p>
+<div class="eq frag up" data-step="a1"><div class="m tex-d">\alpha_m = \frac{1}{2} \ln \frac{1 - \varepsilon_m}{\varepsilon_m}</div><div class="n">(6)</div></div>
+<p class="small frag up" data-step="a2" style="margin:0">Mistakes (<span class="tex">y_i h_m(\mathbf{x}_i) = -1</span>) grow heavier and correct points lighter. Then the weights are rescaled to add up to 1.</p>
+<div class="eq frag up" data-step="a2"><div class="m tex-d">w_i \leftarrow w_i \, e^{-\alpha_m y_i h_m(\mathbf{x}_i)}</div><div class="n">(7)</div></div>
+</div>
+<div class="side" style="gap:28px;padding-top:8px">
+<aside class="am"><div class="t">Example</div><p>A cut with error <span class="tex">\varepsilon = 0.2</span>:</p><p><span class="tex">\alpha = \tfrac{1}{2} \ln \tfrac{0.8}{0.2} = \tfrac{1}{2} \ln 4 \approx 0.69</span></p><p>Weight of a mistake: times <span class="tex">e^{0.69} \approx 2</span></p><p>Weight of a correct point: times <span class="tex">e^{-0.69} \approx 0.5</span></p><p>A cut with <span class="tex">\varepsilon = 0.5</span> gets <span class="tex">\alpha = 0</span>: a coin flip has no say.</p></aside>
+</div>
+</div>
+</section>
+
+<section class="s ats-prose" data-label="Bagging vs boosting">
+<div class="hdr" data-s="Boosting"></div>
+<h2>Bagging vs boosting</h2>
+<p class="cap" style="margin-bottom:16px"><b>Table 2:</b>The two main ways of building an ensemble.</p>
+<table class="tb" style="font-size:26px">
+<colgroup><col style="width:24%"><col style="width:38%"><col style="width:38%"></colgroup>
+<thead><tr><th></th><th>Bagging and random forests</th><th>Boosting</th></tr></thead>
+<tbody>
+<tr class="an-up" style="--d:.05s"><td><strong>Order</strong></td><td>Parallel: models are independent</td><td>Sequential: each model depends on the last</td></tr>
+<tr class="an-up" style="--d:.13s"><td><strong>Data per model</strong></td><td>A bootstrap sample</td><td>All the data, with changing weights</td></tr>
+<tr class="an-up" style="--d:.21s"><td><strong>Base model</strong></td><td>Deep trees (flexible, unstable)</td><td>Very small trees (simple, rigid)</td></tr>
+<tr class="an-up" style="--d:.29s"><td><strong>Combining</strong></td><td>Equal vote or plain average</td><td>Weighted vote: better models count more</td></tr>
+<tr class="an-up" style="--d:.37s"><td><strong>Main effect</strong></td><td>Reduces variance</td><td>Reduces bias</td></tr>
+<tr class="an-up" style="--d:.45s"><td><strong>Too many models</strong></td><td>Rarely hurts, only costs time</td><td>Can overfit; stop with validation</td></tr>
+</tbody>
+</table>
+<aside class="adm k-note sm frag up" style="margin-top:24px;max-width:1300px;font-size:26px"><div class="h"><i data-i="note"></i><span>Recall</span></div><div class="b"><p>Variance: the model changes a lot with the sample (overfitting). Bias: the model is too simple (underfitting).</p></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="In practice">
+<div class="hdr" data-s="Boosting"></div>
+<h2>Ensembles in practice</h2>
+<div class="two">
+<div>
+<ul>
+<li class="an-up" style="--d:.05s"><strong>Random forests</strong> are a strong default for tables of data: good accuracy with little tuning.</li>
+<li class="an-up" style="--d:.15s"><strong>Boosted trees</strong> often give the best scores, and they win many competitions on tabular data.</li>
+<li class="frag up"><strong>Costs:</strong> hundreds of trees are slower to train and to run, and much harder to explain than one tree.</li>
+<li class="frag up"><strong>Feature importance</strong> recovers part of the explanation: how much each feature helped across all the trees.</li>
+</ul>
+</div>
+<div class="col">
+<div class="figbox"><svg id="imp-svg" viewBox="0 0 792 600"></svg></div>
+<p class="cap" style="margin-top:12px"><b>Figure 9:</b>Feature importance of a forest that predicts house prices. Illustrative values that add up to 100%.</p>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ Closing ═══════════ -->
+<section class="s ats-prose" data-label="Key ideas">
+<div class="hdr" data-s="Closing"></div>
+<h2>Key ideas</h2>
+<aside class="adm k-tip" style="max-width:1300px"><div class="h"><i data-i="tip"></i><span>Remember</span></div><div class="b">
+<ul style="margin:0;font-size:36px">
+<li class="an-up" style="--d:.05s">An ensemble combines the answers of many models by voting or averaging.</li>
+<li class="an-up" style="--d:.15s">It works when the models are better than chance and make different mistakes.</li>
+<li class="an-up" style="--d:.25s">Bagging trains trees on bootstrap samples; random forests also pick features at random.</li>
+<li class="an-up" style="--d:.35s">Boosting trains simple models in sequence, each focused on the previous mistakes.</li>
+<li class="an-up" style="--d:.45s">Bagging mainly reduces variance; boosting mainly reduces bias.</li>
+</ul></div></aside>
+</section>
+
+<section class="s ats-prose" data-label="References">
+<div class="hdr" data-s="Closing"></div>
+<div class="bm">
+<div>
+<h2>Going further</h2>
+<p class="lead">The theory page for this topic explains bagging, random forests and boosting step by step, with more examples.</p>
+<div style="display:flex;gap:16px;margin:24px 0 56px"><a class="bt" href="index.html">Read the theory</a></div>
+<section>
+<header style="font-size:1.125em;font-weight:600;color:var(--myst-color-text);line-height:1.6">References</header>
+<div style="padding-left:.75em;font-size:var(--slide-fs-label);line-height:1.6;color:var(--myst-color-text-tertiary)">
+<ol style="margin:.5em 0 0;padding-left:1.625em">
+<li style="margin:.4em 0">Galton, F. (1907). Vox populi. <em>Nature</em>, 75, 450–451.</li>
+<li style="margin:.4em 0">Breiman, L. (1996). Bagging predictors. <em>Machine Learning</em>, 24(2), 123–140.</li>
+<li style="margin:.4em 0">Breiman, L. (2001). Random forests. <em>Machine Learning</em>, 45(1), 5–32.</li>
+<li style="margin:.4em 0">Freund, Y., &amp; Schapire, R. E. (1997). A decision-theoretic generalization of on-line learning and an application to boosting. <em>Journal of Computer and System Sciences</em>, 55(1), 119–139.</li>
+<li style="margin:.4em 0">James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning</em> (2nd ed.), Chapter 8. Springer.</li>
+</ol>
+</div>
+</section>
+</div>
+<div class="side" style="padding-top:8px">
+<aside class="am"><div class="t">Next topic</div><p>Topic 15: unsupervised learning.</p></aside>
+</div>
+</div>
+</section>
+
+</deck-stage>
+
+<script src="../../assets/article-slides/deck-stage.js"></script>
+<script src="../../assets/article-slides/deck.js"></script>
+<script>
+(() => {
+'use strict';
+const { NS, REDUCED, el, rng, gauss, lin, clamp, mean, fmt, polyfit, polyval, curvePath, toSvgPoint, frame, legend } = window.Deck;
+
+/* ───────── shared helpers ───────── */
+const pct = (v) => Math.round(v * 100) + '%';
+const clear = (node) => { while (node.firstChild) node.firstChild.remove(); };
+
+/* A grid of cells in the plot area; paint(fn) colors each cell by fn(x, y) in [0, 1] (share of votes for blue) */
+function shadeGrid(F, xr, yr, cell) {
+  const g = el('g', { 'shape-rendering': 'crispEdges' }, F.plot);
+  const cells = [];
+  for (let px = F.L; px < F.W - F.R; px += cell) {
+    for (let py = F.T; py < F.H - F.B; py += cell) {
+      const rect = el('rect', { x: px, y: py, width: cell, height: cell }, g);
+      cells.push({ x: F.ix(px + cell / 2), y: F.iy(py + cell / 2), rect });
+    }
+  }
+  return {
+    g,
+    paint(fn) {
+      cells.forEach((c) => {
+        if (!fn) { c.rect.setAttribute('style', 'fill:none'); return; }
+        const v = fn(c.x, c.y), blue = v >= 0.5;
+        c.rect.setAttribute('style', `fill:var(${blue ? '--c-a' : '--c-b'});fill-opacity:${(0.05 + 0.25 * Math.abs(2 * v - 1)).toFixed(3)}`);
+      });
+    },
+  };
+}
+
+/* ───────── static figures ───────── */
+function drawOx() {
+  const svg = document.getElementById('ox-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 60, t: 40, x: [1000, 1420], y: [0, 30], xt: [1000, 1100, 1200, 1300, 1400], yt: [], xl: 'guessed weight (pounds)', grid: false });
+  const r = rng(19);
+  let g = Array.from({ length: 200 }, () => 1207 + 62 * gauss(r));
+  g = g.map((v) => clamp(v, 1010, 1410));
+  const shift = 1197 - mean(g);
+  g = g.map((v) => v + shift);
+  const BIN = 15, R = 7.5, counts = {};
+  const sorted = g.slice().sort((a, b) => a - b);
+  sorted.forEach((v, i) => {
+    const b = Math.floor((v - 1000) / BIN), k = counts[b] = (counts[b] || 0) + 1;
+    const cx = F.sx(1000 + (b + 0.5) * BIN), cy = F.H - F.B - R - 2 - (k - 1) * (2 * R + 1);
+    el('circle', { class: 'ink3 an-pop', cx, cy, r: R, style: `--d:${(i * 0.006).toFixed(3)}s` }, F.plot);
+  });
+  document.getElementById('ox-err').textContent = Math.round(mean(g.map((v) => Math.abs(v - 1198)))) + ' lb';
+  const top = F.T + 70;
+  const ga = el('g', { class: 'an-fade', style: '--d:1.4s' }, svg);
+  el('line', { x1: F.sx(1198), x2: F.sx(1198), y1: top, y2: F.H - F.B, style: 'stroke:var(--c-c);stroke-width:4;stroke-dasharray:10 8' }, ga);
+  el('line', { class: 'curve-a', x1: F.sx(1197), x2: F.sx(1197), y1: top + 40, y2: F.H - F.B, style: 'stroke-width:4' }, ga);
+  el('text', { class: 'txs', x: F.sx(1198) + 14, y: top + 4, style: 'fill:var(--c-c);font-weight:600', text: 'true weight 1198' }, ga);
+  el('text', { class: 'txs', x: F.sx(1197) - 14, y: top + 44, 'text-anchor': 'end', style: 'fill:var(--c-a);font-weight:600', text: 'average guess 1197' }, ga);
+  legend(svg, F.L + 20, F.T + 6, [['dot', 'ink3', 'one visitor’s guess']]);
+}
+
+function drawVoting() {
+  const svg = document.getElementById('vot-svg');
+  const g0 = el('g', { class: 'an-fade' }, svg);
+  el('rect', { class: 'box', x: 10, y: 230, width: 170, height: 100, rx: 4 }, g0);
+  el('text', { class: 'tx', x: 95, y: 272, 'text-anchor': 'middle', 'font-weight': 600, text: 'new' }, g0);
+  el('text', { class: 'tx', x: 95, y: 308, 'text-anchor': 'middle', 'font-weight': 600, text: 'email' }, g0);
+  const models = [['decision tree', 'spam', 'fb', 70], ['k-NN', 'spam', 'fb', 230], ['logistic reg.', 'not spam', 'fa', 390]];
+  models.forEach(([name, out, cls, y], i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.3 + i * 0.2}s` }, svg);
+    el('path', { class: 'wire', d: `M180 280C230 280 220 ${y + 50} 262 ${y + 50}`, 'marker-end': 'url(#ah)' }, g);
+    el('rect', { class: 'box', x: 270, y, width: 210, height: 100, rx: 4 }, g);
+    el('text', { class: 'tx', x: 375, y: y + 42, 'text-anchor': 'middle', text: name }, g);
+    el('text', { class: `tx ${cls}`, x: 375, y: y + 80, 'text-anchor': 'middle', style: 'font-weight:700', text: out }, g);
+    el('path', { class: 'wire', d: `M480 ${y + 50}C520 ${y + 50} 520 280 572 280`, 'marker-end': 'url(#ah)' }, g);
+  });
+  const gv = el('g', { class: 'frag' }, svg);
+  el('rect', { class: 'box-b', x: 580, y: 210, width: 200, height: 140, rx: 4 }, gv);
+  el('text', { class: 'tx', x: 680, y: 256, 'text-anchor': 'middle', 'font-weight': 700, text: 'vote' }, gv);
+  el('text', { class: 'txs', x: 680, y: 292, 'text-anchor': 'middle', text: '2 of 3 say' }, gv);
+  el('text', { class: 'tx fb', x: 680, y: 328, 'text-anchor': 'middle', 'font-weight': 700, text: 'spam' }, gv);
+  el('text', { class: 'txs', x: 396, y: 545, 'text-anchor': 'middle', text: 'One model is wrong; the majority is right.' }, gv);
+
+  const sv = document.getElementById('avg-svg');
+  const F = frame(sv, { W: 792, H: 560, l: 80, t: 70, b: 70, x: [0, 10], y: [0, 10], xt: [0, 5, 10], yt: [0, 5, 10], xl: 'x', yl: 'y' });
+  const f = (x) => 5 + 2.6 * Math.sin(0.65 * x);
+  const e1 = (x) => 1.3 * Math.sin(1.9 * x + 1), e2 = (x) => 1.1 * Math.cos(1.5 * x + 0.4);
+  const ms = [(x) => f(x) + e1(x), (x) => f(x) + e2(x), (x) => f(x) - 0.8 * (e1(x) + e2(x))];
+  const avg = (x) => mean(ms.map((m) => m(x)));
+  el('path', { class: 'curve-t', d: curvePath(f, 0, 10, F.sx, F.sy) }, F.plot);
+  ['--c-b', '--c-c', '--c-d'].forEach((c, i) => el('path', { class: 'an-draw', pathLength: 1, d: curvePath(ms[i], 0, 10, F.sx, F.sy), style: `--d:${i * 0.3}s;fill:none;stroke:var(${c});stroke-width:3;stroke-opacity:.75` }, F.plot));
+  el('path', { class: 'curve-a frag', d: curvePath(avg, 0, 10, F.sx, F.sy) }, F.plot);
+  ['--c-b', '--c-c', '--c-d'].forEach((c, i) => el('line', { x1: F.L + 10, x2: F.L + 36, y1: 14 + i * 8, y2: 14 + i * 8, style: `stroke:var(${c});stroke-width:3` }, sv));
+  el('text', { class: 'txs', x: F.L + 48, y: 30, text: 'three models' }, sv);
+  legend(sv, F.L + 250, 22, [['line', 'curve-a', 'their average']]);
+  legend(sv, F.L + 490, 22, [['line', 'curve-t', 'truth']]);
+}
+
+function drawBagging() {
+  const svg = document.getElementById('bag-svg');
+  const r = rng(5);
+  const dots = (g, x0, y0, ids, cols = 4) => ids.forEach((id, k) => el('circle', { class: `pt ${id % 2 ? 'fb' : 'fa'}`, cx: x0 + (k % cols) * 34, cy: y0 + Math.floor(k / cols) * 34, r: 12 }, g));
+  const g0 = el('g', { class: 'an-fade' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 200, text: 'training data' }, g0);
+  el('rect', { class: 'box', x: 0, y: 220, width: 190, height: 160, rx: 4 }, g0);
+  dots(g0, 44, 264, [...Array(12).keys()]);
+  const rows = [40, 240, 440];
+  rows.forEach((y, i) => {
+    const g = el('g', { class: 'an-up', style: `--d:${0.3 + i * 0.15}s` }, svg);
+    const ids = Array.from({ length: 12 }, () => Math.floor(r() * 12)).sort((a, b) => a - b);
+    el('path', { class: 'wire', d: `M190 300C280 300 280 ${y + 80} 352 ${y + 80}`, 'marker-end': 'url(#ah)' }, g);
+    el('text', { class: 'ttl', x: 360, y: y - 10, text: `sample ${i + 1}` }, g);
+    el('rect', { class: 'box', x: 360, y, width: 190, height: 160, rx: 4 }, g);
+    dots(g, 404, y + 44, ids);
+  });
+  const tree = (g, cx, y) => {
+    const n = [[cx, y + 20], [cx - 60, y + 80], [cx + 60, y + 80], [cx - 90, y + 135], [cx - 30, y + 135], [cx + 30, y + 135], [cx + 90, y + 135]];
+    [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]].forEach(([a, b]) => el('line', { x1: n[a][0], y1: n[a][1], x2: n[b][0], y2: n[b][1], style: 'stroke:var(--c-a);stroke-width:3' }, g));
+    n.forEach(([x, yy], k) => el('circle', { cx: x, cy: yy, r: k < 3 ? 12 : 9, class: k < 3 ? 'fa' : (k % 2 ? 'fa' : 'fb'), style: 'stroke:var(--myst-color-bg);stroke-width:2' }, g));
+  };
+  rows.forEach((y, i) => {
+    const g = el('g', { class: 'frag', 'data-step': 'trees' }, svg);
+    el('path', { class: 'wire', d: `M550 ${y + 80}H662`, 'marker-end': 'url(#ah)' }, g);
+    el('rect', { class: 'box-a', x: 670, y, width: 260, height: 160, rx: 4 }, g);
+    tree(g, 800, y);
+    el('text', { class: 'ttl', x: 670, y: y - 10, text: `tree ${i + 1}` }, g);
+    el('path', { class: 'wire', d: `M930 ${y + 80}C1040 ${y + 80} 1040 300 1112 300`, 'marker-end': 'url(#ah)' }, g);
+    const dot = el('circle', { r: 8, class: 'fa' }, g);
+    el('animateMotion', { dur: '1.8s', repeatCount: 'indefinite', path: `M930 ${y + 80}C1040 ${y + 80} 1040 300 1112 300` }, dot);
+  });
+  const gv = el('g', { class: 'frag', 'data-step': 'vote' }, svg);
+  el('rect', { class: 'box-b', x: 1120, y: 220, width: 250, height: 160, rx: 4 }, gv);
+  el('text', { class: 'tx', x: 1245, y: 290, 'text-anchor': 'middle', 'font-weight': 700, text: 'vote' }, gv);
+  el('text', { class: 'txs', x: 1245, y: 328, 'text-anchor': 'middle', text: 'or average' }, gv);
+  el('path', { class: 'wire', d: 'M1370 300H1462', 'marker-end': 'url(#ah)' }, gv);
+  el('rect', { class: 'box', x: 1470, y: 250, width: 210, height: 100, rx: 4 }, gv);
+  el('text', { class: 'tx', x: 1575, y: 310, 'text-anchor': 'middle', 'font-weight': 600, text: 'prediction' }, gv);
+  el('text', { class: 'txs', x: 1245, y: 470, 'text-anchor': 'middle', text: 'In practice: hundreds of trees.' }, gv);
+}
+
+function drawRandomForest() {
+  const svg = document.getElementById('rf-svg');
+  const FEATS = ['area', 'location', 'age', 'rooms', 'garden', 'floor'];
+  const CW = 170, GAP = 28;
+  const g0 = el('g', { class: 'an-fade' }, svg);
+  el('text', { class: 'ttl', x: 0, y: 26, text: 'all 6 features' }, g0);
+  FEATS.forEach((f, i) => {
+    const x = i * (CW + GAP);
+    el('rect', { class: 'box', x, y: 44, width: CW, height: 56, rx: 4 }, g0);
+    el('text', { class: 'tx', x: x + CW / 2, y: 82, 'text-anchor': 'middle', text: f }, g0);
+  });
+  const TREES = [[['age', 'rooms'], 'rooms', 't1'], [['location', 'garden'], 'location', 't2'], [['area', 'floor'], 'area', 't3']];
+  TREES.forEach(([allowed, pick, step], j) => {
+    const cx = 193 + j * 387, g = el('g', { class: 'frag', 'data-step': step }, svg);
+    el('text', { class: 'ttl', x: cx, y: 172, 'text-anchor': 'middle', text: `tree ${j + 1} may use` }, g);
+    allowed.forEach((f, k) => {
+      const on = f === pick, y = 192 + k * 66;
+      el('rect', { class: on ? 'box-a' : 'box', x: cx - 110, y, width: 220, height: 54, rx: 4 }, g);
+      el('text', { class: 'tx', x: cx, y: y + 37, 'text-anchor': 'middle', 'font-weight': on ? 700 : 400, text: f }, g);
+    });
+    el('path', { class: 'wire-a', d: `M${cx} 324V376`, 'marker-end': 'url(#ah-a)' }, g);
+    el('rect', { class: 'box-a', x: cx - 120, y: 384, width: 240, height: 70, rx: 35 }, g);
+    el('text', { class: 'tx', x: cx, y: 429, 'text-anchor': 'middle', 'font-weight': 600, text: pick + '?' }, g);
+    const kids = [[cx - 90, 560], [cx + 90, 560]];
+    kids.forEach(([x, y], k) => {
+      el('line', { x1: cx, y1: 454, x2: x, y2: y - 20, style: 'stroke:var(--c-a);stroke-width:3' }, g);
+      el('circle', { cx: x, cy: y, r: 20, class: k ? 'fb' : 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:2' }, g);
+      [[x - 40, y + 80], [x + 40, y + 80]].forEach(([x2, y2]) => {
+        el('line', { x1: x, y1: y + 20, x2, y2: y2 - 14, style: 'stroke:var(--myst-color-border-strong);stroke-width:2' }, g);
+        el('circle', { cx: x2, cy: y2, r: 14, class: 'ink3' }, g);
+      });
+    });
+  });
+}
+
+function drawImportance() {
+  const svg = document.getElementById('imp-svg');
+  const D = [['area', 0.34], ['location', 0.27], ['age', 0.14], ['rooms', 0.12], ['garden', 0.08], ['floor', 0.04], ['door color', 0.01]];
+  const X0 = 190, SC = 1450, RH = 72;
+  el('line', { class: 'ax', x1: X0, x2: X0, y1: 20, y2: 20 + D.length * RH }, svg);
+  D.forEach(([name, v], i) => {
+    const y = 34 + i * RH;
+    el('text', { class: 'tx', x: X0 - 16, y: y + 30, 'text-anchor': 'end', text: name }, svg);
+    el('rect', { class: `an-grow ${i < 2 ? 'fa' : ''}`, x: X0, y, width: Math.max(4, v * SC), height: 42, rx: 2, style: `--d:${0.2 + i * 0.12}s;${i < 2 ? '' : 'fill:var(--myst-color-border-strong)'}` }, svg);
+    el('text', { class: 'txs an-fade', x: X0 + Math.max(4, v * SC) + 12, y: y + 30, text: pct(v), style: `--d:${0.6 + i * 0.12}s` }, svg);
+  });
+  el('text', { class: 'txs', x: X0, y: 580, text: 'share of the total error reduction, over all trees' }, svg);
+}
+
+/* ───────── interactive demos ───────── */
+const DEMOS = {};
+
+DEMOS.vote = (() => {
+  const svg = document.getElementById('vote-svg');
+  const P = 0.65, NMAX = 101;
+  const F = frame(svg, { W: 1160, H: 700, l: 110, t: 40, x: [0, 102], y: [0.5, 1], xt: [1, 21, 41, 61, 81, 101], yt: [0.5, 0.6, 0.7, 0.8, 0.9, 1], fy: pct, xl: 'number of voters', yl: 'accuracy of the majority' });
+  /* exact probability that more than half of n independent voters are right */
+  function indep(n) {
+    let pmf = (1 - P) ** n, s = 0;
+    for (let k = 0; k <= n; k++) {
+      if (k > n / 2) s += pmf;
+      pmf *= ((n - k) / (k + 1)) * (P / (1 - P));
+    }
+    return s;
+  }
+  const IND = {};
+  for (let n = 1; n <= NMAX; n += 2) IND[n] = indep(n);
+  const acc = (n, c) => c * P + (1 - c) * IND[n];
+  const path = (c) => Object.keys(IND).map(Number).map((n, i) => (i ? 'L' : 'M') + F.sx(n).toFixed(1) + ' ' + F.sy(acc(n, c)).toFixed(1)).join('');
+  el('line', { x1: F.L, x2: F.W - F.R, y1: F.sy(P), y2: F.sy(P), style: 'stroke:var(--c-b);stroke-width:3;stroke-dasharray:4 6' }, F.plot);
+  el('path', { class: 'curve-t', d: path(0) }, F.plot);
+  const cur = el('path', { class: 'curve-a' }, F.plot);
+  const mk = el('circle', { r: 13, class: 'fa', style: 'stroke:var(--myst-color-bg);stroke-width:4' }, F.plot);
+  const mkT = el('text', { class: 'tx', 'text-anchor': 'middle', style: 'font-weight:700;fill:var(--c-a)' }, svg);
+  legend(svg, F.L + 420, F.T + 300, [['line', 'curve-a', 'with the chosen shared mistakes'], ['line', 'curve-t', 'fully independent voters'], ['line', '', 'one voter (65%)']])
+    .querySelectorAll('line')[2].setAttribute('style', 'stroke:var(--c-b);stroke-width:3;stroke-dasharray:4 6');
+  const sn = document.getElementById('vote-n'), sc = document.getElementById('vote-c');
+  function draw() {
+    const n = +sn.value, c = +sc.value / 100, a = acc(n, c);
+    document.getElementById('vote-n-val').textContent = n;
+    document.getElementById('vote-c-val').textContent = sc.value + '%';
+    document.getElementById('vote-acc').textContent = (a * 100).toFixed(1) + '%';
+    cur.setAttribute('d', path(c));
+    mk.setAttribute('cx', F.sx(n)); mk.setAttribute('cy', F.sy(a));
+    mkT.setAttribute('x', clamp(F.sx(n) + 18, F.L + 60, F.W - F.R - 60)); mkT.setAttribute('y', F.sy(a) + 40); mkT.setAttribute('text-anchor', 'start');
+    mkT.textContent = (a * 100).toFixed(1) + '%';
+  }
+  sn.addEventListener('input', draw); sc.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.boot = (() => {
+  const svg = document.getElementById('boot-svg');
+  const N = 12, r = rng(21), W = 84, X0 = 76;
+  const cx = (i) => X0 + i * W + W / 2;
+  el('text', { class: 'ttl', x: X0, y: 40, text: 'original data' }, svg);
+  el('text', { class: 'ttl', x: X0, y: 290, text: 'bootstrap sample (drawn with replacement)' }, svg);
+  el('text', { class: 'ttl', x: X0, y: 530, text: 'left out of this sample' }, svg);
+  const base = [], badges = [];
+  for (let i = 0; i < N; i++) {
+    const g = el('g', {}, svg);
+    el('rect', { class: 'box', x: X0 + i * W + 6, y: 60, width: W - 12, height: W - 12, rx: 4 }, g);
+    el('text', { class: 'tx', x: cx(i), y: 60 + (W - 12) / 2 + 10, 'text-anchor': 'middle', 'font-weight': 600, text: i + 1 }, g);
+    base.push(g);
+    badges.push(el('text', { class: 'txs', x: cx(i), y: 180, 'text-anchor': 'middle', text: '' }, svg));
+  }
+  el('text', { class: 'tk', x: X0 - 12, y: 180, 'text-anchor': 'end', text: 'times' }, svg);
+  const drawn = el('g', {}, svg), out = el('g', {}, svg);
+  let timers = [], total = 0, rounds = 0;
+  function draw() {
+    timers.forEach(clearTimeout); timers = [];
+    clear(drawn); clear(out);
+    const ids = Array.from({ length: N }, () => Math.floor(r() * N));
+    const cnt = new Array(N).fill(0);
+    ids.forEach((id) => cnt[id]++);
+    const shown = new Array(N).fill(0);
+    ids.forEach((id, k) => {
+      const t = setTimeout(() => {
+        shown[id]++;
+        const rep = shown[id] > 1;
+        const g = el('g', { class: 'an-pop' }, drawn);
+        el('rect', { x: X0 + k * W + 6, y: 310, width: W - 12, height: W - 12, rx: 4, class: cnt[id] > 1 ? 'box-a' : 'box', style: cnt[id] > 1 ? 'fill:var(--c-a-soft)' : '' }, g);
+        el('text', { class: 'tx', x: cx(k), y: 310 + (W - 12) / 2 + 10, 'text-anchor': 'middle', 'font-weight': 600, text: id + 1 }, g);
+        if (rep) el('text', { class: 'tk', x: cx(k), y: 420, 'text-anchor': 'middle', style: 'fill:var(--c-a)', text: 'repeat' }, g);
+        badges[id].textContent = '×' + shown[id];
+        badges[id].setAttribute('style', 'fill:var(--c-a);font-weight:600');
+      }, REDUCED ? 0 : k * 90);
+      timers.push(t);
+    });
+    const left = [...Array(N).keys()].filter((i) => !cnt[i]);
+    badges.forEach((b, i) => { b.textContent = cnt[i] ? '' : '×0'; b.setAttribute('style', cnt[i] ? '' : 'fill:var(--c-b);font-weight:600'); });
+    base.forEach((g, i) => g.setAttribute('opacity', cnt[i] ? 1 : 0.45));
+    timers.push(setTimeout(() => {
+      left.forEach((id, k) => {
+        const g = el('g', { class: 'an-pop' }, out);
+        el('rect', { class: 'box-b', x: X0 + k * W + 6, y: 550, width: W - 12, height: W - 12, rx: 4 }, g);
+        el('text', { class: 'tx', x: cx(k), y: 550 + (W - 12) / 2 + 10, 'text-anchor': 'middle', 'font-weight': 600, text: id + 1 }, g);
+      });
+    }, REDUCED ? 0 : N * 90 + 100));
+    rounds++; total += left.length;
+    document.getElementById('boot-uniq').textContent = `${N - left.length} of ${N}`;
+    document.getElementById('boot-out').textContent = left.length;
+    document.getElementById('boot-avg').textContent = rounds > 1 ? `${pct(total / rounds / N)} (${rounds} samples)` : '—';
+  }
+  document.getElementById('boot-draw').addEventListener('click', draw);
+  draw();
+  return {};
+})();
+
+/* Classification tree on 2D points: bootstrap rows, one random feature per split, grown deep */
+function growTree(pts, idx, r, depth = 0) {
+  const n1 = idx.reduce((s, i) => s + pts[i].y, 0);
+  if (n1 === 0 || n1 === idx.length || depth >= 14 || idx.length < 2) return { leaf: n1 * 2 > idx.length ? 1 : n1 * 2 < idx.length ? 0 : (r() < 0.5 ? 1 : 0) };
+  const first = r() < 0.5 ? 0 : 1;
+  for (const f of [first, 1 - first]) {
+    const key = f ? 'b' : 'a';
+    const s = idx.slice().sort((i, j) => pts[i][key] - pts[j][key]);
+    let best = null, left1 = 0;
+    for (let k = 0; k < s.length - 1; k++) {
+      left1 += pts[s[k]].y;
+      if (pts[s[k]][key] === pts[s[k + 1]][key]) continue;
+      const nl = k + 1, nr = s.length - nl, right1 = n1 - left1;
+      const gini = nl * (1 - (left1 / nl) ** 2 - (1 - left1 / nl) ** 2) + nr * (1 - (right1 / nr) ** 2 - (1 - right1 / nr) ** 2);
+      if (!best || gini < best.gini) best = { gini, k, t: (pts[s[k]][key] + pts[s[k + 1]][key]) / 2 };
+    }
+    if (best) return { key, t: best.t, lo: growTree(pts, s.slice(0, best.k + 1), r, depth + 1), hi: growTree(pts, s.slice(best.k + 1), r, depth + 1) };
+  }
+  return { leaf: n1 * 2 >= idx.length ? 1 : 0 };
+}
+const predictTree = (t, p) => { while (t.leaf === undefined) t = p[t.key] < t.t ? t.lo : t.hi; return t.leaf; };
+
+DEMOS.forest = (() => {
+  const svg = document.getElementById('forest-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 80, x: [0, 10], y: [0, 10], xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2', grid: false });
+  const r = rng(7), bound = (a) => 5 + 2.2 * Math.sin(0.7 * a - 0.6);
+  const make = (n, noise) => Array.from({ length: n }, () => {
+    const a = r() * 10, b = r() * 10;
+    let y = b > bound(a) ? 1 : 0;
+    if (r() < noise) y = 1 - y;
+    return { a, b, y };
+  });
+  const train = make(150, 0.1), test = make(600, 0);
+  const NT = 60, trees = [];
+  for (let k = 0; k < NT; k++) {
+    const idx = Array.from({ length: train.length }, () => Math.floor(r() * train.length));
+    trees.push(growTree(train, idx, r));
+  }
+  const grid = shadeGrid(F, [0, 10], [0, 10], 14);
+  el('path', { class: 'curve-t', d: curvePath(bound, 0, 10, F.sx, F.sy) }, F.plot);
+  train.forEach((p) => el('circle', { class: `pt ${p.y ? 'fa' : 'fb'}`, cx: F.sx(p.a), cy: F.sy(p.b), r: 9 }, F.plot));
+  el('rect', { x: F.L + 8, y: F.H - F.B - 54, width: 224, height: 46, rx: 4, style: 'fill:var(--myst-color-bg);fill-opacity:.85' }, svg);
+  legend(svg, F.L + 20, F.H - F.B - 30, [['line', 'curve-t', 'true boundary']]);
+  /* cache each tree's votes on the grid cells and test points */
+  const testVotes = trees.map((t) => test.map((p) => predictTree(t, p)));
+  const accOf = (m) => test.filter((p, i) => {
+    let s = 0; for (let k = 0; k < m; k++) s += testVotes[k][i];
+    return (s * 2 > m ? 1 : s * 2 < m ? 0 : 1) === p.y;
+  }).length / test.length;
+  document.getElementById('forest-one').textContent = pct(accOf(1));
+  const slider = document.getElementById('forest-n');
+  function draw() {
+    const m = +slider.value;
+    document.getElementById('forest-n-val').textContent = m;
+    grid.paint((a, b) => { let s = 0; for (let k = 0; k < m; k++) s += predictTree(trees[k], { a, b }); return s / m; });
+    document.getElementById('forest-acc').textContent = pct(accOf(m));
+  }
+  slider.addEventListener('input', draw);
+  draw();
+  return {};
+})();
+
+DEMOS.boost = (() => {
+  const svg = document.getElementById('boost-svg');
+  const F = frame(svg, { W: 1160, H: 700, l: 80, x: [0, 10], y: [0, 10], xt: [0, 2, 4, 6, 8, 10], yt: [0, 2, 4, 6, 8, 10], xl: 'feature 1', yl: 'feature 2', grid: false });
+  const r = rng(12), pts = [];
+  const inBox = (a, b) => a > 3 && a < 7 && b > 2.5 && b < 7.5;
+  while (pts.length < 50) {
+    const a = 0.4 + r() * 9.2, b = 0.4 + r() * 9.2;
+    if (Math.min(Math.abs(a - 3), Math.abs(a - 7)) < 0.35 && b > 2.2 && b < 7.8) continue;
+    if (Math.min(Math.abs(b - 2.5), Math.abs(b - 7.5)) < 0.35 && a > 2.7 && a < 7.3) continue;
+    const y = inBox(a, b) ? 1 : -1;
+    if (pts.filter((p) => p.y === y).length >= (y > 0 ? 20 : 30)) continue;
+    pts.push({ a, b, y });
+  }
+  const N = pts.length;
+  const grid = shadeGrid(F, [0, 10], [0, 10], 14);
+  const cut = el('line', { style: 'stroke:var(--myst-color-text);stroke-width:4;stroke-dasharray:14 10;display:none' }, F.plot);
+  const dots = pts.map((p) => el('circle', { class: `pt ${p.y > 0 ? 'fa' : 'fb'}`, cx: F.sx(p.a), cy: F.sy(p.b), style: 'transition:r .5s var(--ease-out)' }, F.plot));
+  let w, stumps;
+  const stumpOut = (s, p) => (p[s.key] < s.t ? s.lo : -s.lo);
+  const score = (p) => stumps.reduce((s, st) => s + st.alpha * stumpOut(st, p), 0);
+  function bestStump() {
+    let best = null;
+    for (const key of ['a', 'b']) {
+      const vals = [...new Set(pts.map((p) => p[key]))].sort((x, y) => x - y);
+      for (let k = 0; k < vals.length - 1; k++) {
+        const t = (vals[k] + vals[k + 1]) / 2;
+        for (const lo of [1, -1]) {
+          const err = pts.reduce((s, p, i) => s + ((p[key] < t ? lo : -lo) !== p.y ? w[i] : 0), 0);
+          if (!best || err < best.err) best = { key, t, lo, err };
+        }
+      }
+    }
+    return best;
+  }
+  function paint() {
+    const maxR = 30;
+    dots.forEach((d, i) => d.setAttribute('r', clamp(9 * Math.sqrt(w[i] * N), 6, maxR).toFixed(1)));
+    if (!stumps.length) { grid.paint(null); cut.style.display = 'none'; document.getElementById('boost-acc').textContent = '—'; }
+    else {
+      grid.paint((a, b) => 1 / (1 + Math.exp(-2.5 * score({ a, b }))));
+      const s = stumps[stumps.length - 1];
+      cut.style.display = '';
+      if (s.key === 'a') { cut.setAttribute('x1', F.sx(s.t)); cut.setAttribute('x2', F.sx(s.t)); cut.setAttribute('y1', F.T); cut.setAttribute('y2', F.H - F.B); }
+      else { cut.setAttribute('y1', F.sy(s.t)); cut.setAttribute('y2', F.sy(s.t)); cut.setAttribute('x1', F.L); cut.setAttribute('x2', F.W - F.R); }
+      document.getElementById('boost-acc').textContent = pct(pts.filter((p) => Math.sign(score(p)) === p.y).length / N);
+    }
+    document.getElementById('boost-round').textContent = stumps.length;
+  }
+  function reset() { w = new Array(N).fill(1 / N); stumps = []; paint(); }
+  function next() {
+    if (stumps.length >= 30) return;
+    const s = bestStump(), e = clamp(s.err, 1e-6, 1 - 1e-6);
+    s.alpha = 0.5 * Math.log((1 - e) / e);
+    stumps.push(s);
+    w = w.map((wi, i) => wi * Math.exp(-s.alpha * pts[i].y * stumpOut(s, pts[i])));
+    const z = w.reduce((a, b) => a + b, 0);
+    w = w.map((wi) => wi / z);
+    paint();
+  }
+  el('rect', { x: F.L + 8, y: F.T + 8, width: 170, height: 82, rx: 4, style: 'fill:var(--myst-color-bg);fill-opacity:.85' }, svg);
+  legend(svg, F.L + 20, F.T + 30, [['dot', 'fa', 'class A'], ['dot', 'fb', 'class B']]);
+  document.getElementById('boost-next').addEventListener('click', next);
+  document.getElementById('boost-reset').addEventListener('click', reset);
+  reset();
+  return {};
+})();
+
+drawOx(); drawVoting(); drawBagging(); drawRandomForest(); drawImportance();
+})();
+</script>
+</body>
+</html>

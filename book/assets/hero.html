@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machine Learning</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #ffffff; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<canvas id="hero" role="img" aria-label="Animation: a small neural network trains live on two-class datasets. Points flow into the network, signals pass forward, gradients flow back, and the decision boundary forms on the prediction panel."></canvas>
+<script>
+/* A real 2-10-10-1 neural network trains in the browser on toy datasets (moons, circles, XOR, spiral).
+   Left: the training data. Center: the network, with forward signals and backward gradients.
+   Right: the model's prediction over the whole plane, with the decision boundary. */
+(() => {
+'use strict';
+
+/* ───────── design constants (drawn in a 1280x720 frame, scaled to fit) ───────── */
+const W = 1280, H = 720;
+const COLOR = {
+  a: [13, 148, 136], b: [225, 29, 72],
+  pos: [2, 132, 199], neg: [147, 51, 234],
+  grad: [217, 119, 6], ink: [15, 23, 42],
+  text: '#0f172a', muted: '#64748b', faint: '#e2e8f0',
+};
+const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+const DATA_BOX = { x: 56, y: 165, s: 360 };
+const PRED_BOX = { x: 864, y: 165, s: 360 };
+const LOSS_BOX = { x: 470, y: 585, w: 340, h: 92 };
+const LAYERS = [2, 10, 10, 1];
+const LAYER_X = [500, 603, 706, 806];
+const NET_CY = DATA_BOX.y + DATA_BOX.s / 2;
+const DOMAIN = 1.12;
+const FIELD_RES = 96;
+const CONTENT_SHIFT = -35;
+
+const N_POINTS = 240;
+const LEARNING_RATE = 0.012;
+const STEPS_PER_SECOND = 24;
+const MAX_STEPS = 1200;
+const TARGET_ACCURACY = 0.98, TARGET_LOSS = 0.12;
+const ENTER_TIME = 1.4, HOLD_TIME = 3.2, EXIT_TIME = 0.9;
+const SAMPLE_EVERY = 0.6, T_IN = 0.35, T_NET = 0.8, T_OUT = 0.4, GRAD_TIME = 0.8;
+
+const ORDER = ['moons', 'circles', 'xor', 'spiral'];
+const NAMES = { moons: 'Two moons', circles: 'Circles', xor: 'XOR', spiral: 'Spiral' };
+const CAPTIONS = {
+  enter: 'Examples arrive with known labels.',
+  train: 'Training lowers the loss, step by step.',
+  done: 'Learned: the whole plane is labeled.',
+  exit: 'Next problem.',
+};
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ───────── helpers ───────── */
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+function rng(seed) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const gauss = (r) => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+
+/* ───────── datasets: arrays of [x, y, class] in roughly [-1, 1]² ───────── */
+const DATASETS = {
+  moons(r) {
+    const pts = [];
+    for (let i = 0; i < N_POINTS; i++) {
+      const c = i % 2, t = Math.PI * r();
+      const x = c ? 1 - Math.cos(t) : Math.cos(t);
+      const y = c ? 0.5 - Math.sin(t) : Math.sin(t);
+      pts.push([(x - 0.5) * 0.62 + gauss(r) * 0.05, -(y - 0.25) * 0.62 + gauss(r) * 0.05, c]);
+    }
+    return pts;
+  },
+  circles(r) {
+    const pts = [];
+    for (let i = 0; i < N_POINTS; i++) {
+      const c = i % 2, a = 2 * Math.PI * r(), rad = (c ? 0.35 : 0.78) + gauss(r) * 0.05;
+      pts.push([rad * Math.cos(a), rad * Math.sin(a), c]);
+    }
+    return pts;
+  },
+  xor(r) {
+    const pts = [];
+    for (let i = 0; i < N_POINTS; i++) {
+      const sx = r() < 0.5 ? -1 : 1, sy = r() < 0.5 ? -1 : 1;
+      pts.push([sx * 0.45 + gauss(r) * 0.16, sy * 0.45 + gauss(r) * 0.16, sx * sy > 0 ? 1 : 0]);
+    }
+    return pts;
+  },
+  spiral(r) {
+    const pts = [];
+    for (let i = 0; i < N_POINTS; i++) {
+      const c = i % 2, t = r(), a = t * 2.6 * Math.PI + c * Math.PI, rad = 0.08 + t * 0.82;
+      pts.push([rad * Math.cos(a) + gauss(r) * 0.03, rad * Math.sin(a) + gauss(r) * 0.03, c]);
+    }
+    return pts;
+  },
+};
+
+/* ───────── multilayer perceptron: tanh hidden layers, sigmoid output, Adam ───────── */
+class MLP {
+  constructor(sizes, r) {
+    this.sizes = sizes;
+    this.W = []; this.b = [];
+    for (let l = 0; l < sizes.length - 1; l++) {
+      const n = sizes[l], o = sizes[l + 1], scale = Math.sqrt(2 / (n + o));
+      this.W.push(Float64Array.from({ length: n * o }, () => gauss(r) * scale));
+      this.b.push(new Float64Array(o));
+    }
+    this.params = [...this.W, ...this.b];
+    this.m = this.params.map((p) => new Float64Array(p.length));
+    this.v = this.params.map((p) => new Float64Array(p.length));
+    this.t = 0;
+  }
+  forward(x) {
+    const acts = [Float64Array.from(x)], last = this.W.length - 1;
+    for (let l = 0; l <= last; l++) {
+      const a = acts[l], Wl = this.W[l], bl = this.b[l], n = this.sizes[l], o = this.sizes[l + 1];
+      const z = new Float64Array(o);
+      for (let j = 0; j < o; j++) {
+        let s = bl[j];
+        for (let i = 0; i < n; i++) s += Wl[j * n + i] * a[i];
+        z[j] = l < last ? Math.tanh(s) : 1 / (1 + Math.exp(-s));
+      }
+      acts.push(z);
+    }
+    return acts;
+  }
+  predict(x, y) {
+    const acts = this.forward([x, y]);
+    return acts[acts.length - 1][0];
+  }
+  step(points, lr) {
+    const L = this.W.length;
+    const gW = this.W.map((w) => new Float64Array(w.length));
+    const gb = this.b.map((b) => new Float64Array(b.length));
+    let loss = 0, correct = 0;
+    for (const [x, y, c] of points) {
+      const acts = this.forward([x, y]);
+      const p = acts[L][0];
+      loss -= c ? Math.log(p + 1e-9) : Math.log(1 - p + 1e-9);
+      if ((p > 0.5) === (c === 1)) correct++;
+      let delta = [p - c];
+      for (let l = L - 1; l >= 0; l--) {
+        const n = this.sizes[l], o = this.sizes[l + 1], a = acts[l], Wl = this.W[l];
+        for (let j = 0; j < o; j++) {
+          gb[l][j] += delta[j];
+          for (let i = 0; i < n; i++) gW[l][j * n + i] += delta[j] * a[i];
+        }
+        if (l > 0) {
+          const prev = new Array(n);
+          for (let i = 0; i < n; i++) {
+            let s = 0;
+            for (let j = 0; j < o; j++) s += Wl[j * n + i] * delta[j];
+            prev[i] = s * (1 - a[i] * a[i]);
+          }
+          delta = prev;
+        }
+      }
+    }
+    this.adam([...gW, ...gb], points.length, lr);
+    return { loss: loss / points.length, acc: correct / points.length };
+  }
+  adam(grads, batch, lr) {
+    const b1 = 0.9, b2 = 0.999;
+    this.t++;
+    const c1 = 1 - b1 ** this.t, c2 = 1 - b2 ** this.t;
+    grads.forEach((g, k) => {
+      const p = this.params[k], m = this.m[k], v = this.v[k];
+      for (let i = 0; i < p.length; i++) {
+        const gi = g[i] / batch;
+        m[i] = b1 * m[i] + (1 - b1) * gi;
+        v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+        p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + 1e-8);
+      }
+    });
+  }
+}
+
+/* ───────── geometry ───────── */
+const toBox = (box, x, y) => ({
+  x: box.x + (x + DOMAIN) / (2 * DOMAIN) * box.s,
+  y: box.y + (DOMAIN - y) / (2 * DOMAIN) * box.s,
+});
+function nodePos(l, i) {
+  const n = LAYERS[l];
+  const gap = n > 2 ? 34 : 120;
+  return { x: LAYER_X[l], y: NET_CY + (i - (n - 1) / 2) * gap };
+}
+const NODES = LAYERS.map((n, l) => Array.from({ length: n }, (_, i) => nodePos(l, i)));
+
+/* ───────── canvas and glow sprites ───────── */
+const canvas = document.getElementById('hero');
+const ctx = canvas.getContext('2d');
+let scale = 1, offX = 0, offY = 0, dpr = 1;
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(canvas.clientWidth * dpr);
+  canvas.height = Math.round(canvas.clientHeight * dpr);
+  scale = Math.min(canvas.clientWidth / W, canvas.clientHeight / H);
+  offX = (canvas.clientWidth - W * scale) / 2;
+  offY = (canvas.clientHeight - H * scale) / 2;
+}
+
+const sprites = {};
+function sprite(color) {
+  const key = color.join();
+  if (sprites[key]) return sprites[key];
+  const size = 64, s = document.createElement('canvas');
+  s.width = s.height = size;
+  const g = s.getContext('2d'), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, rgba(color, 1));
+  grd.addColorStop(0.16, rgba(color, 0.9));
+  grd.addColorStop(0.4, rgba(color, 0.22));
+  grd.addColorStop(1, rgba(color, 0));
+  g.fillStyle = grd;
+  g.fillRect(0, 0, size, size);
+  return (sprites[key] = s);
+}
+function glow(color, x, y, r, alpha) {
+  if (alpha <= 0.01) return;
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.drawImage(sprite(color), x - r * 3, y - r * 3, r * 6, r * 6);
+  ctx.globalAlpha = 1;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function text(str, x, y, { size = 16, weight = 400, color = COLOR.text, align = 'left', font = FONT, spacing = 0, maxWidth } = {}) {
+  ctx.font = `${weight} ${size}px ${font}`;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${spacing}px`;
+  if (maxWidth) ctx.fillText(str, x, y, maxWidth);
+  else ctx.fillText(str, x, y);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/* ───────── state ───────── */
+let datasetIndex = -1, datasetName = '', data = [], points = [], net = null;
+let phase = 'enter', phaseTime = 0, stepBudget = 0, epoch = 0;
+let stats = { loss: NaN, acc: NaN }, lossHistory = [];
+let sampleTimer = 0, gradTimer = SAMPLE_EVERY / 2, fieldAlpha = 0;
+let samples = [], gradWaves = [], ripples = [];
+const fieldCanvas = document.createElement('canvas');
+fieldCanvas.width = fieldCanvas.height = FIELD_RES;
+const fieldCtx = fieldCanvas.getContext('2d');
+const fieldImage = fieldCtx.createImageData(FIELD_RES, FIELD_RES);
+const nodeGlow = LAYERS.map((n) => Array.from({ length: n }, () => ({ v: 0, sign: 1, grad: 0 })));
+function nextDataset() {
+  datasetIndex = (datasetIndex + 1) % ORDER.length;
+  datasetName = ORDER[datasetIndex];
+  const r = rng((Math.random() * 1e9) | 0);
+  data = DATASETS[datasetName](r);
+  net = new MLP(LAYERS, r);
+  points = data.map(([x, y, c]) => {
+    const angle = Math.random() * Math.PI * 2, far = 1.6 + Math.random() * 1.2;
+    return { x, y, c, sx: Math.cos(angle) * far, sy: Math.sin(angle) * far, delay: Math.random() * 0.5, out: 0 };
+  });
+  epoch = 0; lossHistory = []; stats = { loss: NaN, acc: NaN };
+  samples = []; gradWaves = []; ripples = [];
+  setPhase('enter');
+  renderField();
+  if (REDUCED) trainToConvergence();
+}
+
+function setPhase(next) { phase = next; phaseTime = 0; }
+const converged = () => stats.acc >= TARGET_ACCURACY && stats.loss < TARGET_LOSS;
+
+function trainStep() {
+  stats = net.step(data, LEARNING_RATE);
+  epoch++;
+  lossHistory.push(stats.loss);
+  if (converged() || epoch >= MAX_STEPS) setPhase('done');
+}
+function trainToConvergence() {
+  while (phase !== 'done') trainStep();
+  renderField();
+  fieldAlpha = 1;
+}
+
+/* ───────── prediction field ───────── */
+function renderField() {
+  const px = fieldImage.data, base = [255, 255, 255];
+  for (let gy = 0; gy < FIELD_RES; gy++) {
+    for (let gx = 0; gx < FIELD_RES; gx++) {
+      const x = -DOMAIN + (gx + 0.5) / FIELD_RES * 2 * DOMAIN;
+      const y = DOMAIN - (gy + 0.5) / FIELD_RES * 2 * DOMAIN;
+      const p = net.predict(x, y);
+      const conf = Math.abs(p - 0.5) * 2, cls = p > 0.5 ? COLOR.b : COLOR.a;
+      const edge = Math.exp(-(((p - 0.5) / 0.035) ** 2)) * 0.75;
+      const k = (gy * FIELD_RES + gx) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const tinted = base[ch] + (cls[ch] - base[ch]) * conf * 0.24;
+        px[k + ch] = tinted + (COLOR.ink[ch] - tinted) * edge;
+      }
+      px[k + 3] = 255;
+    }
+  }
+  fieldCtx.putImageData(fieldImage, 0, 0);
+}
+
+/* ───────── animation update ───────── */
+function spawnSample() {
+  const pt = points[(Math.random() * points.length) | 0];
+  const acts = net.forward([pt.x, pt.y]);
+  samples.push({ t: 0, pt, acts, p: acts[acts.length - 1][0] });
+}
+
+function update(dt) {
+  phaseTime += dt;
+  for (const layer of nodeGlow) for (const g of layer) { g.v *= Math.exp(-dt * 4); g.grad *= Math.exp(-dt * 4); }
+
+  if (phase === 'enter') {
+    fieldAlpha = Math.min(1, fieldAlpha + dt * 1.5);
+    if (phaseTime > ENTER_TIME) setPhase(REDUCED ? 'done' : 'train');
+  } else if (phase === 'train') {
+    stepBudget += dt * STEPS_PER_SECOND;
+    let stepped = false;
+    while (stepBudget >= 1 && phase === 'train') { stepBudget--; trainStep(); stepped = true; }
+    if (stepped) renderField();
+  } else if (phase === 'done') {
+    if (phaseTime > (REDUCED ? HOLD_TIME * 2 : HOLD_TIME)) setPhase('exit');
+  } else if (phase === 'exit') {
+    fieldAlpha = Math.max(0, 1 - phaseTime / EXIT_TIME);
+    for (const p of points) p.out = easeInOut(clamp(phaseTime / EXIT_TIME, 0, 1));
+    if (phaseTime > EXIT_TIME) nextDataset();
+  }
+  if (REDUCED) return;
+
+  if (phase === 'train' || phase === 'done') {
+    sampleTimer -= dt;
+    if (sampleTimer <= 0) { spawnSample(); sampleTimer = SAMPLE_EVERY; }
+  }
+  if (phase === 'train') {
+    gradTimer -= dt;
+    if (gradTimer <= 0) { gradWaves.push({ t: 0 }); gradTimer = SAMPLE_EVERY; }
+  }
+  for (const s of samples) s.t += dt;
+  for (const g of gradWaves) g.t += dt;
+  for (const r of ripples) r.t += dt;
+  samples = samples.filter((s) => {
+    if (s.t < T_IN + T_NET + T_OUT) return true;
+    const at = toBox(PRED_BOX, s.pt.x, s.pt.y);
+    ripples.push({ x: at.x, y: at.y, t: 0, color: s.p > 0.5 ? COLOR.b : COLOR.a });
+    return false;
+  });
+  gradWaves = gradWaves.filter((g) => g.t < GRAD_TIME);
+  ripples = ripples.filter((r) => r.t < 1.2);
+}
+
+/* ───────── drawing ───────── */
+function drawBackground() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * offX, dpr * offY);
+  ctx.translate(0, CONTENT_SHIFT);
+}
+
+function drawDatasetChips() {
+  let x = 56;
+  ORDER.forEach((key, k) => {
+    const name = NAMES[key], active = k === datasetIndex;
+    ctx.font = `600 17px ${FONT}`;
+    const w = ctx.measureText(name).width + 28;
+    roundRect(x, 70, w, 32, 16);
+    ctx.fillStyle = active ? rgba(COLOR.a, 0.1) : '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = active ? rgba(COLOR.a, 0.8) : COLOR.faint;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    text(name, x + w / 2, 92, { size: 17, weight: 600, align: 'center', color: active ? rgba(COLOR.a, 1) : COLOR.muted });
+    x += w + 10;
+  });
+}
+
+function drawPanel(box, label, hint) {
+  text(label, box.x, box.y - 15, { size: 17, weight: 700, color: COLOR.muted, spacing: 3 });
+  if (hint) text(hint, box.x + box.s, box.y - 15, { size: 17, color: COLOR.muted, align: 'right' });
+  roundRect(box.x, box.y, box.s, box.s, 14);
+  ctx.fillStyle = '#f8fafc';
+  ctx.fill();
+  ctx.strokeStyle = COLOR.faint;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawGrid(box) {
+  ctx.save();
+  roundRect(box.x, box.y, box.s, box.s, 14);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(100,116,139,0.10)';
+  ctx.lineWidth = 1;
+  for (let v = -1; v <= 1.001; v += 0.25) {
+    const a = toBox(box, v, 0), b = toBox(box, 0, v);
+    ctx.beginPath(); ctx.moveTo(a.x, box.y); ctx.lineTo(a.x, box.y + box.s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(box.x, b.y); ctx.lineTo(box.x + box.s, b.y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function pointState(p) {
+  const arrive = phase === 'enter' ? easeOut(clamp((phaseTime - p.delay) / (ENTER_TIME - 0.5), 0, 1)) : 1;
+  const x = lerp(p.sx, p.x, arrive), y = lerp(p.sy, p.y, arrive);
+  return { x: lerp(x, p.sx, p.out), y: lerp(y, p.sy, p.out), alpha: arrive * (1 - p.out) };
+}
+
+function drawDataPanel() {
+  drawPanel(DATA_BOX, 'DATA', `${N_POINTS} examples`);
+  drawGrid(DATA_BOX);
+  ctx.save();
+  roundRect(DATA_BOX.x, DATA_BOX.y, DATA_BOX.s, DATA_BOX.s, 14);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'source-over';
+  for (const p of points) {
+    const s = pointState(p), at = toBox(DATA_BOX, s.x, s.y), color = p.c ? COLOR.b : COLOR.a;
+    glow(color, at.x, at.y, 3.6, 0.3 * s.alpha);
+    ctx.fillStyle = rgba(color, 0.9 * s.alpha);
+    ctx.beginPath(); ctx.arc(at.x, at.y, 3.3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawNetwork() {
+  text('MODEL', 470, DATA_BOX.y - 15, { size: 17, weight: 700, color: COLOR.muted, spacing: 3 });
+  text('2 · 10 · 10 · 1', 810, DATA_BOX.y - 15, { size: 17, color: COLOR.muted, align: 'right' });
+  for (let l = 0; l < net.W.length; l++) {
+    const Wl = net.W[l], n = LAYERS[l], o = LAYERS[l + 1];
+    let maxAbs = 1e-6;
+    for (const w of Wl) maxAbs = Math.max(maxAbs, Math.abs(w));
+    for (let j = 0; j < o; j++) {
+      for (let i = 0; i < n; i++) {
+        const w = Wl[j * n + i], k = Math.abs(w) / maxAbs, a = NODES[l][i], b = NODES[l + 1][j];
+        ctx.strokeStyle = rgba(w > 0 ? COLOR.pos : COLOR.neg, 0.06 + 0.4 * k);
+        ctx.lineWidth = 0.4 + 2.4 * k;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  for (const s of samples) drawSampleSignal(s);
+  for (const g of gradWaves) drawGradientWave(g);
+  ctx.globalCompositeOperation = 'source-over';
+  NODES.forEach((layer, l) => layer.forEach((pos, i) => {
+    const g = nodeGlow[l][i], r = l === LAYERS.length - 1 ? 13 : 9;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    glow(g.sign > 0 ? COLOR.pos : COLOR.neg, pos.x, pos.y, r * 0.55, g.v * 0.8);
+    glow(COLOR.grad, pos.x, pos.y, r * 0.55, g.grad * 0.8);
+    ctx.globalCompositeOperation = 'source-over';
+  }));
+  text('x₁', NODES[0][0].x - 20, NODES[0][0].y + 6, { size: 19, color: COLOR.muted, align: 'right', font: MONO });
+  text('x₂', NODES[0][1].x - 20, NODES[0][1].y + 6, { size: 19, color: COLOR.muted, align: 'right', font: MONO });
+  text('ŷ', NODES[3][0].x, NODES[3][0].y + 40, { size: 20, color: COLOR.muted, align: 'center', font: MONO });
+}
+
+function drawSampleSignal(s) {
+  const cls = s.pt.c ? COLOR.b : COLOR.a;
+  if (s.t < T_IN) {
+    const f = easeInOut(s.t / T_IN), from = toBox(DATA_BOX, s.pt.x, s.pt.y);
+    for (const to of NODES[0]) {
+      const cx = (from.x + to.x) / 2, cy = Math.min(from.y, to.y) - 40;
+      const x = (1 - f) ** 2 * from.x + 2 * (1 - f) * f * cx + f * f * to.x;
+      const y = (1 - f) ** 2 * from.y + 2 * (1 - f) * f * cy + f * f * to.y;
+      glow(cls, x, y, 4, 1);
+    }
+    return;
+  }
+  if (s.t < T_IN + T_NET) {
+    const f = (s.t - T_IN) / T_NET * (LAYERS.length - 1);
+    const l = Math.min(Math.floor(f), LAYERS.length - 2), v = easeInOut(f - l);
+    const a = s.acts[l], Wl = net.W[l], n = LAYERS[l], o = LAYERS[l + 1];
+    for (let i = 0; i < n; i++) lightNode(l, i, a[i]);
+    for (let j = 0; j < o; j++) {
+      if (v > 0.85) lightNode(l + 1, j, l + 1 === LAYERS.length - 1 ? s.acts[l + 1][j] * 2 - 1 : s.acts[l + 1][j]);
+      for (let i = 0; i < n; i++) {
+        const signal = a[i] * Wl[j * n + i], p0 = NODES[l][i], p1 = NODES[l + 1][j];
+        glow(signal > 0 ? COLOR.pos : COLOR.neg, lerp(p0.x, p1.x, v), lerp(p0.y, p1.y, v), 2.6, clamp(Math.abs(signal) * 1.4, 0.12, 1));
+      }
+    }
+    return;
+  }
+  const f = easeInOut((s.t - T_IN - T_NET) / T_OUT), from = NODES[3][0], to = toBox(PRED_BOX, s.pt.x, s.pt.y);
+  const cx = (from.x + to.x) / 2, cy = Math.min(from.y, to.y) - 60;
+  const x = (1 - f) ** 2 * from.x + 2 * (1 - f) * f * cx + f * f * to.x;
+  const y = (1 - f) ** 2 * from.y + 2 * (1 - f) * f * cy + f * f * to.y;
+  glow(s.p > 0.5 ? COLOR.b : COLOR.a, x, y, 5, 1);
+}
+
+function lightNode(l, i, activation) {
+  const g = nodeGlow[l][i], v = clamp(Math.abs(activation), 0.15, 1);
+  if (v >= g.v) { g.v = v; g.sign = activation >= 0 ? 1 : -1; }
+}
+
+function drawGradientWave(g) {
+  const steps = LAYERS.length - 1, f = g.t / GRAD_TIME * steps;
+  const l = clamp(steps - 1 - Math.floor(f), 0, steps - 1), v = 1 - easeInOut(f - Math.floor(f));
+  const Wl = net.W[l], n = LAYERS[l], o = LAYERS[l + 1];
+  let maxAbs = 1e-6;
+  for (const w of Wl) maxAbs = Math.max(maxAbs, Math.abs(w));
+  for (let j = 0; j < o; j++) nodeGlow[l + 1][j].grad = Math.max(nodeGlow[l + 1][j].grad, 0.6);
+  for (let j = 0; j < o; j++) {
+    for (let i = 0; i < n; i++) {
+      const p0 = NODES[l][i], p1 = NODES[l + 1][j], k = Math.abs(Wl[j * n + i]) / maxAbs;
+      glow(COLOR.grad, lerp(p0.x, p1.x, v), lerp(p0.y, p1.y, v), 2.2, 0.12 + 0.6 * k);
+    }
+  }
+  if (v < 0.15) for (let i = 0; i < n; i++) nodeGlow[l][i].grad = Math.max(nodeGlow[l][i].grad, 0.6);
+}
+
+function drawPredictionPanel() {
+  drawPanel(PRED_BOX, 'PREDICTION', 'whole plane');
+  ctx.save();
+  roundRect(PRED_BOX.x, PRED_BOX.y, PRED_BOX.s, PRED_BOX.s, 14);
+  ctx.clip();
+  ctx.globalAlpha = fieldAlpha;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(fieldCanvas, PRED_BOX.x, PRED_BOX.y, PRED_BOX.s, PRED_BOX.s);
+  ctx.globalAlpha = 1;
+  drawGrid(PRED_BOX);
+  for (const p of points) {
+    const s = pointState(p), at = toBox(PRED_BOX, s.x, s.y);
+    if (s.alpha <= 0.01) continue;
+    ctx.globalAlpha = s.alpha;
+    ctx.fillStyle = rgba(p.c ? COLOR.b : COLOR.a, 1);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(at.x, at.y, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  for (const r of ripples) {
+    const k = r.t / 1.2;
+    ctx.strokeStyle = rgba(r.color, 0.9 * (1 - k));
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 4 + 26 * easeOut(k), 0, Math.PI * 2); ctx.stroke();
+    glow(r.color, r.x, r.y, 4, 1 - k);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  if (phase === 'done') drawBadge(`✓ learned in ${epoch} epochs`, clamp(phaseTime / 0.4, 0, 1));
+}
+
+function drawBadge(label, alpha) {
+  ctx.font = `700 18px ${FONT}`;
+  const w = ctx.measureText(label).width + 32, x = PRED_BOX.x + (PRED_BOX.s - w) / 2, y = PRED_BOX.y + 16;
+  ctx.globalAlpha = alpha;
+  roundRect(x, y, w, 34, 17);
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.fill();
+  ctx.strokeStyle = rgba(COLOR.a, 0.8);
+  ctx.stroke();
+  text(label, x + w / 2, y + 23, { size: 18, weight: 700, align: 'center' });
+  ctx.globalAlpha = 1;
+}
+
+function drawLossCurve() {
+  const { x, y, w, h } = LOSS_BOX;
+  text('LOSS', x, y - 12, { size: 16, weight: 700, color: COLOR.muted, spacing: 3 });
+  text('training steps →', x + w, y + h + 22, { size: 16, color: COLOR.muted, align: 'right' });
+  ctx.strokeStyle = COLOR.faint;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + h); ctx.lineTo(x + w, y + h); ctx.stroke();
+  if (lossHistory.length < 2) return;
+  const span = Math.max(lossHistory.length, 150), top = Math.max(lossHistory[0], 0.75);
+  const px = (k) => x + (k / (span - 1)) * w, py = (v) => y + h - clamp(v / top, 0, 1) * h;
+  ctx.beginPath();
+  lossHistory.forEach((v, k) => (k ? ctx.lineTo(px(k), py(v)) : ctx.moveTo(px(k), py(v))));
+  const lastX = px(lossHistory.length - 1), lastY = py(lossHistory[lossHistory.length - 1]);
+  ctx.save();
+  ctx.lineTo(lastX, y + h); ctx.lineTo(x, y + h); ctx.closePath();
+  const fill = ctx.createLinearGradient(0, y, 0, y + h);
+  fill.addColorStop(0, rgba(COLOR.a, 0.28));
+  fill.addColorStop(1, rgba(COLOR.a, 0));
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  lossHistory.forEach((v, k) => (k ? ctx.lineTo(px(k), py(v)) : ctx.moveTo(px(k), py(v))));
+  ctx.strokeStyle = rgba(COLOR.a, 1);
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+  glow(COLOR.a, lastX, lastY, 4, 1);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function drawFooter() {
+  text(NAMES[datasetName], 56, 600, { size: 28, weight: 700 });
+  text(CAPTIONS[phase], 56, 634, { size: 21, color: COLOR.muted, maxWidth: 380 });
+  const legend = [[COLOR.a, 'class A'], [COLOR.b, 'class B'], [COLOR.grad, 'gradient']];
+  legend.forEach(([c, label], k) => {
+    const lx = 56 + k * 130;
+    ctx.fillStyle = rgba(c, 1);
+    ctx.beginPath(); ctx.arc(lx + 7, 670, 7, 0, Math.PI * 2); ctx.fill();
+    text(label, lx + 22, 677, { size: 18, color: COLOR.muted });
+  });
+  const cells = [
+    ['EPOCH', String(epoch)],
+    ['LOSS', Number.isNaN(stats.loss) ? '—' : stats.loss.toFixed(3)],
+    ['ACCURACY', Number.isNaN(stats.acc) ? '—' : `${(stats.acc * 100).toFixed(1)}%`],
+  ];
+  cells.forEach(([label, value], k) => {
+    const cx = PRED_BOX.x + k * 122;
+    text(label, cx, 600, { size: 16, weight: 700, color: COLOR.muted, spacing: 2 });
+    text(value, cx, 640, { size: 27, weight: 600, font: MONO });
+  });
+}
+
+function draw() {
+  drawBackground();
+  drawDatasetChips();
+  drawDataPanel();
+  drawNetwork();
+  drawPredictionPanel();
+  drawLossCurve();
+  drawFooter();
+}
+
+/* ───────── main loop (paused while hidden or scrolled out of view) ───────── */
+let visible = true, lastTime = performance.now();
+new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }).observe(canvas);
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  if (visible && !document.hidden) {
+    update(dt);
+    draw();
+  }
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', resize);
+resize();
+nextDataset();
+const skipSeconds = Number(new URLSearchParams(location.search).get('t')) || 0;
+for (let k = 0; k < skipSeconds * 60; k++) update(1 / 60);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

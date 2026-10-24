@@ -1,0 +1,172 @@
+version: 1
+project:
+  id: machine-learning
+  title: Machine Learning
+  subtitle: Course material with slides and notebooks
+  description: Lecture slides for an introductory machine learning course at the .
+  keywords:
+    - machine learning
+    - data preparation
+    - supervised learning
+  authors:
+    - name: Enrique Guillermo Vílchez Lizano
+      affiliations:
+        - affiliation
+  affiliations:
+    - id: affiliation
+      name: 
+      department: 
+  license: CC-BY-SA-4.0
+  copyright: '2026'
+  github: https://github.com/EnriqueVilchezL/machine-learning
+  # Hover definitions, shown wherever these abbreviations appear in a page
+  abbreviations:
+    ML: Machine learning
+    SVM: Support vector machine
+    k-NN: k-nearest neighbors
+  toc:
+    - file: index.md
+    - file: 01-intro/intro-ml/intro-ml.md
+      title: 1. Introduction
+    - title: 2. Data preparation
+      children:
+        - file: 02-data-preparation/data-cleaning/data-cleaning.md
+          children:
+            - file: 02-data-preparation/data-cleaning/data-cleaning-notebook.ipynb
+              title: 'Notebook: Data cleaning'
+        - file: 02-data-preparation/feature-engineering/feature-engineering.md
+          children:
+            - file: 02-data-preparation/feature-engineering/feature-engineering-notebook.ipynb
+              title: 'Notebook: Feature engineering'
+        - file: 02-data-preparation/normalization/normalization.md
+          children:
+            - file: 02-data-preparation/normalization/normalization-notebook.ipynb
+              title: 'Notebook: Normalization'
+        - file: 02-data-preparation/train-test-split/train-test-split.md
+          children:
+            - file: 02-data-preparation/train-test-split/train-test-split-notebook.ipynb
+              title: 'Notebook: Train-test split'
+        - file: 02-data-preparation/cross-validation/cross-validation.md
+          children:
+            - file: 02-data-preparation/cross-validation/cross-validation-notebook.ipynb
+              title: 'Notebook: Cross-validation'
+    - title: 3. Supervised learning
+      children:
+        - file: 03-supervised/supervised-learning/supervised-learning.md
+        - file: 03-supervised/knn/knn.md
+          children:
+            - file: 03-supervised/knn/knn-notebook.ipynb
+              title: 'Notebook: k-nearest neighbors'
+        - file: 03-supervised/regression/regression.md
+          children:
+            - file: 03-supervised/regression/regression-notebook.ipynb
+              title: 'Notebook: Regression'
+        - file: 03-supervised/decision-trees/decision-trees.md
+          children:
+            - file: 03-supervised/decision-trees/decision-trees-notebook.ipynb
+              title: 'Notebook: Decision trees'
+        - file: 03-supervised/logistic-regression/logistic-regression.md
+          children:
+            - file: 03-supervised/logistic-regression/logistic-regression-notebook.ipynb
+              title: 'Notebook: Logistic regression'
+        - file: 03-supervised/svm/svm.md
+          children:
+            - file: 03-supervised/svm/svm-notebook.ipynb
+              title: 'Notebook: Support vector machines'
+        - file: 03-supervised/naive-bayes/naive-bayes.md
+          children:
+            - file: 03-supervised/naive-bayes/naive-bayes-notebook.ipynb
+              title: 'Notebook: Naive Bayes'
+        - file: 03-supervised/ensembles/ensembles.md
+          children:
+            - file: 03-supervised/ensembles/ensembles-notebook.ipynb
+              title: 'Notebook: Ensemble methods'
+    - title: 4. Unsupervised learning
+      children:
+        - file: 04-unsupervised/unsupervised-learning/unsupervised-learning.md
+        - file: 04-unsupervised/kmeans/kmeans.md
+          children:
+            - file: 04-unsupervised/kmeans/kmeans-notebook.ipynb
+              title: 'Notebook: K-means'
+        - file: 04-unsupervised/hierarchical/hierarchical.md
+          children:
+            - file: 04-unsupervised/hierarchical/hierarchical-notebook.ipynb
+              title: 'Notebook: Hierarchical clustering'
+        - file: 04-unsupervised/pca/pca.md
+          children:
+            - file: 04-unsupervised/pca/pca-notebook.ipynb
+              title: 'Notebook: PCA'
+    - title: 5. Reinforcement learning
+      children:
+        - file: 05-reinforcement/reinforcement-learning/reinforcement-learning.md
+        - file: 05-reinforcement/mdp/mdp.md
+          children:
+            - file: 05-reinforcement/mdp/mdp-notebook.ipynb
+              title: 'Notebook: Markov decision processes'
+        - file: 05-reinforcement/q-learning/q-learning.md
+          children:
+            - file: 05-reinforcement/q-learning/q-learning-notebook.ipynb
+              title: 'Notebook: Q-learning'
+    - title: 6. Deep learning
+      children:
+        - file: 06-deep-learning/deep-learning/deep-learning.md
+        - file: 06-deep-learning/neural-networks/neural-networks.md
+          children:
+            - file: 06-deep-learning/neural-networks/neural-networks-notebook.ipynb
+              title: 'Notebook: Neural networks'
+        - file: 06-deep-learning/autodiff/autodiff.md
+          children:
+            - file: 06-deep-learning/autodiff/autodiff-notebook.ipynb
+              title: 'Notebook: Automatic differentiation'
+        - file: 06-deep-learning/cnn/cnn.md
+          children:
+            - file: 06-deep-learning/cnn/cnn-notebook.ipynb
+              title: 'Notebook: Convolutional networks'
+        - file: 06-deep-learning/rnn/rnn.md
+          children:
+            - file: 06-deep-learning/rnn/rnn-notebook.ipynb
+              title: 'Notebook: Recurrent networks'
+        - file: 06-deep-learning/autoencoders/autoencoders.md
+          children:
+            - file: 06-deep-learning/autoencoders/autoencoders-notebook.ipynb
+              title: 'Notebook: Autoencoders'
+        - file: 06-deep-learning/gan/gan.md
+          children:
+            - file: 06-deep-learning/gan/gan-notebook.ipynb
+              title: 'Notebook: GANs'
+        - file: 06-deep-learning/transfer-learning/transfer-learning.md
+          children:
+            - file: 06-deep-learning/transfer-learning/transfer-learning-notebook.ipynb
+              title: 'Notebook: Transfer learning'
+        - file: 06-deep-learning/deep-rl/deep-rl.md
+          children:
+            - file: 06-deep-learning/deep-rl/deep-rl-notebook.ipynb
+              title: 'Notebook: Deep reinforcement learning'
+        - file: 06-deep-learning/transformers/transformers.md
+          children:
+            - file: 06-deep-learning/transformers/transformers-notebook.ipynb
+              title: 'Notebook: Transformers'
+site:
+  template: book-theme
+  title: Machine Learning
+  # Links in the top bar
+  nav:
+    - title: Start with the introduction
+      url: /intro-ml
+  # Buttons at the right of the top bar
+  actions:
+    - title: GitHub
+      url: https://github.com/EnriqueVilchezL/machine-learning
+  options:
+    style: assets/book.css
+    logo: assets/logo.svg
+    logo_text: Machine Learning
+    favicon: assets/favicon.svg
+    outline_maxdepth: 2
+    hide_footer_links: false
+    hide_outline: false
+    hide_authors: false
+  # Text that replaces "Made with MyST" at the bottom of the left sidebar
+  parts:
+    primary_sidebar_footer: |
+      
