@@ -3,3 +3,4 @@ _stage/
 _build/
 .ipynb_checkpoints/
 __pycache__/
+materiales/

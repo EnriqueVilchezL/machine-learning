@@ -1,6 +1,6 @@
 # machine-learning
 
-Course material (slides and notebooks) for an introductory machine learning course at the , published as a [MyST](https://mystmd.org) book.
+Course material (slides and notebooks) for an introductory machine learning course, published as a [MyST](https://mystmd.org) book.
 
 ## Requirements
 

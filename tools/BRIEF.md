@@ -1,6 +1,6 @@
 # Guía para escribir un tema del libro
 
-Proyecto: libro MyST de aprendizaje automático (curso de la Universidad Ejemplo). Directorio raíz: el repositorio actual.
+Proyecto: libro MyST de aprendizaje automático. Directorio raíz: el repositorio actual.
 Referencia completa ya hecha: `book/01-intro/intro-ml/` (slides.html, index.md, notebook.ipynb) y `tools/src/intro_ml.py`. LEA esos tres archivos antes de empezar y copie su estructura.
 
 ## Entregables por tema (carpeta `book/<capitulo>/<slug>/`)
@@ -28,5 +28,4 @@ Referencia completa ya hecha: `book/01-intro/intro-ml/` (slides.html, index.md, 
 
 ## Reglas de trabajo
 - Escriba SOLO dentro de su carpeta de temas `book/<cap>/<slug>/` y `tools/src/<slug>.py`. No toque `myst.yml`, `index.md` raíz, índices de capítulo ni `book/assets/` (si necesita CSS extra, póngalo en un `<style>` del deck).
-- Materiales de apoyo del profesor en `materiales/*.pdf` (puede leer los relacionados al tema para alinear enfoque y nomenclatura).
 - Al terminar, responda con una lista breve: temas hechos, número de diapositivas por tema, y cualquier problema pendiente.
