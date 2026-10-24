@@ -9,6 +9,8 @@
 # %% [markdown]
 # # Neural networks
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/06-deep-learning/neural-networks/neural-networks-notebook.ipynb)
+#
 # Companion notebook for the *Neural networks* slides. Each idea is written first by hand
 # with NumPy and then with the scikit-learn or SciPy tool that does the same job.
 #

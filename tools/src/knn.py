@@ -9,6 +9,8 @@
 # %% [markdown]
 # # k-nearest neighbors
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/03-supervised/knn/knn-notebook.ipynb)
+#
 # Companion notebook for the *k-nearest neighbors* slides. Each idea is written first by hand
 # with NumPy and then with the scikit-learn class that does the same job.
 #

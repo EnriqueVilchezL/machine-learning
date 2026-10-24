@@ -9,6 +9,8 @@
 # %% [markdown]
 # # Cross-validation
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/02-data-preparation/cross-validation/cross-validation-notebook.ipynb)
+#
 # Companion notebook for the *Cross-validation* slides. Each idea is written first by hand
 # with NumPy and then with the scikit-learn tool that does the same job.
 #

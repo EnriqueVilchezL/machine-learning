@@ -9,10 +9,12 @@
 # %% [markdown]
 # # Q-learning
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/05-reinforcement/q-learning/q-learning-notebook.ipynb)
+#
 # Companion notebook for the *Q-learning* slides. Each idea is written first by hand with NumPy
 # and then checked with an independent computation that should give the same answer.
 #
-# **Environment:** the 4 × 3 grid world (wall at (2, 2), goal +1, pit −1, each move −0.04), here without slipping.
+# **Data:** no data set; the agent moves in the 4 × 3 grid world (wall at (2, 2), goal +1, pit −1, each move −0.04), here without slipping.
 
 # %%
 import matplotlib.pyplot as plt

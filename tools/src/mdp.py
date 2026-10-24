@@ -9,10 +9,12 @@
 # %% [markdown]
 # # Markov decision processes
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/05-reinforcement/mdp/mdp-notebook.ipynb)
+#
 # Companion notebook for the *Markov decision processes* slides. Each idea is written first by hand
 # with NumPy and then checked with an independent computation that should give the same answer.
 #
-# **Environment:** the slippery 4 × 3 grid world (wall at (2, 2), goal +1, pit −1, each step −0.04).
+# **Data:** no data set; the agent moves in the slippery 4 × 3 grid world (wall at (2, 2), goal +1, pit −1, each step −0.04).
 
 # %%
 import matplotlib.pyplot as plt

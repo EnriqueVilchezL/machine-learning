@@ -9,6 +9,8 @@
 # %% [markdown]
 # # Support vector machines
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/03-supervised/svm/svm-notebook.ipynb)
+#
 # Companion notebook for the *Support vector machines* slides. Each idea is written first by
 # hand with NumPy and then with the scikit-learn tool that does the same job.
 #
@@ -26,6 +28,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
+RANDOM_STATE = 42
 GAMMA = 0.5
 LARGE_C = 1000
 

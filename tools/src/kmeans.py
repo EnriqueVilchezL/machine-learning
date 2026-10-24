@@ -9,6 +9,8 @@
 # %% [markdown]
 # # k-means clustering
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/04-unsupervised/kmeans/kmeans-notebook.ipynb)
+#
 # Companion notebook for the *k-means clustering* slides. Each idea is written first by hand
 # with NumPy and then with the scikit-learn class that does the same job.
 #

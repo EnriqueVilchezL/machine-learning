@@ -9,6 +9,8 @@
 # %% [markdown]
 # # Logistic regression
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/03-supervised/logistic-regression/logistic-regression-notebook.ipynb)
+#
 # Companion notebook for the *Logistic regression* slides. Each idea is written first by hand
 # with NumPy and then with the scikit-learn tool that does the same job.
 #

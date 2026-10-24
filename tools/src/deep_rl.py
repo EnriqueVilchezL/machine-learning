@@ -9,10 +9,12 @@
 # %% [markdown]
 # # Deep reinforcement learning
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/06-deep-learning/deep-rl/deep-rl-notebook.ipynb)
+#
 # Companion notebook for the *Deep reinforcement learning* slides. Each idea is written first by hand
 # with NumPy and then checked with an independent computation that should give the same answer.
 #
-# **Environment:** the deck's corridor: position $s$ from 0 to 1, each move shifts it by 0.1,
+# **Data:** no data set; the agent moves in the deck's corridor: position $s$ from 0 to 1, each move shifts it by 0.1,
 # the left end pays +0.5 and the right end +1, $\gamma = 0.8$.
 
 # %%

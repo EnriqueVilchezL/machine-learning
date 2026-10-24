@@ -9,6 +9,8 @@
 # %% [markdown]
 # # Transformers
 #
+# [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/06-deep-learning/transformers/transformers-notebook.ipynb)
+#
 # Companion notebook for the *Transformers* slides. Each idea is written first by hand
 # with NumPy and then checked against a second, independent computation or a library function.
 #
