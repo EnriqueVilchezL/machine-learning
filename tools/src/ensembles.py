@@ -29,7 +29,9 @@ ROUNDS = 5
 MIN_AGREEMENT = 0.95
 
 X, y = load_breast_cancer(return_X_y=True)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y
+)
 rng = np.random.default_rng(RANDOM_STATE)
 n = len(y_train)
 
@@ -41,7 +43,8 @@ n = len(y_train)
 # %%
 sample = rng.integers(0, n, size=n)
 left_out = 1 - len(np.unique(sample)) / n
-print(f"left out: {left_out:.3f} | formula: {(1 - 1 / n) ** n:.3f}")
+left_out_formula = (1 - 1 / n) ** n
+print(f"left out: {left_out:.3f} | formula: {left_out_formula:.3f}")
 
 # %% [markdown]
 # ## 2. Bagging
@@ -54,20 +57,27 @@ class BaggingClassifier:
     """Majority vote of decision trees, each trained on its own bootstrap sample."""
 
     def __init__(self, n_estimators: int = 10, random_state: int | None = None):
-        self.n_estimators, self.random_state = n_estimators, random_state
+        self.n_estimators = n_estimators
+        self.random_state = random_state
 
     def fit(self, X, y):
         rng = np.random.default_rng(self.random_state)
         self.classes_ = np.unique(y)
         self.estimators_ = []
         for _ in range(self.n_estimators):
-            sample = rng.integers(0, len(X), size=len(X))
-            self.estimators_.append(tree.DecisionTreeClassifier().fit(X[sample], y[sample]))
+            sample = rng.integers(0, len(X), size=len(X))             # bootstrap sample
+            estimator = tree.DecisionTreeClassifier().fit(X[sample], y[sample])
+            self.estimators_.append(estimator)
         return self
 
     def predict(self, X):
-        votes = np.array([estimator.predict(X) for estimator in self.estimators_])
-        return self.classes_[np.argmax([(votes == c).sum(axis=0) for c in self.classes_], axis=0)]
+        vote_counts = np.zeros((len(self.classes_), len(X)), dtype=int)
+        for estimator in self.estimators_:
+            prediction = estimator.predict(X)                          # f_b(x)
+            for i, c in enumerate(self.classes_):
+                vote_counts[i] += prediction == c                      # I(f_b(x) = c)
+        winner = np.argmax(vote_counts, axis=0)                        # argmax over c
+        return self.classes_[winner]
 
     def score(self, X, y):
         return np.mean(self.predict(X) == y)
@@ -85,8 +95,11 @@ bagging = ensemble.BaggingClassifier(tree.DecisionTreeClassifier(), n_estimators
                                      random_state=RANDOM_STATE).fit(X_train, y_train)
 
 agreement = np.mean(by_hand.predict(X_test) == bagging.predict(X_test))
-print(f"test accuracy: one tree {single_tree.score(X_test, y_test):.3f}, "
-      f"bagging by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {bagging.score(X_test, y_test):.3f}")
+accuracy_tree = single_tree.score(X_test, y_test)
+accuracy_by_hand = by_hand.score(X_test, y_test)
+accuracy_library = bagging.score(X_test, y_test)
+print(f"test accuracy: one tree {accuracy_tree:.3f}, "
+      f"bagging by hand {accuracy_by_hand:.3f}, scikit-learn {accuracy_library:.3f}")
 print(f"agreement {agreement:.3f} | at least {MIN_AGREEMENT}:", agreement >= MIN_AGREEMENT)
 
 # %% [markdown]
@@ -98,7 +111,10 @@ print(f"agreement {agreement:.3f} | at least {MIN_AGREEMENT}:", agreement >= MIN
 # %%
 forest = ensemble.RandomForestClassifier(n_estimators=TREE_COUNT, max_features="sqrt",
                                          random_state=RANDOM_STATE).fit(X_train, y_train)
-print(f"features per split: {int(np.sqrt(X.shape[1]))} of {X.shape[1]} | test accuracy {forest.score(X_test, y_test):.3f}")
+d = X.shape[1]
+features_per_split = int(np.sqrt(d))
+forest_accuracy = forest.score(X_test, y_test)
+print(f"features per split: {features_per_split} of {d} | test accuracy {forest_accuracy:.3f}")
 
 # %% [markdown]
 # ## 4. Boosting
@@ -117,23 +133,28 @@ class AdaBoostClassifier:
 
     def fit(self, X, y):
         self.classes_ = np.unique(y)
-        signs = np.where(y == self.classes_[1], 1, -1)
-        weights = np.full(len(X), 1 / len(X))
-        self.estimators_, self.estimator_weights_, self.estimator_errors_ = [], [], []
+        signs = np.where(y == self.classes_[1], 1, -1)                 # y_i in {-1, +1}
+        weights = np.full(len(X), 1 / len(X))                         # w_i
+        self.estimators_ = []
+        self.estimator_weights_ = []
+        self.estimator_errors_ = []
         for _ in range(self.n_estimators):
             stump = tree.DecisionTreeClassifier(max_depth=1).fit(X, signs, sample_weight=weights)
-            h = stump.predict(X)
-            error = np.sum(weights[h != signs])
-            alpha = 0.5 * np.log((1 - error) / error)
+            h = stump.predict(X)                                       # h_m(x_i)
+            error = np.sum(weights[h != signs])                        # epsilon_m
+            alpha = 0.5 * np.log((1 - error) / error)                  # alpha_m
             weights = weights * np.exp(-alpha * signs * h)
-            weights /= weights.sum()
+            weights /= weights.sum()                                   # rescale to add up to 1
             self.estimators_.append(stump)
             self.estimator_weights_.append(alpha)
             self.estimator_errors_.append(error)
         return self
 
     def decision_function(self, X):
-        return sum(alpha * stump.predict(X) for alpha, stump in zip(self.estimator_weights_, self.estimators_))
+        total = 0
+        for alpha, stump in zip(self.estimator_weights_, self.estimators_):
+            total = total + alpha * stump.predict(X)                   # sum_m alpha_m h_m(x)
+        return total
 
     def predict(self, X):
         return self.classes_[(self.decision_function(X) > 0).astype(int)]
@@ -143,7 +164,9 @@ class AdaBoostClassifier:
 
 
 by_hand = AdaBoostClassifier(n_estimators=ROUNDS).fit(X_train, y_train)
-print("errors:", np.round(by_hand.estimator_errors_, 3), "| votes:", np.round(by_hand.estimator_weights_, 3))
+rounded_errors = np.round(by_hand.estimator_errors_, 3)
+rounded_votes = np.round(by_hand.estimator_weights_, 3)
+print("errors:", rounded_errors, "| votes:", rounded_votes)
 
 # %% [markdown]
 # scikit-learn uses the vote $\ln\frac{1 - \varepsilon_m}{\varepsilon_m}$, twice ours. Doubling every vote does not change

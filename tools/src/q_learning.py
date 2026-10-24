@@ -31,20 +31,27 @@ rng = np.random.default_rng(RANDOM_STATE)
 class GridWorld:
     """The 4 × 3 grid world: wall at (2, 2), goal +1 at (4, 3), pit −1 at (4, 2), start at (1, 1)."""
 
-    cells = [(x, y) for y in range(3) for x in range(4) if (x, y) != (1, 1)]  # (column, row), 0-based
+    # (column, row), 0-based, without the wall
+    cells = [(x, y) for y in range(3) for x in range(4) if (x, y) != (1, 1)]
     moves = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # up, right, down, left
 
     def __init__(self, slip=0.2, step_reward=-0.04, random_state=None):
-        self.slip, self.step_reward = slip, step_reward
+        self.slip = slip
+        self.step_reward = step_reward
         self.rng = np.random.default_rng(random_state)
-        self.n_states, self.n_actions = len(self.cells), len(self.moves)
-        self.start, self.goal, self.pit = (self.cells.index(c) for c in [(0, 0), (3, 2), (3, 1)])
+        self.n_states = len(self.cells)
+        self.n_actions = len(self.moves)
+        self.start = self.cells.index((0, 0))
+        self.goal = self.cells.index((3, 2))
+        self.pit = self.cells.index((3, 1))
         self.terminal = [self.goal, self.pit]
         self.P, self.R = self._model()
 
     def _move(self, s, direction):
         """Next cell when moving in a direction; hitting a wall means staying."""
-        cell = (self.cells[s][0] + self.moves[direction][0], self.cells[s][1] + self.moves[direction][1])
+        column, row = self.cells[s]
+        d_column, d_row = self.moves[direction]
+        cell = (column + d_column, row + d_row)
         return self.cells.index(cell) if cell in self.cells else s
 
     def _model(self):
@@ -55,10 +62,16 @@ class GridWorld:
                 if s in self.terminal:
                     P[s, a, s] = 1
                     continue
-                for direction, chance in [(a, 1 - self.slip), ((a + 1) % 4, self.slip / 2), ((a + 3) % 4, self.slip / 2)]:
+                outcomes = [
+                    (a, 1 - self.slip),            # the intended direction
+                    ((a + 1) % 4, self.slip / 2),  # slip 90° clockwise
+                    ((a + 3) % 4, self.slip / 2),  # slip 90° counter-clockwise
+                ]
+                for direction, chance in outcomes:
                     P[s, a, self._move(s, direction)] += chance
         R = np.full(P.shape, self.step_reward)
-        R[:, :, self.goal], R[:, :, self.pit] = 1, -1
+        R[:, :, self.goal] = 1
+        R[:, :, self.pit] = -1
         R[self.terminal] = 0
         return P, R
 
@@ -75,7 +88,8 @@ class GridWorld:
         return next_state, reward, next_state in self.terminal
 
 
-env = GridWorld(slip=0.0, random_state=RANDOM_STATE)  # the agent only calls reset and step, never reads P or R
+# the agent only calls reset and step, never reads P or R
+env = GridWorld(slip=0.0, random_state=RANDOM_STATE)
 
 # %% [markdown]
 # ## 1. Learning in small steps
@@ -103,7 +117,10 @@ class QLearning:
     """Tabular Q-learning agent with ε-greedy exploration."""
 
     def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.2, n_episodes=3000, random_state=None):
-        self.alpha, self.gamma, self.epsilon, self.n_episodes = alpha, gamma, epsilon, n_episodes
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.n_episodes = n_episodes
         self.rng = np.random.default_rng(random_state)
 
     def predict(self, state):
@@ -117,15 +134,21 @@ class QLearning:
 
     def update(self, state, action, reward, next_state, done):
         """Move Q(s, a) a fraction α toward the target; a terminal next state is worth 0."""
-        target = reward if done else reward + self.gamma * self.q_values_[next_state].max()
-        self.q_values_[state, action] += self.alpha * (target - self.q_values_[state, action])
+        if done:
+            target = reward
+        else:
+            best_next = self.q_values_[next_state].max()  # max_a' Q(s', a')
+            target = reward + self.gamma * best_next  # y = r + γ max_a' Q(s', a')
+        td_error = target - self.q_values_[state, action]  # δ = y − Q(s, a)
+        self.q_values_[state, action] += self.alpha * td_error  # Q(s, a) ← Q(s, a) + α δ
 
     def fit(self, env):
         self.q_values_ = np.zeros((env.n_states, env.n_actions))
         starts = [s for s in range(env.n_states) if s not in env.terminal]
         self.history_ = []
         for _ in range(self.n_episodes):
-            state, done = env.reset(self.rng.choice(starts)), False
+            state = env.reset(self.rng.choice(starts))
+            done = False
             while not done:
                 action = self.act(state)
                 next_state, reward, done = env.step(action)
@@ -140,15 +163,21 @@ class QLearning:
 # $\alpha$ toward the target is the same as the blend $(1 - \alpha)\,Q + \alpha\, y$.
 
 # %%
-q_old, r, max_next, alpha = 0.5, 0.0, 0.8, 0.1
-target = r + GAMMA * max_next
+q_old = 0.5     # Q(s, a)
+r = 0.0         # reward
+max_next = 0.8  # max_a' Q(s', a')
+alpha = 0.1
+target = r + GAMMA * max_next  # y
 agent = QLearning(alpha=alpha, gamma=GAMMA)
 agent.q_values_ = np.array([[q_old, 0, 0, 0],      # state s
                             [max_next, 0, 0, 0]])  # state s'
 agent.update(state=0, action=0, reward=r, next_state=1, done=False)
 
-print(f"y = {target:.2f}, delta = {target - q_old:.2f}, new Q = {agent.q_values_[0, 0]:.3f}")
-print("same result:", np.isclose(agent.q_values_[0, 0], (1 - alpha) * q_old + alpha * target))
+delta = target - q_old
+q_new = agent.q_values_[0, 0]
+blend = (1 - alpha) * q_old + alpha * target
+print(f"y = {target:.2f}, delta = {delta:.2f}, new Q = {q_new:.3f}")
+print("same result:", np.isclose(q_new, blend))
 
 # %% [markdown]
 # ## 3. ε-greedy exploration
@@ -164,7 +193,8 @@ chances = np.full(env.n_actions, EPSILON / env.n_actions)
 chances[agent.predict(0)] += 1 - EPSILON
 
 choices = [agent.act(0) for _ in range(20_000)]
-print("formula:", chances, "| same result:", np.allclose(np.bincount(choices) / len(choices), chances, atol=0.01))
+frequencies = np.bincount(choices) / len(choices)
+print("formula:", chances, "| same result:", np.allclose(frequencies, chances, atol=0.01))
 
 # %% [markdown]
 # ## 4. Q-learning on the grid
@@ -177,12 +207,17 @@ print("formula:", chances, "| same result:", np.allclose(np.bincount(choices) / 
 # %%
 Q_star = np.zeros((env.n_states, env.n_actions))
 for _ in range(200):
-    Q_star = (env.P * (env.R + GAMMA * Q_star.max(axis=1))).sum(axis=2)
+    V_star = Q_star.max(axis=1)  # max_a' Q*(s', a')
+    backup = env.R + GAMMA * V_star  # R(s, a, s') + γ max_a' Q*(s', a')
+    Q_star = (env.P * backup).sum(axis=2)  # weight by P(s' | s, a), sum over s'
 
 # %%
-agent = QLearning(alpha=ALPHA, gamma=GAMMA, epsilon=EPSILON, n_episodes=EPISODES, random_state=RANDOM_STATE).fit(env)
+agent = QLearning(alpha=ALPHA, gamma=GAMMA, epsilon=EPSILON, n_episodes=EPISODES,
+                  random_state=RANDOM_STATE)
+agent.fit(env)
 
-errors = np.abs(np.array(agent.history_) - Q_star).max(axis=(1, 2))
+Q_history = np.array(agent.history_)  # one Q table per episode
+errors = np.abs(Q_history - Q_star).max(axis=(1, 2))  # largest |Q - Q*| per episode
 plt.semilogy(errors)
 plt.xlabel("episode")
 plt.ylabel("largest error  $|Q - Q^*|$")
@@ -196,7 +231,9 @@ plt.show()
 non_terminal = [s for s in range(env.n_states) if s not in env.terminal]
 greedy = agent.predict(non_terminal)
 print("same values:", np.allclose(agent.q_values_[non_terminal], Q_star[non_terminal], atol=0.01))
-print("greedy policy is optimal:", np.allclose(Q_star[non_terminal, greedy], Q_star[non_terminal].max(axis=1)))
+value_of_greedy = Q_star[non_terminal, greedy]  # Q*(s, greedy action)
+value_of_best = Q_star[non_terminal].max(axis=1)  # max_a Q*(s, a)
+print("greedy policy is optimal:", np.allclose(value_of_greedy, value_of_best))
 
 # %% [markdown]
 # ## Exercises

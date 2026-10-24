@@ -46,33 +46,48 @@ class KFold:
     """Cut the row numbers into k folds; each fold is the test part once."""
 
     def __init__(self, n_splits=5, shuffle=False, random_state=None):
-        self.n_splits, self.shuffle, self.random_state = n_splits, shuffle, random_state
+        self.n_splits = n_splits
+        self.shuffle = shuffle
+        self.random_state = random_state
 
     def split(self, X, y=None):
         rows = np.arange(len(X))
         if self.shuffle:
-            rows = np.random.default_rng(self.random_state).permutation(rows)
-        for test_rows in np.array_split(rows, self.n_splits):
-            yield np.setdiff1d(rows, test_rows), test_rows
+            rng = np.random.default_rng(self.random_state)
+            rows = rng.permutation(rows)
+        for test_rows in np.array_split(rows, self.n_splits):  # folds F_1, ..., F_k
+            train_rows = np.setdiff1d(rows, test_rows)  # the other k - 1 folds
+            yield train_rows, test_rows
 
 
 def cross_val_score(estimator, X, y, cv=5):
     """Train a fresh copy of the model on each training part and score it on the fold left out."""
     folds = KFold(cv) if isinstance(cv, int) else cv
-    return np.array([clone(estimator).fit(X[train_rows], y[train_rows]).score(X[test_rows], y[test_rows])
-                     for train_rows, test_rows in folds.split(X, y)])
+    scores = []
+    for train_rows, test_rows in folds.split(X, y):
+        fold_model = clone(estimator)
+        fold_model.fit(X[train_rows], y[train_rows])
+        score = fold_model.score(X[test_rows], y[test_rows])  # s_m
+        scores.append(score)
+    return np.array(scores)
 
 
-fold_scores = cross_val_score(model, X, y, cv=KFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE))
+shuffled_folds = KFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE)
+fold_scores = cross_val_score(model, X, y, cv=shuffled_folds)
+cv_estimate = fold_scores.mean()  # CV_(k) = (1/k) Σ s_m
 print("fold scores:", np.round(fold_scores, 3))
-print(f"CV estimate {fold_scores.mean():.3f}, spread {fold_scores.std():.3f}")
+print(f"CV estimate {cv_estimate:.3f}, spread {fold_scores.std():.3f}")
 
 # %% [markdown]
 # Without shuffling, both `KFold` classes cut the rows in the same places:
 
 # %%
-same_cuts = all(np.array_equal(ours, theirs) for (_, ours), (_, theirs)
-                in zip(KFold(FOLD_COUNT).split(X), model_selection.KFold(FOLD_COUNT).split(X)))
+our_folds = KFold(FOLD_COUNT).split(X)
+their_folds = model_selection.KFold(FOLD_COUNT).split(X)
+same_cuts = True
+for (_, ours), (_, theirs) in zip(our_folds, their_folds):
+    if not np.array_equal(ours, theirs):
+        same_cuts = False
 print("same folds:", same_cuts)
 
 # %%
@@ -97,9 +112,13 @@ print(f"CV estimate {scores.mean():.3f} ± {scores.std():.3f}")
 # $\hat{\theta} = \arg\max_\theta \text{CV}_{(k)}(\theta)$. Here the setting is the number of neighbors in k-nearest neighbors.
 
 # %%
-cv_accuracy = [cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k)), X, y, cv=FOLD_COUNT).mean()
-               for k in NEIGHBOR_CHOICES]
-best_by_hand = list(NEIGHBOR_CHOICES)[int(np.argmax(cv_accuracy))]
+cv_accuracy = []
+for k in NEIGHBOR_CHOICES:
+    knn = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))
+    scores_k = cross_val_score(knn, X, y, cv=FOLD_COUNT)
+    cv_accuracy.append(scores_k.mean())  # CV_(k)(θ)
+best_index = int(np.argmax(cv_accuracy))  # arg max over θ
+best_by_hand = list(NEIGHBOR_CHOICES)[best_index]
 print("best number of neighbors:", best_by_hand)
 
 plt.plot(list(NEIGHBOR_CHOICES), cv_accuracy, marker="o")
@@ -108,11 +127,12 @@ plt.ylabel("cross-validated accuracy")
 plt.show()
 
 # %%
-search = model_selection.GridSearchCV(make_pipeline(StandardScaler(), KNeighborsClassifier()),
-                                      {"kneighborsclassifier__n_neighbors": list(NEIGHBOR_CHOICES)},
-                                      cv=model_selection.KFold(FOLD_COUNT))
+knn = make_pipeline(StandardScaler(), KNeighborsClassifier())
+grid = {"kneighborsclassifier__n_neighbors": list(NEIGHBOR_CHOICES)}
+search = model_selection.GridSearchCV(knn, grid, cv=model_selection.KFold(FOLD_COUNT))
 search.fit(X, y)
-print("same choice:", search.best_params_["kneighborsclassifier__n_neighbors"] == best_by_hand)
+best_library = search.best_params_["kneighborsclassifier__n_neighbors"]
+print("same choice:", best_library == best_by_hand)
 
 # %% [markdown]
 # ## 3. The honest protocol
@@ -121,9 +141,11 @@ print("same choice:", search.best_params_["kneighborsclassifier__n_neighbors"] =
 # and score the final model once on the test set.
 
 # %%
-X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE)
+X_train, X_test, y_train, y_test = model_selection.train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE)
 search.fit(X_train, y_train)
-print("chosen:", search.best_params_, f"| test accuracy {search.score(X_test, y_test):.3f}")
+test_accuracy = search.score(X_test, y_test)
+print("chosen:", search.best_params_, f"| test accuracy {test_accuracy:.3f}")
 
 # %% [markdown]
 # ## Exercises

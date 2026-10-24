@@ -69,8 +69,13 @@ print("same result:", np.isclose(v5, y_t.item()))
 
 # %%
 point = np.array([x1, x2])
-numeric = np.array([(f(point + STEP_H * e) - f(point)) / STEP_H for e in np.eye(2)])
-print("finite differences:", numeric.round(6), "| close to exact:", np.allclose(numeric, exact, atol=1e-4))
+numeric = np.zeros(2)
+for k in range(2):
+    e_k = np.eye(2)[k]                    # unit vector along input k
+    nudged = f(point + STEP_H * e_k)      # f(x + h e_k)
+    numeric[k] = (nudged - f(point)) / STEP_H
+close = np.allclose(numeric, exact, atol=1e-4)
+print("finite differences:", numeric.round(6), "| close to exact:", close)
 print("error against the exact derivative:", np.abs(numeric - exact))
 
 # %% [markdown]
@@ -92,7 +97,9 @@ def forward_mode(dx1: float, dx2: float) -> float:
 
 forward_slopes = np.array([forward_mode(1, 0), forward_mode(0, 1)])
 print("forward mode:", forward_slopes.round(3))
-print("same as exact:", np.allclose(forward_slopes, exact), "| close to finite differences:", np.allclose(forward_slopes, numeric, atol=1e-4))
+same_as_exact = np.allclose(forward_slopes, exact)
+close_to_numeric = np.allclose(forward_slopes, numeric, atol=1e-4)
+print("same as exact:", same_as_exact, "| close to finite differences:", close_to_numeric)
 
 # %% [markdown]
 # ## 4. Reverse mode
@@ -108,13 +115,16 @@ dy_dv4 = dy_dv5 * 1
 dy_dv3 = dy_dv5 * -1
 dy_dv2 = dy_dv4 * 1
 dy_dv1 = dy_dv4 * 1
-dy_dx1 = dy_dv1 * (1 / x1) + dy_dv2 * x2
-dy_dx2 = dy_dv2 * x1 + dy_dv3 * np.cos(x2)
+dy_dx1 = dy_dv1 * (1 / x1) + dy_dv2 * x2      # branch through v1 + branch through v2
+dy_dx2 = dy_dv2 * x1 + dy_dv3 * np.cos(x2)    # branch through v2 + branch through v3
 
 reverse_slopes = np.array([dy_dx1, dy_dx2])
 y_t.backward()
-print("reverse mode:", reverse_slopes.round(3), "| torch:", point_t.grad.numpy().round(3))
-print("same as exact:", np.allclose(reverse_slopes, exact), "| same as torch:", np.allclose(reverse_slopes, point_t.grad.numpy()))
+torch_slopes = point_t.grad.numpy()
+print("reverse mode:", reverse_slopes.round(3), "| torch:", torch_slopes.round(3))
+same_as_exact = np.allclose(reverse_slopes, exact)
+same_as_torch = np.allclose(reverse_slopes, torch_slopes)
+print("same as exact:", same_as_exact, "| same as torch:", same_as_torch)
 
 # %% [markdown]
 # ## 5. A tiny reverse-mode engine
@@ -134,7 +144,9 @@ class Value:
     """A number that remembers how it was made."""
 
     def __init__(self, data: float, parents: tuple = ()):
-        self.data, self.grad, self.parents = data, 0.0, parents  # parents: (node, local derivative)
+        self.data = data
+        self.grad = 0.0
+        self.parents = parents  # pairs (parent node, local derivative)
 
     def __add__(self, other):
         other = as_value(other)
@@ -173,7 +185,7 @@ class Value:
             node.grad = 1.0 if node is self else 0.0
         for node in reversed(order):
             for parent, local in node.parents:
-                parent.grad += node.grad * local
+                parent.grad += node.grad * local  # gradient x local derivative
 
 
 # %% [markdown]
@@ -184,10 +196,14 @@ a, b = Value(x1), Value(x2)
 y = a.log() + a * b - b.sin()
 y.backward()
 
-a_t, b_t = torch.tensor(x1, requires_grad=True), torch.tensor(x2, requires_grad=True)
+a_t = torch.tensor(x1, requires_grad=True)
+b_t = torch.tensor(x2, requires_grad=True)
 y_t = torch.log(a_t) + a_t * b_t - torch.sin(b_t)
 y_t.backward()
-print("engine:", np.round([a.grad, b.grad], 3), "| same as torch:", np.allclose([a.grad, b.grad], [a_t.grad.item(), b_t.grad.item()]))
+engine_slopes = [a.grad, b.grad]
+torch_slopes = [a_t.grad.item(), b_t.grad.item()]
+same_as_torch = np.allclose(engine_slopes, torch_slopes)
+print("engine:", np.round(engine_slopes, 3), "| same as torch:", same_as_torch)
 
 # %% [markdown]
 # ## 6. Backpropagation is reverse mode
@@ -204,7 +220,9 @@ def neuron_loss(w: float) -> float:
 
 
 w = Value(0.5)
-residual = (w * 1.5 + 0.2).tanh() - 0.5
+z = w * 1.5 + 0.2      # w x + b
+a = z.tanh()           # tanh(w x + b)
+residual = a - 0.5     # r = tanh(w x + b) - y
 loss = residual * residual
 loss.backward()
 
@@ -212,12 +230,19 @@ neuron = nn.Linear(1, 1)
 with torch.no_grad():
     neuron.weight.fill_(0.5)
     neuron.bias.fill_(0.2)
-torch_loss = nn.MSELoss()(torch.tanh(neuron(torch.tensor([1.5]))), torch.tensor([0.5]))
+z_t = neuron(torch.tensor([1.5]))
+prediction = torch.tanh(z_t)
+torch_loss = nn.MSELoss()(prediction, torch.tensor([0.5]))
 torch_loss.backward()
+torch_slope = neuron.weight.grad.item()
 
-finite_difference = (neuron_loss(0.5 + STEP_H) - neuron_loss(0.5 - STEP_H)) / (2 * STEP_H)
-print(f"L = {loss.data:.4f}, engine dL/dw = {w.grad:.4f}, torch dL/dw = {neuron.weight.grad.item():.4f}")
-print("same as torch:", np.isclose(w.grad, neuron.weight.grad.item()), "| close to finite difference:", np.isclose(w.grad, finite_difference))
+loss_right = neuron_loss(0.5 + STEP_H)  # L(w + h)
+loss_left = neuron_loss(0.5 - STEP_H)   # L(w - h)
+finite_difference = (loss_right - loss_left) / (2 * STEP_H)
+print(f"L = {loss.data:.4f}, engine dL/dw = {w.grad:.4f}, torch dL/dw = {torch_slope:.4f}")
+same_as_torch = np.isclose(w.grad, torch_slope)
+close_to_numeric = np.isclose(w.grad, finite_difference)
+print("same as torch:", same_as_torch, "| close to finite difference:", close_to_numeric)
 
 # %% [markdown]
 # ## Exercises

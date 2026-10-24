@@ -37,7 +37,8 @@ rng = np.random.default_rng(RANDOM_STATE)
 series = np.sin(np.arange(400) * 0.2) + 0.05 * rng.normal(size=400)
 windows = np.lib.stride_tricks.sliding_window_view(series, T + 1).copy()
 X, y = windows[:, :T, None], windows[:, T:]
-X_train, X_test, y_train, y_test = X[:300], X[300:], y[:300], y[300:]
+X_train, y_train = X[:300], y[:300]
+X_test, y_test = X[300:], y[300:]
 
 # %% [markdown]
 # ## 1. The recurrent cell
@@ -53,14 +54,20 @@ class RNN:
     def __init__(self, input_size: int, hidden_size: int):
         self.weight_ih = rng.normal(0, 0.5, (hidden_size, input_size))
         self.weight_hh = rng.normal(0, 0.3, (hidden_size, hidden_size))
-        self.bias_ih, self.bias_hh = np.zeros(hidden_size), np.zeros(hidden_size)
+        self.bias_ih = np.zeros(hidden_size)
+        self.bias_hh = np.zeros(hidden_size)
 
     def forward(self, x: np.ndarray, h0: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """x has shape (batch, T, input_size); returns every state h_1..h_T and the last one."""
-        states = [h0]
+        h = h0
+        states = []
         for t in range(x.shape[1]):
-            states.append(np.tanh(x[:, t] @ self.weight_ih.T + self.bias_ih + states[-1] @ self.weight_hh.T + self.bias_hh))
-        outputs = np.stack(states[1:], axis=1)
+            x_t = x[:, t]
+            input_term = x_t @ self.weight_ih.T + self.bias_ih      # W_xh x_t
+            recurrent_term = h @ self.weight_hh.T + self.bias_hh    # W_hh h_{t-1}
+            h = np.tanh(input_term + recurrent_term)                # h_t
+            states.append(h)
+        outputs = np.stack(states, axis=1)
         return outputs, outputs[:, -1]
 
 
@@ -75,7 +82,8 @@ def copy_weights(source: RNN, target: nn.RNN) -> None:
 
 # %%
 cell = RNN(1, 1)
-cell.weight_ih, cell.weight_hh = np.array([[1.0]]), np.array([[0.5]])
+cell.weight_ih = np.array([[1.0]])  # W_xh
+cell.weight_hh = np.array([[0.5]])  # W_hh
 inputs = np.array([[[1.0], [0.0], [1.0]]])
 outputs, h_n = cell.forward(inputs, np.zeros((1, 1)))
 print("states:", outputs.ravel().round(3))
@@ -93,31 +101,49 @@ print("same result:", np.allclose(outputs, torch_outputs.detach().numpy()))
 
 # %%
 def bptt(rnn: RNN, x: np.ndarray, outputs: np.ndarray, d_h: np.ndarray) -> list[np.ndarray]:
-    """Gradients of weight_ih, weight_hh, bias_ih, bias_hh, given dJ/dh_T, walking back along the states (h_0 = 0)."""
-    states = np.concatenate([np.zeros_like(outputs[:, :1]), outputs], axis=1)
-    grad_ih, grad_hh, grad_b = 0, 0, 0
+    """Gradients of weight_ih, weight_hh, bias_ih, bias_hh, given d_h = dJ/dh_T.
+
+    Walks back along the states h_T, ..., h_1 (with h_0 = 0)."""
+    states = np.concatenate([np.zeros_like(outputs[:, :1]), outputs], axis=1)  # h_0, h_1, ..., h_T
+    grad_ih = 0
+    grad_hh = 0
+    grad_b = 0
     for t in range(x.shape[1], 0, -1):
-        d_a = d_h * (1 - states[:, t] ** 2)
-        grad_ih, grad_hh, grad_b = grad_ih + d_a.T @ x[:, t - 1], grad_hh + d_a.T @ states[:, t - 1], grad_b + d_a.sum(axis=0)
-        d_h = d_a @ rnn.weight_hh
+        h_t = states[:, t]
+        h_prev = states[:, t - 1]
+        x_t = x[:, t - 1]
+        d_a = d_h * (1 - h_t ** 2)       # back through tanh: tanh' = 1 - h_t^2
+        grad_ih = grad_ih + d_a.T @ x_t      # this step's share of dJ/dW_xh
+        grad_hh = grad_hh + d_a.T @ h_prev   # this step's share of dJ/dW_hh
+        grad_b = grad_b + d_a.sum(axis=0)
+        d_h = d_a @ rnn.weight_hh        # dJ/dh_{t-1}
     return [grad_ih, grad_hh, grad_b, grad_b]
 
 
 rnn = RNN(1, HIDDEN)
-head_weight, head_bias = rng.normal(0, 0.5, (1, HIDDEN)), np.zeros(1)
+head_weight = rng.normal(0, 0.5, (1, HIDDEN))  # W_hy
+head_bias = np.zeros(1)                        # b_y
 
 
 def gradients(X: np.ndarray, y: np.ndarray) -> list[np.ndarray]:
-    """Forward pass, then the gradients of every weight: the RNN's four and the head's two (W_hy, b_y)."""
+    """Forward pass, then the gradients of every weight.
+
+    Returns the RNN's four and the head's two (W_hy, b_y)."""
     outputs, h_n = rnn.forward(X, np.zeros((len(X), HIDDEN)))
-    d_y = 2 * (h_n @ head_weight.T + head_bias - y) / len(y)
-    return bptt(rnn, X, outputs, d_y @ head_weight) + [d_y.T @ h_n, d_y.sum(axis=0)]
+    y_hat = h_n @ head_weight.T + head_bias   # W_hy h_T + b_y
+    d_y = 2 * (y_hat - y) / len(y)            # dJ/dy_hat for the mean squared error
+    d_h = d_y @ head_weight                   # dJ/dh_T
+    rnn_grads = bptt(rnn, X, outputs, d_h)
+    grad_head_weight = d_y.T @ h_n
+    grad_head_bias = d_y.sum(axis=0)
+    return rnn_grads + [grad_head_weight, grad_head_bias]
 
 # %% [markdown]
 # PyTorch's autograd finds the same gradients from the forward pass alone: `loss.backward()` fills every `.grad`.
 
 # %%
-torch_rnn, torch_head = nn.RNN(1, HIDDEN, batch_first=True), nn.Linear(HIDDEN, 1)
+torch_rnn = nn.RNN(1, HIDDEN, batch_first=True)
+torch_head = nn.Linear(HIDDEN, 1)
 copy_weights(rnn, torch_rnn)
 with torch.no_grad():
     torch_head.weight.copy_(torch.from_numpy(head_weight))
@@ -130,8 +156,15 @@ def torch_predict(X: np.ndarray) -> torch.Tensor:
     return torch_head(h_n[-1])
 
 
-nn.MSELoss()(torch_predict(X_train), torch.from_numpy(y_train)).backward()
-print("same result:", all(np.allclose(g, p.grad.numpy()) for g, p in zip(gradients(X_train, y_train), torch_params)))
+loss_fn = nn.MSELoss()
+y_train_t = torch.from_numpy(y_train)
+prediction = torch_predict(X_train)
+loss = loss_fn(prediction, y_train_t)
+loss.backward()
+
+grads_by_hand = gradients(X_train, y_train)
+same = all(np.allclose(g, p.grad.numpy()) for g, p in zip(grads_by_hand, torch_params))
+print("same result:", same)
 
 # %% [markdown]
 # ## 3. Vanishing and exploding gradients
@@ -148,7 +181,8 @@ def run_scalar(h_1: float, w_hh: float, inputs: np.ndarray) -> np.ndarray:
 
 inputs = rng.normal(0, 0.5, 20)
 states = run_scalar(0.1, 0.8, inputs)
-product = np.prod(0.8 * (1 - states[1:] ** 2))
+factors = 0.8 * (1 - states[1:] ** 2)  # w_hh (1 - h_t^2), for t = 2..T
+product = np.prod(factors)
 
 # %% [markdown]
 # Autograd follows the same chain of steps backwards and gives the same number.
@@ -163,8 +197,10 @@ print(f"dh_T/dh_1 = {product:.2e} | same result:", np.isclose(product, autograd.
 
 # %%
 for w_hh in [0.5, 0.8, 1.5]:
-    factors = w_hh * (1 - run_scalar(0.0, w_hh, inputs)[1:] ** 2)
-    plt.semilogy(np.abs(np.cumprod(factors[::-1])), marker="o", label=f"$w_{{hh}}$ = {w_hh}")
+    states = run_scalar(0.0, w_hh, inputs)
+    factors = w_hh * (1 - states[1:] ** 2)
+    gradient_sizes = np.abs(np.cumprod(factors[::-1]))  # product of the last k factors
+    plt.semilogy(gradient_sizes, marker="o", label=f"$w_{{hh}}$ = {w_hh}")
 plt.xlabel("steps back")
 plt.ylabel("gradient size")
 plt.legend()
@@ -179,21 +215,27 @@ plt.show()
 
 # %%
 class SGD:
-    """NumPy version of torch.optim.SGD; step() takes the gradients because NumPy arrays have no .grad."""
+    """NumPy version of torch.optim.SGD.
+
+    step() takes the gradients, because NumPy arrays have no .grad."""
 
     def __init__(self, params: list[np.ndarray], lr: float):
-        self.params, self.lr = params, lr
+        self.params = params
+        self.lr = lr
 
     def step(self, grads: list[np.ndarray]) -> None:
         for param, grad in zip(self.params, grads):
             param -= self.lr * grad
 
 
-optimizer = SGD([rnn.weight_ih, rnn.weight_hh, rnn.bias_ih, rnn.bias_hh, head_weight, head_bias], lr=LEARNING_RATE)
+params = [rnn.weight_ih, rnn.weight_hh, rnn.bias_ih, rnn.bias_hh, head_weight, head_bias]
+optimizer = SGD(params, lr=LEARNING_RATE)
 for _ in range(STEPS):
     grads = gradients(X_train, y_train)
-    norm = np.sqrt(sum(np.sum(g ** 2) for g in grads))
-    optimizer.step([g * min(1, CLIP / (norm + 1e-6)) for g in grads])
+    norm = np.sqrt(sum(np.sum(g ** 2) for g in grads))  # length of all gradients together
+    scale = min(1, CLIP / (norm + 1e-6))                 # < 1 only if the length passes CLIP
+    clipped = [g * scale for g in grads]
+    optimizer.step(clipped)
 
 # %% [markdown]
 # The PyTorch loop, from the same starting weights: `zero_grad`, `backward`, `clip_grad_norm_`, `step`.
@@ -202,21 +244,26 @@ for _ in range(STEPS):
 torch_optimizer = torch.optim.SGD(torch_params, lr=LEARNING_RATE)
 for _ in range(STEPS):
     torch_optimizer.zero_grad()
-    nn.MSELoss()(torch_predict(X_train), torch.from_numpy(y_train)).backward()
+    prediction = torch_predict(X_train)
+    loss = loss_fn(prediction, y_train_t)
+    loss.backward()
     nn.utils.clip_grad_norm_(torch_params, CLIP)
     torch_optimizer.step()
 
-print("same weights:", all(np.allclose(p, q.detach().numpy()) for p, q in zip(optimizer.params, torch_params)))
+same = all(np.allclose(p, q.detach().numpy()) for p, q in zip(optimizer.params, torch_params))
+print("same weights:", same)
 
 # %% [markdown]
 # A Ridge regression on the same $T$ past values (lag features) is a reference forecaster.
 
 # %%
 rnn_mse = mean_squared_error(y_test, torch_predict(X_test).detach().numpy())
-ridge_mse = mean_squared_error(y_test, Ridge(alpha=1.0).fit(X_train[:, :, 0], y_train).predict(X_test[:, :, 0]))
+ridge = Ridge(alpha=1.0).fit(X_train[:, :, 0], y_train)
+ridge_mse = mean_squared_error(y_test, ridge.predict(X_test[:, :, 0]))
 last_value_mse = mean_squared_error(y_test, X_test[:, -1])
 print(f"test MSE: RNN {rnn_mse:.4f}, Ridge {ridge_mse:.4f}, repeat last value {last_value_mse:.4f}")
-print("both beat repeating the last value:", rnn_mse < last_value_mse and ridge_mse < last_value_mse)
+both_beat = rnn_mse < last_value_mse and ridge_mse < last_value_mse
+print("both beat repeating the last value:", both_beat)
 
 # %% [markdown]
 # ## 5. The LSTM cell
@@ -240,25 +287,38 @@ class LSTMCell:
         self.weight_hh = rng.normal(0, 0.5, (4 * hidden_size, hidden_size))
         self.bias_ih, self.bias_hh = rng.normal(0, 0.1, (2, 4 * hidden_size))
 
-    def forward(self, x: np.ndarray, state: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    def forward(self, x: np.ndarray,
+                state: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
         """One step: returns the new (h, c)."""
         h_prev, c_prev = state
-        a = x @ self.weight_ih.T + self.bias_ih + h_prev @ self.weight_hh.T + self.bias_hh
+        input_term = x @ self.weight_ih.T + self.bias_ih            # part for x_t
+        recurrent_term = h_prev @ self.weight_hh.T + self.bias_hh   # part for h_{t-1}
+        a = input_term + recurrent_term
         a_i, a_f, a_g, a_o = np.split(a, 4, axis=1)
-        c = sigmoid(a_f) * c_prev + sigmoid(a_i) * np.tanh(a_g)
-        return sigmoid(a_o) * np.tanh(c), c
+        i = sigmoid(a_i)        # input gate i_t
+        f = sigmoid(a_f)        # forget gate f_t
+        g = np.tanh(a_g)        # candidate c~_t
+        o = sigmoid(a_o)        # output gate o_t
+        c = f * c_prev + i * g  # c_t
+        h = o * np.tanh(c)      # h_t
+        return h, c
 
 
 lstm = LSTMCell(1, HIDDEN)
-x_t, h_prev, c_prev = np.array([[0.7]]), rng.normal(size=(1, HIDDEN)), rng.normal(size=(1, HIDDEN))
+x_t = np.array([[0.7]])
+h_prev = rng.normal(size=(1, HIDDEN))
+c_prev = rng.normal(size=(1, HIDDEN))
 h, c = lstm.forward(x_t, (h_prev, c_prev))
 
 torch_lstm = nn.LSTMCell(1, HIDDEN)
 with torch.no_grad():
     for name in ["weight_ih", "weight_hh", "bias_ih", "bias_hh"]:
         getattr(torch_lstm, name).copy_(torch.from_numpy(getattr(lstm, name)))
-torch_h, torch_c = torch_lstm(torch.from_numpy(x_t), (torch.from_numpy(h_prev), torch.from_numpy(c_prev)))
-print("same result:", np.allclose(h, torch_h.detach().numpy()) and np.allclose(c, torch_c.detach().numpy()))
+torch_state = (torch.from_numpy(h_prev), torch.from_numpy(c_prev))
+torch_h, torch_c = torch_lstm(torch.from_numpy(x_t), torch_state)
+same_h = np.allclose(h, torch_h.detach().numpy())
+same_c = np.allclose(c, torch_c.detach().numpy())
+print("same result:", same_h and same_c)
 
 # %% [markdown]
 # ## Exercises

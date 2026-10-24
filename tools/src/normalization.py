@@ -46,11 +46,13 @@ class MinMaxScaler:
     """Map each feature to [0, 1] with the minimum and maximum learned in fit."""
 
     def fit(self, X):
-        self.data_min_, self.data_max_ = X.min(axis=0), X.max(axis=0)
+        self.data_min_ = X.min(axis=0)  # min_j
+        self.data_max_ = X.max(axis=0)  # max_j
         return self
 
     def transform(self, X):
-        return (X - self.data_min_) / (self.data_max_ - self.data_min_)
+        data_range = self.data_max_ - self.data_min_  # max_j - min_j
+        return (X - self.data_min_) / data_range
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -58,7 +60,8 @@ class MinMaxScaler:
 
 X = features.to_numpy()
 min_max_by_hand = MinMaxScaler().fit_transform(X)
-print("same result:", np.allclose(min_max_by_hand, preprocessing.MinMaxScaler().fit_transform(X)))
+min_max_library = preprocessing.MinMaxScaler().fit_transform(X)
+print("same result:", np.allclose(min_max_by_hand, min_max_library))
 
 # %% [markdown]
 # ## 2. Standardization
@@ -70,7 +73,8 @@ class StandardScaler:
     """Give each feature mean 0 and standard deviation 1 with the values learned in fit."""
 
     def fit(self, X):
-        self.mean_, self.scale_ = X.mean(axis=0), X.std(axis=0)
+        self.mean_ = X.mean(axis=0)  # x̄_j
+        self.scale_ = X.std(axis=0)  # s_j
         return self
 
     def transform(self, X):
@@ -81,7 +85,8 @@ class StandardScaler:
 
 
 standard_by_hand = StandardScaler().fit_transform(X)
-print("same result:", np.allclose(standard_by_hand, preprocessing.StandardScaler().fit_transform(X)))
+standard_library = preprocessing.StandardScaler().fit_transform(X)
+print("same result:", np.allclose(standard_by_hand, standard_library))
 
 # %% [markdown]
 # ## 3. Robust scaling
@@ -94,8 +99,10 @@ class RobustScaler:
     """Center each feature on its median and divide by its interquartile range."""
 
     def fit(self, X):
-        q1, self.center_, q3 = np.percentile(X, [25, 50, 75], axis=0)
-        self.scale_ = q3 - q1
+        q1 = np.percentile(X, 25, axis=0)
+        self.center_ = np.percentile(X, 50, axis=0)  # median x̃_j
+        q3 = np.percentile(X, 75, axis=0)
+        self.scale_ = q3 - q1  # interquartile range
         return self
 
     def transform(self, X):
@@ -106,7 +113,8 @@ class RobustScaler:
 
 
 robust_by_hand = RobustScaler().fit_transform(X)
-print("same result:", np.allclose(robust_by_hand, preprocessing.RobustScaler().fit_transform(X)))
+robust_library = preprocessing.RobustScaler().fit_transform(X)
+print("same result:", np.allclose(robust_by_hand, robust_library))
 
 # %% [markdown]
 # ## 4. Fit on training rows, apply to new rows
@@ -115,11 +123,14 @@ print("same result:", np.allclose(robust_by_hand, preprocessing.RobustScaler().f
 # Test rows are scaled with those same numbers.
 
 # %%
-X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.3, random_state=RANDOM_STATE, stratify=labels)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, labels, test_size=0.3, random_state=RANDOM_STATE, stratify=labels)
 
 scaler_by_hand = StandardScaler().fit(X_train)
 scaler_library = preprocessing.StandardScaler().fit(X_train)
-print("same result:", np.allclose(scaler_by_hand.transform(X_test), scaler_library.transform(X_test)))
+X_test_by_hand = scaler_by_hand.transform(X_test)
+X_test_library = scaler_library.transform(X_test)
+print("same result:", np.allclose(X_test_by_hand, X_test_library))
 
 # %% [markdown]
 # ## 5. Why it matters
@@ -129,9 +140,12 @@ print("same result:", np.allclose(scaler_by_hand.transform(X_test), scaler_libra
 
 # %%
 raw_knn = KNeighborsClassifier().fit(X_train, y_train)
-scaled_knn = make_pipeline(preprocessing.StandardScaler(), KNeighborsClassifier()).fit(X_train, y_train)
-print(f"raw features:    test accuracy {raw_knn.score(X_test, y_test):.3f}")
-print(f"scaled features: test accuracy {scaled_knn.score(X_test, y_test):.3f}")
+scaled_knn = make_pipeline(preprocessing.StandardScaler(), KNeighborsClassifier())
+scaled_knn.fit(X_train, y_train)
+raw_accuracy = raw_knn.score(X_test, y_test)
+scaled_accuracy = scaled_knn.score(X_test, y_test)
+print(f"raw features:    test accuracy {raw_accuracy:.3f}")
+print(f"scaled features: test accuracy {scaled_accuracy:.3f}")
 
 # %% [markdown]
 # ## 6. Log transform for a long tail
@@ -145,7 +159,8 @@ population = fetch_california_housing(as_frame=True).frame["Population"].to_nump
 fig, (left, right) = plt.subplots(1, 2, figsize=(10, 3))
 left.hist(population, bins=50)
 left.set_title("population")
-right.hist(np.log10(1 + population), bins=50, color="tab:orange")
+log_population = np.log10(1 + population)
+right.hist(log_population, bins=50, color="tab:orange")
 right.set_title("log10(1 + population)")
 plt.show()
 

@@ -51,7 +51,12 @@ class OneHotEncoder:
         return self
 
     def transform(self, X):
-        return np.hstack([(X[:, [j]] == categories).astype(float) for j, categories in enumerate(self.categories_)])
+        blocks = []
+        for j, categories in enumerate(self.categories_):
+            column = X[:, [j]]
+            block = (column == categories).astype(float)  # I(x = c_k) for every c_k
+            blocks.append(block)
+        return np.hstack(blocks)
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -80,12 +85,21 @@ class OrdinalEncoder:
         self.categories = categories
 
     def fit(self, X):
-        given = self.categories != "auto"
-        self.categories_ = [np.array(self.categories[j]) if given else np.unique(column) for j, column in enumerate(X.T)]
+        self.categories_ = []
+        for j, column in enumerate(X.T):
+            if self.categories == "auto":
+                self.categories_.append(np.unique(column))
+            else:
+                self.categories_.append(np.array(self.categories[j]))
         return self
 
     def transform(self, X):
-        return np.column_stack([(X[:, [j]] == categories).argmax(axis=1) for j, categories in enumerate(self.categories_)])
+        codes = []
+        for j, categories in enumerate(self.categories_):
+            column = X[:, [j]]
+            position = (column == categories).argmax(axis=1)  # c_k becomes k - 1
+            codes.append(position)
+        return np.column_stack(codes)
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -98,7 +112,8 @@ education = adult[["education"]].astype(str).to_numpy()
 education_by_hand = OrdinalEncoder(categories=[education_order]).fit_transform(education)
 
 # %%
-education_library = preprocessing.OrdinalEncoder(categories=[education_order]).fit_transform(education)
+ordinal_library = preprocessing.OrdinalEncoder(categories=[education_order])
+education_library = ordinal_library.fit_transform(education)
 print("same result:", np.array_equal(education_by_hand, education_library))
 
 # %% [markdown]
@@ -115,13 +130,17 @@ class KBinsDiscretizer:
         self.n_bins = n_bins
 
     def fit(self, X):
-        self.bin_edges_ = np.linspace(X.min(axis=0), X.max(axis=0), self.n_bins + 1).T
+        low = X.min(axis=0)  # a
+        high = X.max(axis=0)  # b
+        self.bin_edges_ = np.linspace(low, high, self.n_bins + 1).T
         return self
 
     def transform(self, X):
-        low, high = self.bin_edges_[:, 0], self.bin_edges_[:, -1]
-        width = (high - low) / self.n_bins
-        return np.clip(np.floor((X - low) / width), 0, self.n_bins - 1)
+        low = self.bin_edges_[:, 0]  # a
+        high = self.bin_edges_[:, -1]  # b
+        width = (high - low) / self.n_bins  # w = (b - a) / B
+        bins = np.floor((X - low) / width)  # bin(x) = floor((x - a) / w)
+        return np.clip(bins, 0, self.n_bins - 1)  # the largest value goes in the last bin
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -133,7 +152,8 @@ bins_by_hand = binner.fit_transform(ages)
 print("bin edges:", binner.bin_edges_[0])
 
 # %%
-bins_library = preprocessing.KBinsDiscretizer(n_bins=BIN_COUNT, encode="ordinal", strategy="uniform").fit_transform(ages)
+binner_library = preprocessing.KBinsDiscretizer(n_bins=BIN_COUNT, encode="ordinal", strategy="uniform")
+bins_library = binner_library.fit_transform(ages)
 print("same result:", np.array_equal(bins_by_hand, bins_library))
 
 # %% [markdown]
@@ -144,7 +164,8 @@ print("same result:", np.array_equal(bins_by_hand, bins_library))
 # %%
 gains = adult["capital-gain"].to_numpy(dtype=float)
 log_gains_by_hand = np.log(1 + gains)
-log_gains_library = preprocessing.FunctionTransformer(np.log1p).fit_transform(gains.reshape(-1, 1)).ravel()
+log_transformer = preprocessing.FunctionTransformer(np.log1p)
+log_gains_library = log_transformer.fit_transform(gains.reshape(-1, 1)).ravel()
 print("same result:", np.allclose(log_gains_by_hand, log_gains_library))
 
 fig, (left, right) = plt.subplots(1, 2, figsize=(10, 3))
@@ -168,8 +189,12 @@ class PolynomialFeatures:
         return self
 
     def transform(self, X):
-        columns = range(self.n_features_in_)
-        return np.column_stack([X] + [X[:, a] * X[:, b] for a in columns for b in columns if a <= b])
+        n = self.n_features_in_
+        new_columns = [X]
+        for a in range(n):
+            for b in range(a, n):
+                new_columns.append(X[:, a] * X[:, b])  # x_a * x_b (a square when a == b)
+        return np.column_stack(new_columns)
 
     def fit_transform(self, X):
         return self.fit(X).transform(X)
@@ -179,7 +204,8 @@ age_hours = adult[["age", "hours-per-week"]].to_numpy(dtype=float)
 squares_by_hand = PolynomialFeatures().fit_transform(age_hours)
 
 # %%
-squares_library = preprocessing.PolynomialFeatures(degree=2, include_bias=False).fit_transform(age_hours)
+polynomial_library = preprocessing.PolynomialFeatures(degree=2, include_bias=False)
+squares_library = polynomial_library.fit_transform(age_hours)
 print("same result:", np.allclose(squares_by_hand, squares_library))
 
 # %% [markdown]

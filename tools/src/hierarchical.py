@@ -38,7 +38,8 @@ X, _ = make_blobs(n_samples=30, centers=K, cluster_std=1.5, random_state=RANDOM_
 # %%
 def distances(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Euclidean distance from every row of A to every row of B."""
-    return np.sqrt(((A[:, None, :] - B[None, :, :]) ** 2).sum(axis=2))
+    differences = A[:, None, :] - B[None, :, :]  # a_j - b_j, for every pair of rows
+    return np.sqrt((differences ** 2).sum(axis=2))  # square, sum over j, square root
 
 
 print("distance table:", distances(X, X).shape)
@@ -58,11 +59,14 @@ class AgglomerativeClustering:
     LINKAGES = {"single": np.min, "complete": np.max, "average": np.mean}
 
     def __init__(self, n_clusters: int = 2, linkage: str = "average"):
-        self.n_clusters, self.linkage = n_clusters, linkage
+        self.n_clusters = n_clusters
+        self.linkage = linkage
 
     def fit(self, X, y=None):
-        d, rule = distances(X, X), self.LINKAGES[self.linkage]
-        clusters, heights = [[i] for i in range(len(X))], []
+        d = distances(X, X)  # d(a, b) for every pair of examples
+        rule = self.LINKAGES[self.linkage]  # min, max or mean
+        clusters = [[i] for i in range(len(X))]  # every example starts alone
+        heights = []
         while True:
             if len(clusters) == self.n_clusters:
                 self.labels_ = np.zeros(len(X), dtype=int)
@@ -70,10 +74,15 @@ class AgglomerativeClustering:
                     self.labels_[members] = k
             if len(clusters) == 1:
                 break
-            height, a, b = min((rule(d[np.ix_(A, B)]), a, b)
-                               for a, A in enumerate(clusters) for b, B in enumerate(clusters) if a < b)
+            height, best_a, best_b = np.inf, None, None
+            for a in range(len(clusters)):
+                for b in range(a + 1, len(clusters)):
+                    A, B = clusters[a], clusters[b]
+                    D = rule(d[np.ix_(A, B)])  # linkage D(A, B) over all pairs a in A, b in B
+                    if D < height:
+                        height, best_a, best_b = D, a, b
             heights.append(height)
-            clusters[a] += clusters.pop(b)
+            clusters[best_a] += clusters.pop(best_b)  # merge B* into A*
         self.distances_ = np.array(heights)
         return self
 
@@ -88,9 +97,12 @@ class AgglomerativeClustering:
 for method in AgglomerativeClustering.LINKAGES:
     by_hand = AgglomerativeClustering(n_clusters=K, linkage=method).fit(X)
     model = cluster.AgglomerativeClustering(n_clusters=K, linkage=method).fit(X)
-    same_heights = np.allclose(np.sort(by_hand.distances_), hierarchy.linkage(X, method)[:, 2])
+    scipy_heights = hierarchy.linkage(X, method)[:, 2]
+    same_heights = np.allclose(np.sort(by_hand.distances_), scipy_heights)
     same_grouping = adjusted_rand_score(by_hand.labels_, model.labels_) == 1.0
-    print(f"{method:8} {len(by_hand.distances_)} merges | same heights: {same_heights} | same grouping: {same_grouping}")
+    n_merges = len(by_hand.distances_)
+    print(f"{method:8} {n_merges} merges | same heights: {same_heights} | "
+          f"same grouping: {same_grouping}")
 
 # %% [markdown]
 # ## 3. Ward's linkage
@@ -108,11 +120,15 @@ A, B = X[two == 1], X[two == 2]
 
 def within(C: np.ndarray) -> float:
     """Sum of squared distances from each example to the mean of its cluster."""
-    return ((C - C.mean(axis=0)) ** 2).sum()
+    centered = C - C.mean(axis=0)  # a - mu_A
+    return (centered ** 2).sum()
 
 
-delta = len(A) * len(B) / (len(A) + len(B)) * ((A.mean(axis=0) - B.mean(axis=0)) ** 2).sum()
-print("formula matches W growth:", np.isclose(delta, within(np.vstack([A, B])) - within(A) - within(B)))
+size_factor = len(A) * len(B) / (len(A) + len(B))  # |A| |B| / (|A| + |B|)
+mean_gap = ((A.mean(axis=0) - B.mean(axis=0)) ** 2).sum()  # ||mu_A - mu_B||^2
+delta = size_factor * mean_gap
+growth = within(np.vstack([A, B])) - within(A) - within(B)  # W(A + B) - W(A) - W(B)
+print("formula matches W growth:", np.isclose(delta, growth))
 print("same height:", np.isclose(np.sqrt(2 * delta), ward_tree[-1, 2]))
 
 # %% [markdown]

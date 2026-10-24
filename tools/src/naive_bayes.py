@@ -37,8 +37,9 @@ VAR_SMOOTHING = 1e-9
 
 # %%
 prior_spam, likelihood_spam, likelihood_ham = 0.3, 0.8, 0.0857
-evidence = likelihood_spam * prior_spam + likelihood_ham * (1 - prior_spam)
-print(f"P(spam | word) = {likelihood_spam * prior_spam / evidence:.2f}")
+evidence = likelihood_spam * prior_spam + likelihood_ham * (1 - prior_spam)   # P(word)
+posterior_spam = likelihood_spam * prior_spam / evidence
+print(f"P(spam | word) = {posterior_spam:.2f}")
 
 # %% [markdown]
 # ## 2. Counting with smoothing
@@ -60,13 +61,20 @@ class CategoricalNB:
         self.class_log_prior_ = np.log([np.mean(y == c) for c in self.classes_])
         self.feature_log_prob_ = []
         for j in range(X.shape[1]):
-            counts = np.array([np.bincount(X[y == c, j], minlength=X[:, j].max() + 1) for c in self.classes_])
-            smoothed = counts + self.alpha
-            self.feature_log_prob_.append(np.log(smoothed / smoothed.sum(axis=1, keepdims=True)))
+            n_values = X[:, j].max() + 1                                  # V_j
+            counts = np.zeros((len(self.classes_), n_values))
+            for i, c in enumerate(self.classes_):
+                counts[i] = np.bincount(X[y == c, j], minlength=n_values)   # N_jvc
+            smoothed = counts + self.alpha                                # N_jvc + alpha
+            totals = smoothed.sum(axis=1, keepdims=True)                  # N_c + alpha V_j
+            self.feature_log_prob_.append(np.log(smoothed / totals))
         return self
 
     def predict_proba(self, X):
-        scores = self.class_log_prior_ + sum(log_prob[:, X[:, j]].T for j, log_prob in enumerate(self.feature_log_prob_))
+        log_likelihood = np.zeros((len(X), len(self.classes_)))
+        for j, log_prob in enumerate(self.feature_log_prob_):
+            log_likelihood += log_prob[:, X[:, j]].T                      # + log P(x_j | c)
+        scores = self.class_log_prior_ + log_likelihood                   # log P(c) + sum_j ...
         return softmax(scores, axis=1)
 
     def predict(self, X):
@@ -107,9 +115,12 @@ class GaussianNB:
         return self
 
     def predict_proba(self, X):
-        log_likelihood = -0.5 * np.sum(np.log(2 * np.pi * self.var_)
-                                       + (X[:, None, :] - self.theta_) ** 2 / self.var_, axis=2)
-        return softmax(np.log(self.class_prior_) + log_likelihood, axis=1)
+        log_prior = np.log(self.class_prior_)                             # log P(c)
+        squared_gap = (X[:, None, :] - self.theta_) ** 2                  # (x_j - mu_jc)^2
+        log_density = -0.5 * (np.log(2 * np.pi * self.var_) + squared_gap / self.var_)
+        log_likelihood = log_density.sum(axis=2)                          # sum_j log P(x_j | c)
+        scores = log_prior + log_likelihood
+        return softmax(scores, axis=1)
 
     def predict(self, X):
         return self.classes_[self.predict_proba(X).argmax(axis=1)]
@@ -125,9 +136,13 @@ by_hand = GaussianNB(var_smoothing=VAR_SMOOTHING).fit(X_train, y_train)
 
 # %%
 model = naive_bayes.GaussianNB(var_smoothing=VAR_SMOOTHING).fit(X_train, y_train)
-print("same means and variances:", np.allclose(by_hand.theta_, model.theta_) and np.allclose(by_hand.var_, model.var_))
+same_means = np.allclose(by_hand.theta_, model.theta_)
+same_variances = np.allclose(by_hand.var_, model.var_)
+print("same means and variances:", same_means and same_variances)
 print("same probabilities:", np.allclose(by_hand.predict_proba(X_test), model.predict_proba(X_test)))
-print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
+accuracy_by_hand = by_hand.score(X_test, y_test)
+accuracy_library = model.score(X_test, y_test)
+print(f"test accuracy: by hand {accuracy_by_hand:.3f}, scikit-learn {accuracy_library:.3f}")
 
 # %% [markdown]
 # ## Exercises

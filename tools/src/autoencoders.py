@@ -35,7 +35,8 @@ torch.manual_seed(RANDOM_STATE)
 torch.set_default_dtype(torch.float64)
 X, labels = load_digits(return_X_y=True)
 X = X / 16
-X_train, X_test, labels_train, labels_test = train_test_split(X, labels, test_size=0.3, random_state=RANDOM_STATE)
+X_train, X_test, labels_train, labels_test = train_test_split(
+    X, labels, test_size=0.3, random_state=RANDOM_STATE)
 rng = np.random.default_rng(RANDOM_STATE)
 
 # %% [markdown]
@@ -46,10 +47,12 @@ rng = np.random.default_rng(RANDOM_STATE)
 # %%
 x = np.array([[1.0, 0, 2], [0, 1, 1]])
 x_hat = np.array([[0.8, 0.1, 1.7], [0.2, 0.9, 1.0]])
-J = np.mean(np.sum((x - x_hat) ** 2, axis=1))
+squared_norms = np.sum((x - x_hat) ** 2, axis=1)  # ||x_i - x_hat_i||^2 for each example
+J = np.mean(squared_norms)  # (1/n) sum_i
 
 # nn.MSELoss averages over the 3 features too; summing and dividing by n gives J
-torch_J = nn.MSELoss(reduction="sum")(torch.from_numpy(x_hat), torch.from_numpy(x)) / len(x)
+sum_of_squares = nn.MSELoss(reduction="sum")
+torch_J = sum_of_squares(torch.from_numpy(x_hat), torch.from_numpy(x)) / len(x)
 print(f"J = {J:.3f} | same result:", np.isclose(J, torch_J.item()))
 
 # %% [markdown]
@@ -68,7 +71,10 @@ class Linear:
         self.bias = np.zeros(out_features) if bias else None
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        return x @ self.weight.T + (0 if self.bias is None else self.bias)
+        output = x @ self.weight.T
+        if self.bias is not None:
+            output = output + self.bias
+        return output
 
 
 class Tanh:
@@ -94,10 +100,13 @@ class Autoencoder:
     """Encoder f_phi then decoder g_psi."""
 
     def __init__(self, encoder, decoder):
-        self.encoder, self.decoder = encoder, decoder
+        self.encoder = encoder
+        self.decoder = decoder
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        return self.decoder.forward(self.encoder.forward(x))
+        z = self.encoder.forward(x)  # z = f_phi(x)
+        x_hat = self.decoder.forward(z)  # x_hat = g_psi(z)
+        return x_hat
 
 # %% [markdown]
 # Training by hand, with the gradients of $J$ written out.
@@ -105,21 +114,27 @@ class Autoencoder:
 # %%
 mean = X_train.mean(axis=0)
 X_centered = X_train - mean
-linear_ae = Autoencoder(Linear(X.shape[1], CODE_SIZE, bias=False), Linear(CODE_SIZE, X.shape[1], bias=False))
-W1, W2 = linear_ae.encoder.weight, linear_ae.decoder.weight
+d = X.shape[1]
+linear_ae = Autoencoder(Linear(d, CODE_SIZE, bias=False), Linear(CODE_SIZE, d, bias=False))
+W1 = linear_ae.encoder.weight
+W2 = linear_ae.decoder.weight
 
-torch_linear_ae = nn.Sequential(nn.Linear(X.shape[1], CODE_SIZE, bias=False), nn.Linear(CODE_SIZE, X.shape[1], bias=False))
+torch_linear_ae = nn.Sequential(nn.Linear(d, CODE_SIZE, bias=False),
+                                nn.Linear(CODE_SIZE, d, bias=False))
 with torch.no_grad():  # same starting weights, copied before training
     torch_linear_ae[0].weight.copy_(torch.from_numpy(W1))
     torch_linear_ae[1].weight.copy_(torch.from_numpy(W2))
 
 losses = []
 for _ in range(STEPS):
-    Z = linear_ae.encoder.forward(X_centered)
-    residual = linear_ae.decoder.forward(Z) - X_centered
-    losses.append(np.mean(np.sum(residual ** 2, axis=1)))
-    grad_W2 = 2 * residual.T @ Z / len(X_centered)
-    grad_W1 = 2 * (residual @ W2).T @ X_centered / len(X_centered)
+    n = len(X_centered)
+    Z = linear_ae.encoder.forward(X_centered)  # z = W1 x
+    X_hat = linear_ae.decoder.forward(Z)  # x_hat = W2 z
+    residual = X_hat - X_centered
+    J = np.mean(np.sum(residual ** 2, axis=1))
+    losses.append(J)
+    grad_W2 = 2 * residual.T @ Z / n  # dJ/dW2
+    grad_W1 = 2 * (residual @ W2).T @ X_centered / n  # dJ/dW1
     W1 -= LEARNING_RATE * grad_W1
     W2 -= LEARNING_RATE * grad_W2
 
@@ -129,14 +144,17 @@ for _ in range(STEPS):
 # %%
 X_centered_t = torch.from_numpy(X_centered)
 optimizer = torch.optim.SGD(torch_linear_ae.parameters(), lr=LEARNING_RATE)
+loss_fn = nn.MSELoss()
 for _ in range(STEPS):
     optimizer.zero_grad()
-    loss = X.shape[1] * nn.MSELoss()(torch_linear_ae(X_centered_t), X_centered_t)
+    reconstruction = torch_linear_ae(X_centered_t)
+    loss = d * loss_fn(reconstruction, X_centered_t)  # times d to get J
     loss.backward()
     optimizer.step()
 
-print("same weights:", np.allclose(W1, torch_linear_ae[0].weight.detach().numpy())
-      and np.allclose(W2, torch_linear_ae[1].weight.detach().numpy()))
+same_W1 = np.allclose(W1, torch_linear_ae[0].weight.detach().numpy())
+same_W2 = np.allclose(W2, torch_linear_ae[1].weight.detach().numpy())
+print("same weights:", same_W1 and same_W2)
 
 # %% [markdown]
 # PCA, the non-neural reference, keeps the same subspace. The two codes can be rotated versions of each other,
@@ -144,7 +162,8 @@ print("same weights:", np.allclose(W1, torch_linear_ae[0].weight.detach().numpy(
 
 # %%
 pca = PCA(n_components=CODE_SIZE).fit(X_train)
-pca_error = np.mean(np.sum((pca.inverse_transform(pca.transform(X_train)) - X_train) ** 2, axis=1))
+pca_reconstruction = pca.inverse_transform(pca.transform(X_train))
+pca_error = np.mean(np.sum((pca_reconstruction - X_train) ** 2, axis=1))
 
 plt.plot(losses, label="linear autoencoder")
 plt.axhline(pca_error, color="gray", linestyle="--", label="PCA")
@@ -169,20 +188,25 @@ class TorchAutoencoder(nn.Module):
 
     def __init__(self, encoder: nn.Module, decoder: nn.Module):
         super().__init__()
-        self.encoder, self.decoder = encoder, decoder
+        self.encoder = encoder
+        self.decoder = decoder
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.decoder(self.encoder(x))
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        return x_hat
 
 
-d = X.shape[1]
-autoencoder = TorchAutoencoder(nn.Sequential(nn.Linear(d, 64), nn.Tanh(), nn.Linear(64, CODE_SIZE), nn.Tanh()),
-                               nn.Sequential(nn.Linear(CODE_SIZE, 64), nn.Tanh(), nn.Linear(64, d)))
-X_train_t, X_test_t = torch.from_numpy(X_train), torch.from_numpy(X_test)
+encoder = nn.Sequential(nn.Linear(d, 64), nn.Tanh(), nn.Linear(64, CODE_SIZE), nn.Tanh())
+decoder = nn.Sequential(nn.Linear(CODE_SIZE, 64), nn.Tanh(), nn.Linear(64, d))
+autoencoder = TorchAutoencoder(encoder, decoder)
+X_train_t = torch.from_numpy(X_train)
+X_test_t = torch.from_numpy(X_test)
 optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.003)
 for _ in range(STEPS):
     optimizer.zero_grad()
-    loss = d * nn.MSELoss()(autoencoder(X_train_t), X_train_t)
+    reconstruction = autoencoder(X_train_t)
+    loss = d * loss_fn(reconstruction, X_train_t)
     loss.backward()
     optimizer.step()
 
@@ -192,19 +216,26 @@ for _ in range(STEPS):
 # %%
 numpy_ae = Autoencoder(Sequential(Linear(d, 64), Tanh(), Linear(64, CODE_SIZE), Tanh()),
                        Sequential(Linear(CODE_SIZE, 64), Tanh(), Linear(64, d)))
-for numpy_part, torch_part in [(numpy_ae.encoder, autoencoder.encoder), (numpy_ae.decoder, autoencoder.decoder)]:
+pairs = [(numpy_ae.encoder, autoencoder.encoder), (numpy_ae.decoder, autoencoder.decoder)]
+for numpy_part, torch_part in pairs:
     for numpy_layer, torch_layer in zip(numpy_part.layers, torch_part):
         if isinstance(torch_layer, nn.Linear):
-            numpy_layer.weight, numpy_layer.bias = torch_layer.weight.detach().numpy(), torch_layer.bias.detach().numpy()
+            numpy_layer.weight = torch_layer.weight.detach().numpy()
+            numpy_layer.bias = torch_layer.bias.detach().numpy()
 
 codes = numpy_ae.encoder.forward(X_test)
+reconstructions = numpy_ae.forward(X_test)
 with torch.no_grad():
-    print("same result:", np.allclose(codes, autoencoder.encoder(X_test_t).numpy())
-          and np.allclose(numpy_ae.forward(X_test), autoencoder(X_test_t).numpy()))
+    torch_codes = autoencoder.encoder(X_test_t).numpy()
+    torch_reconstructions = autoencoder(X_test_t).numpy()
+print("same result:", np.allclose(codes, torch_codes)
+      and np.allclose(reconstructions, torch_reconstructions))
 
-ae_error = np.mean(np.sum((numpy_ae.forward(X_test) - X_test) ** 2, axis=1))
-pca_test_error = np.mean(np.sum((pca.inverse_transform(pca.transform(X_test)) - X_test) ** 2, axis=1))
-print(f"test reconstruction error with a code of 2: autoencoder {ae_error:.2f}, PCA {pca_test_error:.2f}")
+ae_error = np.mean(np.sum((reconstructions - X_test) ** 2, axis=1))
+pca_test_reconstruction = pca.inverse_transform(pca.transform(X_test))
+pca_test_error = np.mean(np.sum((pca_test_reconstruction - X_test) ** 2, axis=1))
+print(f"test reconstruction error with a code of 2: autoencoder {ae_error:.2f},",
+      f"PCA {pca_test_error:.2f}")
 
 # %%
 plt.scatter(codes[:, 0], codes[:, 1], c=labels_test, cmap="tab10", s=10)
@@ -221,19 +252,23 @@ plt.show()
 
 # %%
 def score(images: np.ndarray) -> np.ndarray:
-    return np.sum((images - numpy_ae.forward(images)) ** 2, axis=1)
+    reconstructions = numpy_ae.forward(images)  # g_psi(f_phi(x))
+    return np.sum((images - reconstructions) ** 2, axis=1)  # s(x)
 
 
 tau = np.percentile(score(X_train), 99)
 noise_images = rng.uniform(0, 1, (50, d))
-print(f"flagged: {np.mean(score(X_test) > tau):.0%} of new digits, {np.mean(score(noise_images) > tau):.0%} of noise pictures")
+flagged_digits = np.mean(score(X_test) > tau)
+flagged_noise = np.mean(score(noise_images) > tau)
+print(f"flagged: {flagged_digits:.0%} of new digits, {flagged_noise:.0%} of noise pictures")
 
 # %% [markdown]
 # In PyTorch, `reduction="none"` keeps one squared error per pixel; summing each row gives the scores.
 
 # %%
 with torch.no_grad():
-    torch_scores = nn.MSELoss(reduction="none")(autoencoder(X_test_t), X_test_t).sum(dim=1)
+    squared_errors = nn.MSELoss(reduction="none")(autoencoder(X_test_t), X_test_t)
+    torch_scores = squared_errors.sum(dim=1)
 print("same result:", np.allclose(score(X_test), torch_scores.numpy()))
 
 # %% [markdown]
@@ -243,22 +278,30 @@ print("same result:", np.allclose(score(X_test), torch_scores.numpy()))
 # The randomness sits in $\boldsymbol\epsilon$, so autograd can still send gradients to $\boldsymbol\mu$ and $\boldsymbol\sigma$.
 
 # %%
-mu, sigma = np.array([1.0, -0.5]), np.array([0.5, 2.0])
-z = mu + sigma * rng.normal(size=(100_000, 2))
+mu = np.array([1.0, -0.5])
+sigma = np.array([0.5, 2.0])
+epsilon = rng.normal(size=(100_000, 2))  # epsilon ~ N(0, I)
+z = mu + sigma * epsilon
 
-mu_t, sigma_t = torch.tensor(mu, requires_grad=True), torch.tensor(sigma, requires_grad=True)
-z_t = mu_t + sigma_t * torch.randn(100_000, 2)
+mu_t = torch.tensor(mu, requires_grad=True)
+sigma_t = torch.tensor(sigma, requires_grad=True)
+epsilon_t = torch.randn(100_000, 2)
+z_t = mu_t + sigma_t * epsilon_t
 z_t.sum().backward()
 print("gradients reach mu and sigma:", mu_t.grad is not None and sigma_t.grad is not None)
-print("both samples match mu and sigma (tolerance 0.02):",
-      all(np.allclose(s.mean(axis=0), mu, atol=0.02) and np.allclose(s.std(axis=0), sigma, atol=0.02)
-          for s in [z, z_t.detach().numpy()]))
+both_match = True
+for sample in [z, z_t.detach().numpy()]:
+    mean_ok = np.allclose(sample.mean(axis=0), mu, atol=0.02)
+    std_ok = np.allclose(sample.std(axis=0), sigma, atol=0.02)
+    both_match = both_match and mean_ok and std_ok
+print("both samples match mu and sigma (tolerance 0.02):", both_match)
 
 # %% [markdown]
 # The penalty is $\text{KL} = \sum_j \tfrac12(\mu_j^2 + \sigma_j^2 - 1 - \ln\sigma_j^2)$. PyTorch has it built in for two normal distributions.
 
 # %%
-kl_by_hand = np.sum(0.5 * (mu ** 2 + sigma ** 2 - 1 - np.log(sigma ** 2)))
+kl_terms = 0.5 * (mu ** 2 + sigma ** 2 - 1 - np.log(sigma ** 2))  # one term per j
+kl_by_hand = np.sum(kl_terms)
 kl_torch = kl_divergence(Normal(mu_t, sigma_t), Normal(0.0, 1.0)).sum()
 print(f"KL = {kl_by_hand:.3f} | same result:", np.isclose(kl_by_hand, kl_torch.item()))
 

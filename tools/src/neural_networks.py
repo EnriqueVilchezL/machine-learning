@@ -36,9 +36,12 @@ torch.set_default_dtype(torch.float64)
 rng = np.random.default_rng(RANDOM_STATE)
 
 X, y = make_moons(n_samples=300, noise=0.25, random_state=RANDOM_STATE)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,
+                                                    random_state=RANDOM_STATE, stratify=y)
 Y_train = y_train[:, None].astype(float)  # one column, like the network's output
-X_train_t, X_test_t, Y_train_t = torch.tensor(X_train), torch.tensor(X_test), torch.tensor(Y_train)
+X_train_t = torch.tensor(X_train)
+X_test_t = torch.tensor(X_test)
+Y_train_t = torch.tensor(Y_train)
 
 # %% [markdown]
 # ## 1. The artificial neuron
@@ -50,15 +53,18 @@ X_train_t, X_test_t, Y_train_t = torch.tensor(X_train), torch.tensor(X_test), to
 # %%
 x_example = np.array([1.0, 2.0, -1.0])
 w_example = np.array([0.8, 0.2, -0.5])
-z = w_example @ x_example - 0.3
-a_by_hand = 1 / (1 + np.exp(-z))
+b_example = -0.3
+z = w_example @ x_example + b_example  # z = w^T x + b
+a_by_hand = 1 / (1 + np.exp(-z))       # a = sigma(z)
 
 neuron = nn.Linear(3, 1)
 with torch.no_grad():
     neuron.weight.copy_(torch.tensor(w_example[None, :]))
-    neuron.bias.fill_(-0.3)
-a_torch = torch.sigmoid(neuron(torch.tensor(x_example)))
-print(f"z = {z:.2f}, a = {a_by_hand:.3f} | same result:", np.allclose(a_by_hand, a_torch.detach().numpy()))
+    neuron.bias.fill_(b_example)
+z_torch = neuron(torch.tensor(x_example))
+a_torch = torch.sigmoid(z_torch)
+same = np.allclose(a_by_hand, a_torch.detach().numpy())
+print(f"z = {z:.2f}, a = {a_by_hand:.3f} | same result:", same)
 
 # %% [markdown]
 # ## 2. The forward pass
@@ -74,7 +80,8 @@ class Parameter:
     """An array plus a slot for its gradient."""
 
     def __init__(self, data: np.ndarray):
-        self.data, self.grad = data, np.zeros_like(data)
+        self.data = data
+        self.grad = np.zeros_like(data)
 
 
 class Module:
@@ -100,9 +107,9 @@ class Linear(Module):
         return a @ self.weight.data.T + self.bias.data
 
     def backward(self, delta):
-        self.weight.grad += delta.T @ self.a
+        self.weight.grad += delta.T @ self.a  # delta^(l) (a^(l-1))^T
         self.bias.grad += delta.sum(axis=0)
-        return delta @ self.weight.data
+        return delta @ self.weight.data       # (W^(l))^T delta^(l), sent to the layer below
 
     def parameters(self):
         return [self.weight, self.bias]
@@ -116,7 +123,7 @@ class ReLU(Module):
         return z * self.positive
 
     def backward(self, delta):
-        return delta * self.positive
+        return delta * self.positive  # times g'(z): 1 where z > 0, else 0
 
 
 class Sequential(Module):
@@ -180,13 +187,17 @@ digits_model = Sequential(Linear(64, 32), ReLU(), Linear(32, 10))
 digits_net = nn.Sequential(nn.Linear(64, 32), nn.ReLU(), nn.Linear(32, 10))
 copy_weights(digits_model, digits_net)
 
-scores = digits_model(Xd_test)
-probs_by_hand = np.exp(scores) / np.exp(scores).sum(axis=1, keepdims=True)
-cost_by_hand = -np.mean(np.log(probs_by_hand[np.arange(len(yd_test)), yd_test]))
+scores = digits_model(Xd_test)                            # z, one row of K scores per example
+exp_scores = np.exp(scores)                               # e^{z_k}
+probs_by_hand = exp_scores / exp_scores.sum(axis=1, keepdims=True)  # e^{z_k} / sum_j e^{z_j}
+prob_true_class = probs_by_hand[np.arange(len(yd_test)), yd_test]   # y_hat_{i, y_i}
+cost_by_hand = -np.mean(np.log(prob_true_class))
 
 scores_t = digits_net(Xd_test_t)
-print("same probabilities:", np.allclose(probs_by_hand, torch.softmax(scores_t, dim=1).detach().numpy()))
-print("same cost:", np.isclose(cost_by_hand, nn.CrossEntropyLoss()(scores_t, yd_test_t).item()))
+probs_torch = torch.softmax(scores_t, dim=1)
+cost_torch = nn.CrossEntropyLoss()(scores_t, yd_test_t)
+print("same probabilities:", np.allclose(probs_by_hand, probs_torch.detach().numpy()))
+print("same cost:", np.isclose(cost_by_hand, cost_torch.item()))
 
 # %% [markdown]
 # ## 4. Cost and backpropagation
@@ -202,23 +213,29 @@ class BCEWithLogitsLoss:
     """Mean cross-entropy of sigmoid(z); backward gives delta^(L)."""
 
     def __call__(self, z, y):
-        self.p, self.y = sigmoid(z), y
-        return -np.mean(y * np.log(self.p) + (1 - y) * np.log(1 - self.p))
+        self.y = y
+        self.p = sigmoid(z)  # y_hat
+        losses = y * np.log(self.p) + (1 - y) * np.log(1 - self.p)
+        return -np.mean(losses)
 
     def backward(self):
-        return (self.p - self.y) / len(self.y)
+        return (self.p - self.y) / len(self.y)  # (y_hat - y), averaged over the n examples
 
 
 loss_fn = BCEWithLogitsLoss()
-cost_by_hand = loss_fn(model(X_train), Y_train)
-model.backward(loss_fn.backward())
+z = model(X_train)
+cost_by_hand = loss_fn(z, Y_train)
+delta_L = loss_fn.backward()  # delta^(L)
+model.backward(delta_L)
 
 torch_loss_fn = nn.BCEWithLogitsLoss()
-loss = torch_loss_fn(net(X_train_t), Y_train_t)
+prediction = net(X_train_t)
+loss = torch_loss_fn(prediction, Y_train_t)
 loss.backward()
+same_gradients = all(np.allclose(mine.grad, theirs.grad.numpy())
+                     for mine, theirs in zip(model.parameters(), net.parameters()))
 print("same cost:", np.isclose(cost_by_hand, loss.item()))
-print("same gradients:", all(np.allclose(mine.grad, theirs.grad.numpy())
-                             for mine, theirs in zip(model.parameters(), net.parameters())))
+print("same gradients:", same_gradients)
 
 # %% [markdown]
 # ## 5. Gradient descent
@@ -232,7 +249,8 @@ class SGD:
     """theta <- theta - lr * gradient, for every parameter."""
 
     def __init__(self, params: list, lr: float):
-        self.params, self.lr = params, lr
+        self.params = params
+        self.lr = lr
 
     def zero_grad(self):
         for p in self.params:
@@ -247,19 +265,23 @@ optimizer = SGD(model.parameters(), lr=LEARNING_RATE)
 costs = []
 for _ in range(STEPS):
     optimizer.zero_grad()
-    costs.append(loss_fn(model(X_train), Y_train))
+    z = model(X_train)
+    cost = loss_fn(z, Y_train)
     model.backward(loss_fn.backward())
     optimizer.step()
+    costs.append(cost)
 
 torch_optimizer = torch.optim.SGD(net.parameters(), lr=LEARNING_RATE)
 for _ in range(STEPS):
     torch_optimizer.zero_grad()
-    loss = torch_loss_fn(net(X_train_t), Y_train_t)
+    prediction = net(X_train_t)
+    loss = torch_loss_fn(prediction, Y_train_t)
     loss.backward()
     torch_optimizer.step()
 
-print("same weights:", all(np.allclose(mine.data, theirs.detach().numpy())
-                           for mine, theirs in zip(model.parameters(), net.parameters())))
+same_weights = all(np.allclose(mine.data, theirs.detach().numpy())
+                   for mine, theirs in zip(model.parameters(), net.parameters()))
+print("same weights:", same_weights)
 
 # %%
 plt.plot(costs)
@@ -282,13 +304,15 @@ optimizer = torch.optim.Adam(digits_net.parameters(), lr=0.01)
 cross_entropy = nn.CrossEntropyLoss()
 for _ in range(DIGIT_STEPS):
     optimizer.zero_grad()
-    loss = cross_entropy(digits_net(Xd_train_t), yd_train_t)
+    prediction = digits_net(Xd_train_t)
+    loss = cross_entropy(prediction, yd_train_t)
     loss.backward()
     optimizer.step()
 
 with torch.no_grad():
     predicted_digits = digits_net(Xd_test_t).argmax(dim=1)
-print(f"training cost {loss.item():.3f}, test accuracy {(predicted_digits == yd_test_t).double().mean().item():.3f}")
+accuracy = (predicted_digits == yd_test_t).double().mean().item()
+print(f"training cost {loss.item():.3f}, test accuracy {accuracy:.3f}")
 
 # %% [markdown]
 # ## Exercises

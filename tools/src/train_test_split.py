@@ -38,10 +38,13 @@ print(f"{n} tumors, {X.shape[1]} features, malignant share {np.mean(y == 0):.2f}
 # Only examples it never saw tell us how good it is.
 
 # %%
-X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=TEST_SHARE, random_state=RANDOM_STATE)
+X_train, X_test, y_train, y_test = model_selection.train_test_split(
+    X, y, test_size=TEST_SHARE, random_state=RANDOM_STATE)
 memorizer = KNeighborsClassifier(n_neighbors=1).fit(X_train, y_train)
-print(f"training accuracy {memorizer.score(X_train, y_train):.3f}")
-print(f"test accuracy     {memorizer.score(X_test, y_test):.3f}")
+train_accuracy = memorizer.score(X_train, y_train)
+test_accuracy = memorizer.score(X_test, y_test)
+print(f"training accuracy {train_accuracy:.3f}")
+print(f"test accuracy     {test_accuracy:.3f}")
 
 # %% [markdown]
 # ## 2. A shuffled split
@@ -54,22 +57,38 @@ def train_test_split(*arrays, test_size=0.25, random_state=None, stratify=None):
     """Shuffle the rows and hold out a share of them as the test set."""
     rng = np.random.default_rng(random_state)
     n = len(arrays[0])
-    n_test = int(np.ceil(test_size * n))
+    n_test = int(np.ceil(test_size * n))  # n_test = p n
     if stratify is None:
-        test_rows = rng.permutation(n)[:n_test]
+        shuffled = rng.permutation(n)
+        test_rows = shuffled[:n_test]
     else:
-        test_rows = np.concatenate([rng.permutation(np.flatnonzero(stratify == c))[:round(n_test * np.mean(stratify == c))]
-                                    for c in np.unique(stratify)])
+        test_parts = []
+        for c in np.unique(stratify):
+            rows_c = np.flatnonzero(stratify == c)  # rows of class c
+            share_c = np.mean(stratify == c)  # π_c
+            n_test_c = round(n_test * share_c)  # n_test,c ≈ π_c n_test
+            shuffled_c = rng.permutation(rows_c)
+            test_parts.append(shuffled_c[:n_test_c])
+        test_rows = np.concatenate(test_parts)
     train_rows = np.setdiff1d(np.arange(n), test_rows)
-    return [part for array in arrays for part in (array[train_rows], array[test_rows])]
+
+    parts = []
+    for array in arrays:
+        parts.append(array[train_rows])
+        parts.append(array[test_rows])
+    return parts
 
 
 train_rows, test_rows = train_test_split(np.arange(n), test_size=TEST_SHARE, random_state=RANDOM_STATE)
-print("train/test sizes:", len(train_rows), len(test_rows), "| overlap:", len(np.intersect1d(train_rows, test_rows)))
+overlap = np.intersect1d(train_rows, test_rows)
+print("train/test sizes:", len(train_rows), len(test_rows), "| overlap:", len(overlap))
 
 # %%
-train_rows_library, test_rows_library = model_selection.train_test_split(np.arange(n), test_size=TEST_SHARE, random_state=RANDOM_STATE)
-print("same sizes:", (len(train_rows), len(test_rows)) == (len(train_rows_library), len(test_rows_library)))
+train_rows_library, test_rows_library = model_selection.train_test_split(
+    np.arange(n), test_size=TEST_SHARE, random_state=RANDOM_STATE)
+sizes_by_hand = (len(train_rows), len(test_rows))
+sizes_library = (len(train_rows_library), len(test_rows_library))
+print("same sizes:", sizes_by_hand == sizes_library)
 
 # %% [markdown]
 # The two functions use different random generators, so they pick different rows; the sizes and the idea are the same.
@@ -79,12 +98,18 @@ print("same sizes:", (len(train_rows), len(test_rows)) == (len(train_rows_librar
 # Split each class separately so the test set keeps the class shares $\pi_c = n_c / n$.
 
 # %%
-_, _, _, y_test_by_hand = train_test_split(X, y, test_size=TEST_SHARE, stratify=y, random_state=RANDOM_STATE)
-print(f"malignant share: all {np.mean(y == 0):.3f}, stratified test by hand {np.mean(y_test_by_hand == 0):.3f}")
+_, _, _, y_test_by_hand = train_test_split(
+    X, y, test_size=TEST_SHARE, stratify=y, random_state=RANDOM_STATE)
+share_all = np.mean(y == 0)
+share_test = np.mean(y_test_by_hand == 0)
+print(f"malignant share: all {share_all:.3f}, stratified test by hand {share_test:.3f}")
 
 # %%
-_, _, _, y_test_library = model_selection.train_test_split(X, y, test_size=TEST_SHARE, stratify=y, random_state=RANDOM_STATE)
-print("same class counts in the test set:", np.array_equal(np.bincount(y_test_by_hand), np.bincount(y_test_library)))
+_, _, _, y_test_library = model_selection.train_test_split(
+    X, y, test_size=TEST_SHARE, stratify=y, random_state=RANDOM_STATE)
+counts_by_hand = np.bincount(y_test_by_hand)
+counts_library = np.bincount(y_test_library)
+print("same class counts in the test set:", np.array_equal(counts_by_hand, counts_library))
 
 # %% [markdown]
 # ## 4. A test score is noisy
@@ -100,8 +125,10 @@ for seed in range(REPEATS):
     scores.append(model.score(X_test, y_test))
 
 mean_accuracy = np.mean(scores)
-standard_error = np.sqrt(mean_accuracy * (1 - mean_accuracy) / len(y_test))
-print(f"spread of {REPEATS} test scores: {np.std(scores):.3f} | formula SE: {standard_error:.3f}")
+n_test = len(y_test)
+standard_error = np.sqrt(mean_accuracy * (1 - mean_accuracy) / n_test)  # SE = sqrt(a(1-a)/n_test)
+spread = np.std(scores)
+print(f"spread of {REPEATS} test scores: {spread:.3f} | formula SE: {standard_error:.3f}")
 
 plt.hist(scores, bins=15)
 plt.axvline(mean_accuracy, color="tab:orange", label="mean")

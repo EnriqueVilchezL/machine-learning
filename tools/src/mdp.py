@@ -29,20 +29,27 @@ ARROWS = "↑→↓←"
 class GridWorld:
     """The 4 × 3 grid world: wall at (2, 2), goal +1 at (4, 3), pit −1 at (4, 2), start at (1, 1)."""
 
-    cells = [(x, y) for y in range(3) for x in range(4) if (x, y) != (1, 1)]  # (column, row), 0-based
+    # (column, row), 0-based, without the wall
+    cells = [(x, y) for y in range(3) for x in range(4) if (x, y) != (1, 1)]
     moves = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # up, right, down, left
 
     def __init__(self, slip=0.2, step_reward=-0.04, random_state=None):
-        self.slip, self.step_reward = slip, step_reward
+        self.slip = slip
+        self.step_reward = step_reward
         self.rng = np.random.default_rng(random_state)
-        self.n_states, self.n_actions = len(self.cells), len(self.moves)
-        self.start, self.goal, self.pit = (self.cells.index(c) for c in [(0, 0), (3, 2), (3, 1)])
+        self.n_states = len(self.cells)
+        self.n_actions = len(self.moves)
+        self.start = self.cells.index((0, 0))
+        self.goal = self.cells.index((3, 2))
+        self.pit = self.cells.index((3, 1))
         self.terminal = [self.goal, self.pit]
         self.P, self.R = self._model()
 
     def _move(self, s, direction):
         """Next cell when moving in a direction; hitting a wall means staying."""
-        cell = (self.cells[s][0] + self.moves[direction][0], self.cells[s][1] + self.moves[direction][1])
+        column, row = self.cells[s]
+        d_column, d_row = self.moves[direction]
+        cell = (column + d_column, row + d_row)
         return self.cells.index(cell) if cell in self.cells else s
 
     def _model(self):
@@ -53,10 +60,16 @@ class GridWorld:
                 if s in self.terminal:
                     P[s, a, s] = 1
                     continue
-                for direction, chance in [(a, 1 - self.slip), ((a + 1) % 4, self.slip / 2), ((a + 3) % 4, self.slip / 2)]:
+                outcomes = [
+                    (a, 1 - self.slip),            # the intended direction
+                    ((a + 1) % 4, self.slip / 2),  # slip 90° clockwise
+                    ((a + 3) % 4, self.slip / 2),  # slip 90° counter-clockwise
+                ]
+                for direction, chance in outcomes:
                     P[s, a, self._move(s, direction)] += chance
         R = np.full(P.shape, self.step_reward)
-        R[:, :, self.goal], R[:, :, self.pit] = 1, -1
+        R[:, :, self.goal] = 1
+        R[:, :, self.pit] = -1
         R[self.terminal] = 0
         return P, R
 
@@ -89,9 +102,12 @@ samples = []
 for _ in range(10_000):
     env.reset()
     samples.append(env.step(UP)[0])
-frequencies = np.bincount(samples, minlength=env.n_states) / len(samples)
+counts = np.bincount(samples, minlength=env.n_states)
+frequencies = counts / len(samples)
 for s in np.flatnonzero(env.P[env.start, UP]):
-    print(f"start, up -> cell {env.cells[s][0] + 1, env.cells[s][1] + 1}: chance {env.P[env.start, UP, s]:.1f}")
+    column, row = env.cells[s]
+    chance = env.P[env.start, UP, s]
+    print(f"start, up -> cell {column + 1, row + 1}: chance {chance:.1f}")
 print("same result:", np.allclose(frequencies, env.P[env.start, UP], atol=0.02))
 
 # %% [markdown]
@@ -102,7 +118,8 @@ print("same result:", np.allclose(frequencies, env.P[env.start, UP], atol=0.02))
 
 # %%
 rewards = np.array([2, 2, -3])
-return_by_sum = np.sum(GAMMA ** np.arange(len(rewards)) * rewards)
+discounts = GAMMA ** np.arange(len(rewards))  # γ^k
+return_by_sum = np.sum(discounts * rewards)
 
 return_by_recursion = 0
 for r in rewards[::-1]:
@@ -122,14 +139,18 @@ class PolicyEvaluation:
     """Sweep the Bellman equation of a fixed policy until the values stop changing."""
 
     def __init__(self, gamma=0.9, tol=1e-10):
-        self.gamma, self.tol = gamma, tol
+        self.gamma = gamma
+        self.tol = tol
 
     def fit(self, env, policy):
         rows = np.arange(env.n_states)
-        P_pi, R_pi = env.P[rows, policy], env.R[rows, policy]
+        P_pi = env.P[rows, policy]  # P(s' | s, π(s)), one row per state s
+        R_pi = env.R[rows, policy]  # R(s, π(s), s')
         V = np.zeros(env.n_states)
         while True:
-            V_new = (P_pi * (R_pi + self.gamma * V)).sum(axis=1)
+            # V(s) = Σ_s' P(s' | s, π(s)) [R(s, π(s), s') + γ V(s')], for every s at once
+            backup = R_pi + self.gamma * V  # R(s, π(s), s') + γ V(s')
+            V_new = (P_pi * backup).sum(axis=1)  # weight by P(s' | s, π(s)), sum over s'
             if np.max(np.abs(V_new - V)) < self.tol:
                 break
             V = V_new
@@ -143,10 +164,15 @@ policy = np.array([0, 3, 0, 3,  # bottom row: up, left, up, left
                    1, 1, 1, 0])  # top row: right, right, right, (goal)
 evaluation = PolicyEvaluation(gamma=GAMMA).fit(env, policy)
 
+# The Bellman equation in matrix form: (I − γ P_π) V = r_π, with r_π(s) = Σ_s' P R
 rows = np.arange(env.n_states)
-P_pi, R_pi = env.P[rows, policy], env.R[rows, policy]
-V_solve = np.linalg.solve(np.eye(env.n_states) - GAMMA * P_pi, (P_pi * R_pi).sum(axis=1))
-print(f"V(start) = {evaluation.values_[env.start]:.3f} | same result:", np.allclose(evaluation.values_, V_solve))
+P_pi = env.P[rows, policy]
+R_pi = env.R[rows, policy]
+r_pi = (P_pi * R_pi).sum(axis=1)
+I = np.eye(env.n_states)
+V_solve = np.linalg.solve(I - GAMMA * P_pi, r_pi)
+V_start = evaluation.values_[env.start]
+print(f"V(start) = {V_start:.3f} | same result:", np.allclose(evaluation.values_, V_solve))
 
 # %% [markdown]
 # ## 4. Value iteration and policy iteration
@@ -160,17 +186,24 @@ class ValueIteration:
     """Repeat the Bellman optimality update, then act greedily on Q*."""
 
     def __init__(self, gamma=0.9, tol=1e-10):
-        self.gamma, self.tol = gamma, tol
+        self.gamma = gamma
+        self.tol = tol
 
     def fit(self, env):
-        V, self.n_iter_ = np.zeros(env.n_states), 0
+        V = np.zeros(env.n_states)
+        self.n_iter_ = 0
         while True:
-            Q = (env.P * (env.R + self.gamma * V)).sum(axis=2)
+            # Q(s, a) = Σ_s' P(s' | s, a) [R(s, a, s') + γ V_k(s')], for every s and a at once
+            backup = env.R + self.gamma * V  # R(s, a, s') + γ V_k(s')
+            Q = (env.P * backup).sum(axis=2)  # weight by P(s' | s, a), sum over s'
+            V_new = Q.max(axis=1)  # V_{k+1}(s) = max_a Q(s, a)
             self.n_iter_ += 1
-            if np.max(np.abs(Q.max(axis=1) - V)) < self.tol:
+            if np.max(np.abs(V_new - V)) < self.tol:
                 break
-            V = Q.max(axis=1)
-        self.values_, self.q_values_, self.policy_ = Q.max(axis=1), Q, Q.argmax(axis=1)
+            V = V_new
+        self.values_ = V_new
+        self.q_values_ = Q
+        self.policy_ = Q.argmax(axis=1)  # π*(s) = argmax_a Q*(s, a)
         return self
 
     def predict(self, state):
@@ -181,18 +214,23 @@ class PolicyIteration:
     """Evaluate the policy, make it greedy for those values, and repeat until it stops changing."""
 
     def __init__(self, gamma=0.9, tol=1e-10):
-        self.gamma, self.tol = gamma, tol
+        self.gamma = gamma
+        self.tol = tol
 
     def fit(self, env):
-        policy, self.n_iter_ = np.full(env.n_states, 3), 0  # start from "always go left"
+        policy = np.full(env.n_states, 3)  # start from "always go left"
+        self.n_iter_ = 0
         while True:
-            V = PolicyEvaluation(self.gamma, self.tol).fit(env, policy).values_
-            improved = (env.P * (env.R + self.gamma * V)).sum(axis=2).argmax(axis=1)
+            V = PolicyEvaluation(self.gamma, self.tol).fit(env, policy).values_  # evaluate
+            backup = env.R + self.gamma * V  # R(s, a, s') + γ V(s')
+            Q = (env.P * backup).sum(axis=2)  # Q(s, a) = Σ_s' P(s' | s, a) [...]
+            improved = Q.argmax(axis=1)  # act greedily: argmax_a Q(s, a)
             self.n_iter_ += 1
             if np.array_equal(improved, policy):
                 break
             policy = improved
-        self.values_, self.policy_ = V, policy
+        self.values_ = V
+        self.policy_ = policy
         return self
 
     def predict(self, state):
@@ -204,16 +242,24 @@ value_iteration = ValueIteration(gamma=GAMMA).fit(env)
 policy_iteration = PolicyIteration(gamma=GAMMA).fit(env)
 
 non_terminal = [s for s in range(env.n_states) if s not in env.terminal]
-print(f"value iteration: {value_iteration.n_iter_} sweeps | policy iteration: {policy_iteration.n_iter_} rounds")
+print(f"value iteration: {value_iteration.n_iter_} sweeps | "
+      f"policy iteration: {policy_iteration.n_iter_} rounds")
 print("same values:", np.allclose(value_iteration.values_, policy_iteration.values_, atol=1e-8))
-print("same policy:", np.array_equal(value_iteration.predict(non_terminal), policy_iteration.predict(non_terminal)))
+policy_by_values = value_iteration.predict(non_terminal)
+policy_by_policies = policy_iteration.predict(non_terminal)
+print("same policy:", np.array_equal(policy_by_values, policy_by_policies))
 
 # %%
 grid = np.full((3, 4), np.nan)
 for s, (x, y) in enumerate(env.cells):
     grid[y, x] = value_iteration.values_[s]
-    label = {env.goal: "goal +1", env.pit: "pit −1"}.get(
-        s, f"{ARROWS[value_iteration.predict(s)]}\n{value_iteration.values_[s]:.2f}")
+    if s == env.goal:
+        label = "goal +1"
+    elif s == env.pit:
+        label = "pit −1"
+    else:
+        arrow = ARROWS[value_iteration.predict(s)]
+        label = f"{arrow}\n{value_iteration.values_[s]:.2f}"
     plt.text(x, y, label, ha="center", va="center")
 plt.imshow(grid, origin="lower", cmap="coolwarm_r", vmin=-1, vmax=1)
 plt.xticks(range(4), range(1, 5))

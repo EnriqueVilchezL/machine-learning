@@ -37,7 +37,7 @@ X, y = iris.data, iris.target
 # %%
 def gini(labels: np.ndarray) -> float:
     """Gini impurity of a set of labels."""
-    shares = np.bincount(labels) / len(labels)
+    shares = np.bincount(labels) / len(labels)      # p_k
     return 1 - np.sum(shares**2)
 
 
@@ -66,22 +66,31 @@ def best_split(X: np.ndarray, y: np.ndarray) -> tuple:
     best = (np.inf, None, None)
     for feature in range(X.shape[1]):
         values = np.unique(X[:, feature])
-        for threshold in (values[:-1] + values[1:]) / 2:
+        midpoints = (values[:-1] + values[1:]) / 2
+        for threshold in midpoints:
             left = X[:, feature] <= threshold
-            score = left.mean() * gini(y[left]) + (~left).mean() * gini(y[~left])
+            right = ~left
+            share_left = left.mean()                    # n_L / n
+            share_right = right.mean()                  # n_R / n
+            score = share_left * gini(y[left]) + share_right * gini(y[right])
             if score < best[0]:
                 best = (score, feature, threshold)
     return best
 
 
 best_score, best_feature, best_threshold = best_split(X, y)
-print(f"by hand: {iris.feature_names[best_feature]} <= {best_threshold:.2f}, weighted Gini {best_score:.3f}")
+best_name = iris.feature_names[best_feature]
+print(f"by hand: {best_name} <= {best_threshold:.2f}, weighted Gini {best_score:.3f}")
 
 # %%
 left, right = stump.tree_.children_left[0], stump.tree_.children_right[0]
-node_sizes, node_gini = stump.tree_.n_node_samples, stump.tree_.impurity
-library_score = (node_sizes[left] * node_gini[left] + node_sizes[right] * node_gini[right]) / node_sizes[0]
-print(f"scikit-learn: {iris.feature_names[stump.tree_.feature[0]]} <= {stump.tree_.threshold[0]:.2f}")
+node_sizes = stump.tree_.n_node_samples
+node_gini = stump.tree_.impurity
+weighted_left = node_sizes[left] / node_sizes[0] * node_gini[left]
+weighted_right = node_sizes[right] / node_sizes[0] * node_gini[right]
+library_score = weighted_left + weighted_right
+library_feature = iris.feature_names[stump.tree_.feature[0]]
+print(f"scikit-learn: {library_feature} <= {stump.tree_.threshold[0]:.2f}")
 print("same weighted Gini:", np.isclose(best_score, library_score))
 
 # %% [markdown]
@@ -112,7 +121,10 @@ class DecisionTreeClassifier:
             return np.bincount(y).argmax()
         _, feature, threshold = best_split(X, y)
         left = X[:, feature] <= threshold
-        return (feature, threshold, self._grow(X[left], y[left], depth + 1), self._grow(X[~left], y[~left], depth + 1))
+        right = ~left
+        left_branch = self._grow(X[left], y[left], depth + 1)
+        right_branch = self._grow(X[right], y[right], depth + 1)
+        return (feature, threshold, left_branch, right_branch)
 
     def _predict_one(self, x):
         node = self.tree_
@@ -128,13 +140,17 @@ class DecisionTreeClassifier:
         return np.mean(self.predict(X) == y)
 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y
+)
 by_hand = DecisionTreeClassifier(max_depth=MAX_DEPTH).fit(X_train, y_train)
 
 # %%
 model = tree.DecisionTreeClassifier(max_depth=MAX_DEPTH, random_state=RANDOM_STATE).fit(X_train, y_train)
 print("same predictions:", np.array_equal(by_hand.predict(X_test), model.predict(X_test)))
-print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
+accuracy_by_hand = by_hand.score(X_test, y_test)
+accuracy_library = model.score(X_test, y_test)
+print(f"test accuracy: by hand {accuracy_by_hand:.3f}, scikit-learn {accuracy_library:.3f}")
 
 plt.figure(figsize=(12, 6))
 tree.plot_tree(model, feature_names=iris.feature_names, class_names=iris.target_names, filled=True)

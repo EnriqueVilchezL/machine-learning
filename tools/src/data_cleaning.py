@@ -54,7 +54,10 @@ class SimpleImputer:
 
     def fit(self, X):
         X = np.asarray(X, dtype=float)
-        self.statistics_ = np.nanmedian(X, axis=0) if self.strategy == "median" else np.nanmean(X, axis=0)
+        if self.strategy == "median":
+            self.statistics_ = np.nanmedian(X, axis=0)  # median of the known values
+        else:
+            self.statistics_ = np.nanmean(X, axis=0)
         return self
 
     def transform(self, X):
@@ -70,7 +73,8 @@ ages_by_hand = imputer.fit_transform(titanic[["age"]]).ravel()
 print("median age:", imputer.statistics_[0])
 
 # %%
-ages_library = impute.SimpleImputer(strategy="median").fit_transform(titanic[["age"]]).ravel()
+imputer_library = impute.SimpleImputer(strategy="median")
+ages_library = imputer_library.fit_transform(titanic[["age"]]).ravel()
 print("same result:", np.allclose(ages_by_hand, ages_library))
 
 # %% [markdown]
@@ -84,12 +88,19 @@ print("same result:", np.allclose(ages_by_hand, ages_library))
 # %%
 fares = titanic["fare"].to_numpy()
 
-z_by_hand = (fares - fares.mean()) / fares.std()
-q1, q3 = np.percentile(fares, [25, 75])
-low_fence, high_fence = q1 - IQR_FACTOR * (q3 - q1), q3 + IQR_FACTOR * (q3 - q1)
+mean = fares.mean()  # x̄
+std = fares.std()  # s
+z_by_hand = (fares - mean) / std  # z = (x - x̄) / s
+z_outliers = np.abs(z_by_hand) > Z_LIMIT
 
-print("z-score outliers:", np.sum(np.abs(z_by_hand) > Z_LIMIT))
-print("IQR outliers:", np.sum((fares < low_fence) | (fares > high_fence)))
+q1, q3 = np.percentile(fares, [25, 75])
+iqr = q3 - q1
+low_fence = q1 - IQR_FACTOR * iqr
+high_fence = q3 + IQR_FACTOR * iqr
+iqr_outliers = (fares < low_fence) | (fares > high_fence)
+
+print("z-score outliers:", np.sum(z_outliers))
+print("IQR outliers:", np.sum(iqr_outliers))
 
 # %%
 print("same z-scores:", np.allclose(z_by_hand, stats.zscore(fares)))
@@ -98,7 +109,8 @@ print("same z-scores:", np.allclose(z_by_hand, stats.zscore(fares)))
 fig, axis = plt.subplots(figsize=(9, 2.5))
 axis.boxplot(fares, orientation="horizontal", whis=IQR_FACTOR)
 axis.axvline(high_fence, color="tab:orange", linestyle="--", label="upper IQR fence")
-axis.axvline(fares.mean() + Z_LIMIT * fares.std(), color="tab:red", linestyle=":", label="z = 3")
+z_limit_fare = mean + Z_LIMIT * std  # the fare where z = 3
+axis.axvline(z_limit_fare, color="tab:red", linestyle=":", label="z = 3")
 axis.set_xlabel("fare")
 axis.set_yticks([])
 axis.legend()
@@ -119,8 +131,8 @@ test_ages_by_hand = imputer_by_hand.transform(test[["age"]]).ravel()
 # %%
 imputer_library = impute.SimpleImputer(strategy="median").fit(train[["age"]])
 test_ages_library = imputer_library.transform(test[["age"]]).ravel()
-print("learned median:", imputer_library.statistics_[0],
-      "| same result:", np.allclose(test_ages_by_hand, test_ages_library))
+same_result = np.allclose(test_ages_by_hand, test_ages_library)
+print("learned median:", imputer_library.statistics_[0], "| same result:", same_result)
 
 # %% [markdown]
 # ## Exercises

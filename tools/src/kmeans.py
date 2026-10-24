@@ -41,11 +41,14 @@ start = X[rng.choice(len(X), size=K, replace=False)]
 # %%
 def squared_distances(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Squared Euclidean distance from every row of A to every row of B."""
-    return ((A[:, None, :] - B[None, :, :]) ** 2).sum(axis=2)
+    differences = A[:, None, :] - B[None, :, :]  # x_ij - mu_kj, for every pair (i, k)
+    return (differences ** 2).sum(axis=2)  # sum over the features j
 
 
-print("distance table:", squared_distances(X, start).shape)
-print("same result:", np.allclose(squared_distances(X, start), euclidean_distances(X, start, squared=True)))
+D = squared_distances(X, start)
+D_sklearn = euclidean_distances(X, start, squared=True)
+print("distance table:", D.shape)
+print("same result:", np.allclose(D, D_sklearn))
 
 # %% [markdown]
 # ## 2. Assign, update, repeat
@@ -58,23 +61,32 @@ class KMeans:
     """k-means: alternate assigning examples to the nearest centroid and moving each centroid to its mean."""
 
     def __init__(self, n_clusters: int = 8, init: np.ndarray | None = None, max_iter: int = 300):
-        self.n_clusters, self.init, self.max_iter = n_clusters, init, max_iter
+        self.n_clusters = n_clusters
+        self.init = init
+        self.max_iter = max_iter
 
     def fit(self, X, y=None):
         self.cluster_centers_ = self.init.copy()
         self.labels_ = np.full(len(X), -1)
         for step in range(self.max_iter):
-            labels = self.predict(X)
+            labels = self.predict(X)  # assign: c_i = argmin_k ||x_i - mu_k||^2
             if np.array_equal(labels, self.labels_):
                 break
             self.labels_ = labels
-            self.cluster_centers_ = np.array([X[labels == k].mean(axis=0) for k in range(self.n_clusters)])
+            centers = np.empty_like(self.cluster_centers_)
+            for k in range(self.n_clusters):
+                members = X[labels == k]  # the examples in C_k
+                centers[k] = members.mean(axis=0)  # update: mu_k = mean of C_k
+            self.cluster_centers_ = centers
         self.n_iter_ = step + 1
-        self.inertia_ = squared_distances(X, self.cluster_centers_).min(axis=1).sum()
+        D = squared_distances(X, self.cluster_centers_)
+        closest = D.min(axis=1)  # ||x_i - mu_{c_i}||^2 for each example
+        self.inertia_ = closest.sum()  # J
         return self
 
     def predict(self, X):
-        return squared_distances(X, self.cluster_centers_).argmin(axis=1)
+        D = squared_distances(X, self.cluster_centers_)
+        return D.argmin(axis=1)  # index of the nearest centroid
 
     def fit_predict(self, X, y=None):
         return self.fit(X).labels_
@@ -93,11 +105,13 @@ plt.show()
 # and the centroids through the centroid each example gets.
 
 # %%
-kmeans = cluster.KMeans(n_clusters=K, init=start, n_init=1, max_iter=MAX_STEPS, algorithm="lloyd").fit(X)
+kmeans = cluster.KMeans(n_clusters=K, init=start, n_init=1, max_iter=MAX_STEPS, algorithm="lloyd")
+kmeans.fit(X)
 print("same grouping:", adjusted_rand_score(by_hand.labels_, kmeans.labels_) == 1.0)
 print("same number of rounds:", by_hand.n_iter_ == kmeans.n_iter_)
-print("same centroid for every example:",
-      np.allclose(by_hand.cluster_centers_[by_hand.labels_], kmeans.cluster_centers_[kmeans.labels_]))
+centroid_by_hand = by_hand.cluster_centers_[by_hand.labels_]  # mu_{c_i} for each example
+centroid_sklearn = kmeans.cluster_centers_[kmeans.labels_]
+print("same centroid for every example:", np.allclose(centroid_by_hand, centroid_sklearn))
 
 # %% [markdown]
 # ## 3. Inertia
@@ -115,7 +129,10 @@ print(f"J = {by_hand.inertia_:.1f} | same result:", np.isclose(by_hand.inertia_,
 # Each $K$ keeps the best of 10 runs with k-means++ starts.
 
 # %%
-inertias = [cluster.KMeans(n_clusters=k, n_init=10, random_state=RANDOM_STATE).fit(X).inertia_ for k in K_CHOICES]
+inertias = []
+for k in K_CHOICES:
+    model = cluster.KMeans(n_clusters=k, n_init=10, random_state=RANDOM_STATE).fit(X)
+    inertias.append(model.inertia_)
 
 plt.plot(K_CHOICES, inertias, marker="o")
 plt.xlabel("number of clusters K")

@@ -35,7 +35,9 @@ n, d = X_raw.shape
 # The features use different units, so each one becomes $\tilde{x}_{ij} = \dfrac{x_{ij} - \bar{x}_j}{s_j}$: mean 0 and spread 1.
 
 # %%
-X = (X_raw - X_raw.mean(axis=0)) / X_raw.std(axis=0)
+means = X_raw.mean(axis=0)  # x̄_j
+spreads = X_raw.std(axis=0)  # s_j
+X = (X_raw - means) / spreads
 print("same result:", np.allclose(X, StandardScaler().fit_transform(X_raw)))
 
 # %% [markdown]
@@ -55,21 +57,24 @@ class PCA:
     def fit(self, X, y=None):
         self.mean_ = X.mean(axis=0)
         centered = X - self.mean_
-        eigenvalues, W = np.linalg.eigh(centered.T @ centered / len(X))
-        order = np.argsort(eigenvalues)[::-1][: self.n_components]
+        S = centered.T @ centered / len(X)  # covariance S = X^T X / n
+        eigenvalues, W = np.linalg.eigh(S)  # S w_k = λ_k w_k, columns of W
+        order = np.argsort(eigenvalues)[::-1]  # largest eigenvalue first
+        order = order[: self.n_components]  # keep the first q
         self.components_ = W[:, order].T
         self.explained_variance_ = eigenvalues[order]
-        self.explained_variance_ratio_ = eigenvalues[order] / eigenvalues.sum()
+        self.explained_variance_ratio_ = self.explained_variance_ / eigenvalues.sum()
         return self
 
     def transform(self, X):
-        return (X - self.mean_) @ self.components_.T
+        centered = X - self.mean_
+        return centered @ self.components_.T  # z_ik = w_k^T x̃_i
 
     def fit_transform(self, X, y=None):
         return self.fit(X).transform(X)
 
     def inverse_transform(self, Z):
-        return self.mean_ + Z @ self.components_
+        return self.mean_ + Z @ self.components_  # x̂_i = x̄ + Σ_k z_ik w_k
 
 
 by_hand = PCA().fit(X)
@@ -79,8 +84,10 @@ by_hand = PCA().fit(X)
 
 # %%
 pca = decomposition.PCA().fit(X)
-print("same variances:", np.allclose(by_hand.explained_variance_, pca.explained_variance_ * (n - 1) / n))
-print("same directions (up to sign):", np.allclose(np.abs(by_hand.components_), np.abs(pca.components_)))
+sklearn_variances = pca.explained_variance_ * (n - 1) / n  # back to dividing by n
+print("same variances:", np.allclose(by_hand.explained_variance_, sklearn_variances))
+same_directions = np.allclose(np.abs(by_hand.components_), np.abs(pca.components_))
+print("same directions (up to sign):", same_directions)
 
 # %% [markdown]
 # ## 3. Scores: the new coordinates
@@ -109,12 +116,16 @@ plt.show()
 
 # %%
 by_hand_q = PCA(n_components=Q).fit(X)
-X_hat = by_hand_q.inverse_transform(by_hand_q.transform(X))
-error = ((X - X_hat) ** 2).sum(axis=1).mean()
-print("error equals dropped variance:", np.isclose(error, by_hand.explained_variance_[Q:].sum()))
+Z_q = by_hand_q.transform(X)  # q scores per example
+X_hat = by_hand_q.inverse_transform(Z_q)
+squared_errors = ((X - X_hat) ** 2).sum(axis=1)  # ||x̃_i - x̂_i||^2
+error = squared_errors.mean()
+dropped = by_hand.explained_variance_[Q:].sum()  # Σ_{k > q} λ_k
+print("error equals dropped variance:", np.isclose(error, dropped))
 
 pca_q = decomposition.PCA(n_components=Q).fit(X)
-print("same reconstruction:", np.allclose(X_hat, pca_q.inverse_transform(pca_q.transform(X))))
+X_hat_sklearn = pca_q.inverse_transform(pca_q.transform(X))
+print("same reconstruction:", np.allclose(X_hat, X_hat_sklearn))
 
 # %% [markdown]
 # ## 5. How many components: explained variance
