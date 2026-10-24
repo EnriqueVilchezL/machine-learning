@@ -20,13 +20,15 @@
 # %%
 import numpy as np
 import seaborn as sns
+from scipy.special import softmax
+from sklearn import naive_bayes
 from sklearn.datasets import load_wine
 from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import CategoricalNB, GaussianNB
 from sklearn.preprocessing import OrdinalEncoder
 
 RANDOM_STATE = 42
 ALPHA = 1
+VAR_SMOOTHING = 1e-9
 
 # %% [markdown]
 # ## 1. Bayes' rule
@@ -44,27 +46,42 @@ print(f"P(spam | word) = {likelihood_spam * prior_spam / evidence:.2f}")
 # Naive Bayes multiplies one probability per feature: $\hat{y} = \arg\max_c P(c)\prod_j P(x_j \mid c)$.
 # Each probability is a count, with Laplace smoothing so no count is zero:
 # $P(x_j = v \mid c) = \dfrac{N_{jvc} + \alpha}{N_c + \alpha V_j}$, where $V_j$ is the number of values of feature $j$.
+# `fit` only counts; `predict_proba` adds the logs and rescales so the classes add up to 1.
 
 # %%
+class CategoricalNB:
+    """Naive Bayes for categorical features coded 0, 1, 2, ..., with Laplace smoothing."""
+
+    def __init__(self, alpha: float = 1.0):
+        self.alpha = alpha
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        self.class_log_prior_ = np.log([np.mean(y == c) for c in self.classes_])
+        self.feature_log_prob_ = []
+        for j in range(X.shape[1]):
+            counts = np.array([np.bincount(X[y == c, j], minlength=X[:, j].max() + 1) for c in self.classes_])
+            smoothed = counts + self.alpha
+            self.feature_log_prob_.append(np.log(smoothed / smoothed.sum(axis=1, keepdims=True)))
+        return self
+
+    def predict_proba(self, X):
+        scores = self.class_log_prior_ + sum(log_prob[:, X[:, j]].T for j, log_prob in enumerate(self.feature_log_prob_))
+        return softmax(scores, axis=1)
+
+    def predict(self, X):
+        return self.classes_[self.predict_proba(X).argmax(axis=1)]
+
+
 titanic = sns.load_dataset("titanic")[["sex", "pclass", "embarked", "survived"]].dropna()
 X = OrdinalEncoder().fit_transform(titanic[["sex", "pclass", "embarked"]]).astype(int)
 y = titanic["survived"].to_numpy()
 
-classes = np.unique(y)
-priors = np.array([np.mean(y == c) for c in classes])
-scores = np.tile(np.log(priors), (len(X), 1))
-for j in range(X.shape[1]):
-    value_count = X[:, j].max() + 1
-    for c in classes:
-        counts = np.bincount(X[y == c, j], minlength=value_count)
-        likelihood = (counts + ALPHA) / (np.sum(y == c) + ALPHA * value_count)
-        scores[:, c] += np.log(likelihood[X[:, j]])
-
-probabilities_by_hand = np.exp(scores) / np.exp(scores).sum(axis=1, keepdims=True)
+by_hand = CategoricalNB(alpha=ALPHA).fit(X, y)
 
 # %%
-model = CategoricalNB(alpha=ALPHA).fit(X, y)
-print("same probabilities:", np.allclose(probabilities_by_hand, model.predict_proba(X)))
+model = naive_bayes.CategoricalNB(alpha=ALPHA).fit(X, y)
+print("same probabilities:", np.allclose(by_hand.predict_proba(X), model.predict_proba(X)))
 
 # %% [markdown]
 # Adding logs instead of multiplying probabilities gives the same winner and avoids numbers that are too small for the computer.
@@ -72,30 +89,49 @@ print("same probabilities:", np.allclose(probabilities_by_hand, model.predict_pr
 # ## 3. Numeric features: the bell curve
 #
 # For a number, $P(x_j \mid c)$ is a normal curve with the class mean $\mu_{jc}$ and variance $\sigma_{jc}^2$.
+# scikit-learn adds a tiny amount to every variance, a share `VAR_SMOOTHING` of the largest feature variance, so none is zero.
 
 # %%
+class GaussianNB:
+    """Naive Bayes with one bell curve per feature and class."""
+
+    def __init__(self, var_smoothing: float = 1e-9):
+        self.var_smoothing = var_smoothing
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        self.class_prior_ = np.array([np.mean(y == c) for c in self.classes_])
+        self.theta_ = np.array([X[y == c].mean(axis=0) for c in self.classes_])
+        extra_variance = self.var_smoothing * X.var(axis=0).max()
+        self.var_ = np.array([X[y == c].var(axis=0) for c in self.classes_]) + extra_variance
+        return self
+
+    def predict_proba(self, X):
+        log_likelihood = -0.5 * np.sum(np.log(2 * np.pi * self.var_)
+                                       + (X[:, None, :] - self.theta_) ** 2 / self.var_, axis=2)
+        return softmax(np.log(self.class_prior_) + log_likelihood, axis=1)
+
+    def predict(self, X):
+        return self.classes_[self.predict_proba(X).argmax(axis=1)]
+
+    def score(self, X, y):
+        return np.mean(self.predict(X) == y)
+
+
 wine = load_wine()
 X_train, X_test, y_train, y_test = train_test_split(wine.data, wine.target, test_size=0.3,
                                                     random_state=RANDOM_STATE, stratify=wine.target)
-
-model = GaussianNB().fit(X_train, y_train)
-extra_variance = model.epsilon_            # a tiny amount scikit-learn adds to every variance
-
-log_scores = []
-for c in np.unique(y_train):
-    rows = X_train[y_train == c]
-    mean, variance = rows.mean(axis=0), rows.var(axis=0) + extra_variance
-    log_likelihood = -0.5 * np.sum(np.log(2 * np.pi * variance) + (X_test - mean) ** 2 / variance, axis=1)
-    log_scores.append(np.log(len(rows) / len(X_train)) + log_likelihood)
-predictions_by_hand = np.argmax(log_scores, axis=0)
+by_hand = GaussianNB(var_smoothing=VAR_SMOOTHING).fit(X_train, y_train)
 
 # %%
-print("same predictions:", np.array_equal(predictions_by_hand, model.predict(X_test)))
-print(f"test accuracy {model.score(X_test, y_test):.3f}")
+model = naive_bayes.GaussianNB(var_smoothing=VAR_SMOOTHING).fit(X_train, y_train)
+print("same means and variances:", np.allclose(by_hand.theta_, model.theta_) and np.allclose(by_hand.var_, model.var_))
+print("same probabilities:", np.allclose(by_hand.predict_proba(X_test), model.predict_proba(X_test)))
+print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
 
 # %% [markdown]
 # ## Exercises
 #
 # 1. Set `ALPHA = 0` in section 2. Which probabilities become 0, and why is that a problem?
-# 2. Add `alone` as a fourth Titanic feature and check the result against `CategoricalNB` again.
-# 3. Print the class means of `alcohol` in the Wine data. Which class does a wine with 14% alcohol favor?
+# 2. Add `alone` as a fourth Titanic feature and check the result against `naive_bayes.CategoricalNB` again.
+# 3. Print `by_hand.theta_` for `alcohol` (the first feature) in the Wine data. Which class does a wine with 14% alcohol favor?

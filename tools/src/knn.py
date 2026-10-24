@@ -20,10 +20,10 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import neighbors
 from sklearn.datasets import load_diabetes, load_iris
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -40,23 +40,49 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # $d(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_j (a_j - b_j)^2}$, for every test flower against every training flower.
 
 # %%
-distances_by_hand = np.sqrt(((X_test[:, None, :] - X_train[None, :, :]) ** 2).sum(axis=2))
-print("distance table:", distances_by_hand.shape)
-print("same result:", np.allclose(distances_by_hand, euclidean_distances(X_test, X_train)))
+def distances(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """Euclidean distance from every row of A to every row of B."""
+    return np.sqrt(((A[:, None, :] - B[None, :, :]) ** 2).sum(axis=2))
+
+
+print("distance table:", distances(X_test, X_train).shape)
+print("same result:", np.allclose(distances(X_test, X_train), euclidean_distances(X_test, X_train)))
 
 # %% [markdown]
 # ## 2. Vote of the k nearest
 #
 # Take the $k$ closest training flowers and predict the species that appears most often among them.
+# `fit` only stores the training data; all the work happens in `predict`.
 
 # %%
-nearest = np.argsort(distances_by_hand, axis=1)[:, :K]
-predictions_by_hand = np.array([np.bincount(y_train[rows]).argmax() for rows in nearest])
+class KNeighborsClassifier:
+    """k-NN classifier: majority vote of the k nearest training examples."""
+
+    def __init__(self, n_neighbors: int = 5):
+        self.n_neighbors = n_neighbors
+
+    def fit(self, X, y):
+        self.X_train_, self.y_train_, self.classes_ = X, y, np.unique(y)
+        return self
+
+    def predict_proba(self, X):
+        nearest = np.argsort(distances(X, self.X_train_), axis=1)[:, : self.n_neighbors]
+        return (self.y_train_[nearest][:, :, None] == self.classes_).mean(axis=1)
+
+    def predict(self, X):
+        return self.classes_[self.predict_proba(X).argmax(axis=1)]
+
+    def score(self, X, y):
+        return np.mean(self.predict(X) == y)
+
+
+by_hand = KNeighborsClassifier(n_neighbors=K).fit(X_train, y_train)
 
 # %%
-classifier = KNeighborsClassifier(n_neighbors=K).fit(X_train, y_train)
-print("same predictions:", np.array_equal(predictions_by_hand, classifier.predict(X_test)))
-print(f"test accuracy {classifier.score(X_test, y_test):.3f}")
+classifier = neighbors.KNeighborsClassifier(n_neighbors=K).fit(X_train, y_train)
+print("same predictions:", np.array_equal(by_hand.predict(X_test), classifier.predict(X_test)))
+print("same probabilities:", np.allclose(by_hand.predict_proba(X_test), classifier.predict_proba(X_test)))
+print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {classifier.score(X_test, y_test):.3f}")
 
 # %% [markdown]
 # ## 3. Average of the k nearest
@@ -64,15 +90,32 @@ print(f"test accuracy {classifier.score(X_test, y_test):.3f}")
 # For a number, the prediction is the mean of the neighbors' values: $\hat{y} = \frac{1}{k}\sum_{i \in N_k(\mathbf{x})} y_i$.
 
 # %%
+class KNeighborsRegressor:
+    """k-NN regressor: mean target of the k nearest training examples."""
+
+    def __init__(self, n_neighbors: int = 5):
+        self.n_neighbors = n_neighbors
+
+    def fit(self, X, y):
+        self.X_train_, self.y_train_ = X, y
+        return self
+
+    def predict(self, X):
+        nearest = np.argsort(distances(X, self.X_train_), axis=1)[:, : self.n_neighbors]
+        return self.y_train_[nearest].mean(axis=1)
+
+    def score(self, X, y):
+        return 1 - np.sum((y - self.predict(X)) ** 2) / np.sum((y - y.mean()) ** 2)
+
+
 X_d, y_d = load_diabetes(return_X_y=True)
 Xd_train, Xd_test, yd_train, yd_test = train_test_split(X_d, y_d, test_size=0.3, random_state=RANDOM_STATE)
-
-nearest = np.argsort(euclidean_distances(Xd_test, Xd_train), axis=1)[:, :K]
-averages_by_hand = yd_train[nearest].mean(axis=1)
+by_hand = KNeighborsRegressor(n_neighbors=K).fit(Xd_train, yd_train)
 
 # %%
-regressor = KNeighborsRegressor(n_neighbors=K).fit(Xd_train, yd_train)
-print("same predictions:", np.allclose(averages_by_hand, regressor.predict(Xd_test)))
+regressor = neighbors.KNeighborsRegressor(n_neighbors=K).fit(Xd_train, yd_train)
+print("same predictions:", np.allclose(by_hand.predict(Xd_test), regressor.predict(Xd_test)))
+print("same R2:", np.isclose(by_hand.score(Xd_test, yd_test), regressor.score(Xd_test, yd_test)))
 
 # %% [markdown]
 # ## 4. Choosing k
@@ -81,7 +124,7 @@ print("same predictions:", np.allclose(averages_by_hand, regressor.predict(Xd_te
 # The features are scaled first because k-NN works with distances.
 
 # %%
-cv_accuracy = [cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k)),
+cv_accuracy = [cross_val_score(make_pipeline(StandardScaler(), neighbors.KNeighborsClassifier(n_neighbors=k)),
                                X_train, y_train, cv=5).mean()
                for k in K_CHOICES]
 
@@ -93,6 +136,6 @@ plt.show()
 # %% [markdown]
 # ## Exercises
 #
-# 1. Use the Manhattan distance $\sum_j |a_j - b_j|$ in section 1 and compare with `KNeighborsClassifier(metric="manhattan")`.
-# 2. Write a weighted vote with weights $1/d$ and compare with `KNeighborsClassifier(weights="distance")`.
+# 1. Add a Manhattan distance $\sum_j |a_j - b_j|$ to the class of section 2 and compare with `neighbors.KNeighborsClassifier(metric="manhattan")`.
+# 2. Write a weighted vote with weights $1/d$ and compare with `neighbors.KNeighborsClassifier(weights="distance")`.
 # 3. Find the best $k$ from section 4 and report its test accuracy once.

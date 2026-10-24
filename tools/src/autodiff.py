@@ -12,23 +12,32 @@
 # [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/06-deep-learning/autodiff/autodiff-notebook.ipynb)
 #
 # Companion notebook for the *Automatic differentiation* slides. Each idea is written first by hand
-# with NumPy and then checked against the exact derivative and against finite differences from SciPy.
+# with NumPy and then with PyTorch's automatic differentiation (autograd), which does the same job.
 #
 # **Data:** no data set. The running example $f(x_1, x_2) = \ln x_1 + x_1 x_2 - \sin x_2$ at $(2, 5)$
 # and the one-neuron loss of the slides.
 
 # %%
 import numpy as np
-from scipy.optimize import approx_fprime
+import torch
+from torch import nn
 
 RANDOM_STATE = 42
 STEP_H = 1e-6
 x1, x2 = 2.0, 5.0
 
+torch.manual_seed(RANDOM_STATE)
+torch.set_default_dtype(torch.float64)
+
 
 def f(x: np.ndarray) -> float:
     """The running example."""
     return np.log(x[0]) + x[0] * x[1] - np.sin(x[1])
+
+
+def f_torch(x: torch.Tensor) -> torch.Tensor:
+    """The running example with torch operations, so autograd can follow it."""
+    return torch.log(x[0]) + x[0] * x[1] - torch.sin(x[1])
 
 
 exact = np.array([1 / x1 + x2, x1 - np.cos(x2)])  # derivative by formula: (1/x1 + x2, x1 - cos x2)
@@ -37,6 +46,8 @@ exact = np.array([1 / x1 + x2, x1 - np.cos(x2)])  # derivative by formula: (1/x1
 # ## 1. The evaluation trace
 #
 # Running $f$ computes one elementary operation at a time, $v_i = \varphi_i(\text{parents of } v_i)$.
+# A tensor created with `requires_grad=True` makes PyTorch record this trace as it runs:
+# each result keeps in `grad_fn` the operation that made it.
 
 # %%
 v1 = np.log(x1)
@@ -45,26 +56,29 @@ v3 = np.sin(x2)
 v4 = v1 + v2
 v5 = v4 - v3
 print(f"v1 = {v1:.3f}, v2 = {v2:.0f}, v3 = {v3:.3f}, v4 = {v4:.3f}, y = v5 = {v5:.3f}")
-print("same result:", np.isclose(v5, f(np.array([x1, x2]))))
+point_t = torch.tensor([x1, x2], requires_grad=True)
+y_t = f_torch(point_t)
+print("last operation recorded by torch:", y_t.grad_fn.name())
+print("same result:", np.isclose(v5, y_t.item()))
 
 # %% [markdown]
 # ## 2. Finite differences
 #
 # Nudge one input by a small step $h$: $\dfrac{\partial f}{\partial x_k} \approx \dfrac{f(\mathbf{x} + h\,\mathbf{e}_k) - f(\mathbf{x})}{h}$.
-# The answer is close to the exact derivative, but not equal.
+# The answer is close to the exact derivative, but not equal. Autograd, used from section 4 on, has no such error.
 
 # %%
 point = np.array([x1, x2])
-by_hand = np.array([(f(point + STEP_H * e) - f(point)) / STEP_H for e in np.eye(2)])
-numeric = approx_fprime(point, f, STEP_H)
-print("finite differences:", by_hand.round(6), "| same as SciPy:", np.allclose(by_hand, numeric))
-print("error against the exact derivative:", np.abs(by_hand - exact))
+numeric = np.array([(f(point + STEP_H * e) - f(point)) / STEP_H for e in np.eye(2)])
+print("finite differences:", numeric.round(6), "| close to exact:", np.allclose(numeric, exact, atol=1e-4))
+print("error against the exact derivative:", np.abs(numeric - exact))
 
 # %% [markdown]
 # ## 3. Forward mode
 #
 # Fix one input and go from left to right: $\dfrac{\partial v_i}{\partial x_1} = \sum_{j \in \text{parents}(i)} \dfrac{\partial v_i}{\partial v_j} \dfrac{\partial v_j}{\partial x_1}$.
 # One pass gives the slope for that input only, so two inputs need two passes.
+# With many inputs and one output (a cost) this is slow, so PyTorch's `.backward()` uses reverse mode, the next section.
 
 # %%
 def forward_mode(dx1: float, dx2: float) -> float:
@@ -86,6 +100,7 @@ print("same as exact:", np.allclose(forward_slopes, exact), "| close to finite d
 # After the forward pass, go from right to left starting at $\partial y / \partial y = 1$:
 # $\dfrac{\partial y}{\partial v_j} = \sum_{i \in \text{children}(j)} \dfrac{\partial y}{\partial v_i} \dfrac{\partial v_i}{\partial v_j}$.
 # One pass gives the slopes for both inputs. $x_1$ and $x_2$ each feed two operations, so their two terms add up.
+# This is what `y.backward()` does in PyTorch: it walks the recorded trace backwards and leaves each slope in `.grad`.
 
 # %%
 dy_dv5 = 1.0
@@ -97,13 +112,15 @@ dy_dx1 = dy_dv1 * (1 / x1) + dy_dv2 * x2
 dy_dx2 = dy_dv2 * x1 + dy_dv3 * np.cos(x2)
 
 reverse_slopes = np.array([dy_dx1, dy_dx2])
-print("reverse mode:", reverse_slopes.round(3))
-print("same as exact:", np.allclose(reverse_slopes, exact), "| close to finite differences:", np.allclose(reverse_slopes, numeric, atol=1e-4))
+y_t.backward()
+print("reverse mode:", reverse_slopes.round(3), "| torch:", point_t.grad.numpy().round(3))
+print("same as exact:", np.allclose(reverse_slopes, exact), "| same as torch:", np.allclose(reverse_slopes, point_t.grad.numpy()))
 
 # %% [markdown]
 # ## 5. A tiny reverse-mode engine
 #
 # Each operation creates a node that stores its value and, for each parent, the local derivative.
+# The names copy PyTorch's tensors: the value is in `.data`, the slope in `.grad`, and `.backward()` fills it.
 # `backward` sorts the nodes so that each comes after its parents, sets the output's gradient to 1,
 # and visits them from last to first, adding gradient × local derivative to each parent.
 
@@ -116,29 +133,29 @@ def as_value(x):
 class Value:
     """A number that remembers how it was made."""
 
-    def __init__(self, value: float, parents: tuple = ()):
-        self.value, self.grad, self.parents = value, 0.0, parents  # parents: (node, local derivative)
+    def __init__(self, data: float, parents: tuple = ()):
+        self.data, self.grad, self.parents = data, 0.0, parents  # parents: (node, local derivative)
 
     def __add__(self, other):
         other = as_value(other)
-        return Value(self.value + other.value, ((self, 1.0), (other, 1.0)))
+        return Value(self.data + other.data, ((self, 1.0), (other, 1.0)))
 
     def __sub__(self, other):
         other = as_value(other)
-        return Value(self.value - other.value, ((self, 1.0), (other, -1.0)))
+        return Value(self.data - other.data, ((self, 1.0), (other, -1.0)))
 
     def __mul__(self, other):
         other = as_value(other)
-        return Value(self.value * other.value, ((self, other.value), (other, self.value)))
+        return Value(self.data * other.data, ((self, other.data), (other, self.data)))
 
     def log(self):
-        return Value(np.log(self.value), ((self, 1 / self.value),))
+        return Value(np.log(self.data), ((self, 1 / self.data),))
 
     def sin(self):
-        return Value(np.sin(self.value), ((self, np.cos(self.value)),))
+        return Value(np.sin(self.data), ((self, np.cos(self.data)),))
 
     def tanh(self):
-        t = np.tanh(self.value)
+        t = np.tanh(self.data)
         return Value(t, ((self, 1 - t**2),))
 
     def backward(self):
@@ -160,19 +177,25 @@ class Value:
 
 
 # %% [markdown]
-# The engine on the running example gives the same slopes as reverse mode by hand.
+# The engine and torch run the same lines on the running example and give the same slopes.
 
 # %%
 a, b = Value(x1), Value(x2)
 y = a.log() + a * b - b.sin()
 y.backward()
-print("engine:", np.round([a.grad, b.grad], 3), "| same as exact:", np.allclose([a.grad, b.grad], exact))
+
+a_t, b_t = torch.tensor(x1, requires_grad=True), torch.tensor(x2, requires_grad=True)
+y_t = torch.log(a_t) + a_t * b_t - torch.sin(b_t)
+y_t.backward()
+print("engine:", np.round([a.grad, b.grad], 3), "| same as torch:", np.allclose([a.grad, b.grad], [a_t.grad.item(), b_t.grad.item()]))
 
 # %% [markdown]
 # ## 6. Backpropagation is reverse mode
 #
 # One neuron, $L = (\tanh(w x + b) - y)^2$ with $x = 1.5$, $b = 0.2$, $y = 0.5$, $w = 0.5$.
 # The residual $r$ is used twice in $r \cdot r$, so its two branches add up inside the engine.
+# In PyTorch the neuron is an `nn.Linear(1, 1)` layer, the loss is `nn.MSELoss`, and `loss.backward()` is backpropagation.
+# A centered finite difference $\big(L(w + h) - L(w - h)\big) / 2h$ gives one more, independent check.
 
 # %%
 def neuron_loss(w: float) -> float:
@@ -185,13 +208,21 @@ residual = (w * 1.5 + 0.2).tanh() - 0.5
 loss = residual * residual
 loss.backward()
 
+neuron = nn.Linear(1, 1)
+with torch.no_grad():
+    neuron.weight.fill_(0.5)
+    neuron.bias.fill_(0.2)
+torch_loss = nn.MSELoss()(torch.tanh(neuron(torch.tensor([1.5]))), torch.tensor([0.5]))
+torch_loss.backward()
+
 finite_difference = (neuron_loss(0.5 + STEP_H) - neuron_loss(0.5 - STEP_H)) / (2 * STEP_H)
-print(f"L = {loss.value:.4f}, engine dL/dw = {w.grad:.4f}, finite difference = {finite_difference:.4f}")
-print("same result:", np.isclose(w.grad, finite_difference))
+print(f"L = {loss.data:.4f}, engine dL/dw = {w.grad:.4f}, torch dL/dw = {neuron.weight.grad.item():.4f}")
+print("same as torch:", np.isclose(w.grad, neuron.weight.grad.item()), "| close to finite difference:", np.isclose(w.grad, finite_difference))
 
 # %% [markdown]
 # ## Exercises
 #
 # 1. Add a `__pow__` method for $u^2$ (local derivative $2u$) and check that `residual ** 2` gives the same `w.grad`.
-# 2. Take ten gradient steps $w \leftarrow w - 0.5 \, \partial L / \partial w$ with the engine and print the loss after each one.
+# 2. Take ten gradient steps $w \leftarrow w - 0.5 \, \partial L / \partial w$ with the engine, and the same ten with
+#    `torch.optim.SGD([neuron.weight], lr=0.5)` (call `zero_grad()` before each `backward()`). Print both losses after each step.
 # 3. In section 4, keep only the last term of $\partial y / \partial x_1$ (forget the branch through $v_1$) and compare with the exact value.

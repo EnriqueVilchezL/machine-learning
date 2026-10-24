@@ -19,8 +19,8 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import decomposition
 from sklearn.datasets import load_wine
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 RANDOM_STATE = 42
@@ -41,18 +41,46 @@ print("same result:", np.allclose(X, StandardScaler().fit_transform(X_raw)))
 # %% [markdown]
 # ## 2. Covariance and eigenvectors
 #
-# $\mathbf{S} = \frac{1}{n}\mathbf{X}^\top\mathbf{X}$. The components are its eigenvectors, $\mathbf{S}\,\mathbf{w}_k = \lambda_k \mathbf{w}_k$,
-# sorted from the largest eigenvalue down. scikit-learn divides by $n - 1$ instead of $n$, and the sign of each direction is arbitrary.
+# $\mathbf{S} = \frac{1}{n}\mathbf{X}^\top\mathbf{X}$ for the centered $\mathbf{X}$. The components are its eigenvectors, $\mathbf{S}\,\mathbf{w}_k = \lambda_k \mathbf{w}_k$,
+# sorted from the largest eigenvalue down. `fit` stores $\bar{\mathbf{x}}$ in `mean_`, the $\mathbf{w}_k$ as the rows of `components_`
+# and the $\lambda_k$ in `explained_variance_`; `transform` gives the scores and `inverse_transform` rebuilds the examples.
 
 # %%
-S = X.T @ X / n
-eigenvalues, W = np.linalg.eigh(S)
-order = np.argsort(eigenvalues)[::-1]
-eigenvalues, W = eigenvalues[order], W[:, order]
+class PCA:
+    """Principal component analysis from the eigenvectors of the covariance matrix."""
 
-pca = PCA().fit(X)
-print("same variances:", np.allclose(eigenvalues, pca.explained_variance_ * (n - 1) / n))
-print("same directions (up to sign):", np.allclose(np.abs(W.T), np.abs(pca.components_)))
+    def __init__(self, n_components: int | None = None):
+        self.n_components = n_components
+
+    def fit(self, X, y=None):
+        self.mean_ = X.mean(axis=0)
+        centered = X - self.mean_
+        eigenvalues, W = np.linalg.eigh(centered.T @ centered / len(X))
+        order = np.argsort(eigenvalues)[::-1][: self.n_components]
+        self.components_ = W[:, order].T
+        self.explained_variance_ = eigenvalues[order]
+        self.explained_variance_ratio_ = eigenvalues[order] / eigenvalues.sum()
+        return self
+
+    def transform(self, X):
+        return (X - self.mean_) @ self.components_.T
+
+    def fit_transform(self, X, y=None):
+        return self.fit(X).transform(X)
+
+    def inverse_transform(self, Z):
+        return self.mean_ + Z @ self.components_
+
+
+by_hand = PCA().fit(X)
+
+# %% [markdown]
+# scikit-learn divides by $n - 1$ instead of $n$, and the sign of each direction is arbitrary.
+
+# %%
+pca = decomposition.PCA().fit(X)
+print("same variances:", np.allclose(by_hand.explained_variance_, pca.explained_variance_ * (n - 1) / n))
+print("same directions (up to sign):", np.allclose(np.abs(by_hand.components_), np.abs(pca.components_)))
 
 # %% [markdown]
 # ## 3. Scores: the new coordinates
@@ -61,8 +89,8 @@ print("same directions (up to sign):", np.allclose(np.abs(W.T), np.abs(pca.compo
 # and the variance of column $k$ is $\lambda_k$.
 
 # %%
-Z = X @ W
-print("variances are the eigenvalues:", np.allclose(Z.var(axis=0), eigenvalues))
+Z = by_hand.transform(X)
+print("variances are the eigenvalues:", np.allclose(Z.var(axis=0), by_hand.explained_variance_))
 print("same scores (up to sign):", np.allclose(np.abs(Z), np.abs(pca.transform(X))))
 
 plt.scatter(Z[:, 0], Z[:, 1], c=y, s=15)
@@ -77,24 +105,24 @@ plt.show()
 #
 # Rebuild each example from $q$ scores: $\hat{\mathbf{x}}_i = \bar{\mathbf{x}} + \sum_{k=1}^{q} z_{ik}\,\mathbf{w}_k$.
 # The average squared error is the variance left out, $\sum_{k=q+1}^{d} \lambda_k$.
+# The sign of each direction cancels in $z_{ik}\,\mathbf{w}_k$, so the rebuilt examples must match exactly.
 
 # %%
-X_hat = Z[:, :Q] @ W[:, :Q].T
+by_hand_q = PCA(n_components=Q).fit(X)
+X_hat = by_hand_q.inverse_transform(by_hand_q.transform(X))
 error = ((X - X_hat) ** 2).sum(axis=1).mean()
-print("error equals dropped variance:", np.isclose(error, eigenvalues[Q:].sum()))
+print("error equals dropped variance:", np.isclose(error, by_hand.explained_variance_[Q:].sum()))
 
-pca_q = PCA(n_components=Q).fit(X)
+pca_q = decomposition.PCA(n_components=Q).fit(X)
 print("same reconstruction:", np.allclose(X_hat, pca_q.inverse_transform(pca_q.transform(X))))
 
 # %% [markdown]
-# Here $\bar{\mathbf{x}} = \mathbf{0}$ because the data was already centered.
-#
 # ## 5. How many components: explained variance
 #
 # $\text{PVE}_k = \lambda_k / \sum_j \lambda_j$ and $\text{CPVE}_q = \sum_{k \le q} \lambda_k / \sum_j \lambda_j$. Choose $q$ at the elbow or at a target such as 80%.
 
 # %%
-pve = eigenvalues / eigenvalues.sum()
+pve = by_hand.explained_variance_ratio_
 print("same result:", np.allclose(pve, pca.explained_variance_ratio_))
 
 components = np.arange(1, d + 1)
@@ -109,6 +137,6 @@ plt.show()
 # %% [markdown]
 # ## Exercises
 #
-# 1. Run section 2 on `X_raw` without standardizing. Which feature dominates PC1, and why?
-# 2. Find the smallest $q$ with $\text{CPVE}_q \ge 0.8$ and compare with `PCA(n_components=0.8)`.
-# 3. Look at `W[:, 0]`: which three features have the largest weights (in absolute value) on PC1?
+# 1. Fit the `PCA` of section 2 on `X_raw` without standardizing. Which feature dominates PC1, and why?
+# 2. Find the smallest $q$ with $\text{CPVE}_q \ge 0.8$ and compare with `decomposition.PCA(n_components=0.8)`.
+# 3. Look at `by_hand.components_[0]`: which three features have the largest weights (in absolute value) on PC1?

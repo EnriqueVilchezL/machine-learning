@@ -19,11 +19,11 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import preprocessing
 from sklearn.datasets import fetch_california_housing, load_wine
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
 RANDOM_STATE = 42
 
@@ -39,11 +39,26 @@ features.agg(["min", "max"]).T.sort_values("max", ascending=False).head()
 # ## 1. Min-max scaling
 #
 # $x'_{ij} = \dfrac{x_{ij} - \min_j}{\max_j - \min_j}$ maps every feature to $[0, 1]$.
+# `fit` learns $\min_j$ and $\max_j$, `transform` applies the formula.
 
 # %%
+class MinMaxScaler:
+    """Map each feature to [0, 1] with the minimum and maximum learned in fit."""
+
+    def fit(self, X):
+        self.data_min_, self.data_max_ = X.min(axis=0), X.max(axis=0)
+        return self
+
+    def transform(self, X):
+        return (X - self.data_min_) / (self.data_max_ - self.data_min_)
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
 X = features.to_numpy()
-min_max_by_hand =(X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
-print("same result:", np.allclose(min_max_by_hand, MinMaxScaler().fit_transform(X)))
+min_max_by_hand = MinMaxScaler().fit_transform(X)
+print("same result:", np.allclose(min_max_by_hand, preprocessing.MinMaxScaler().fit_transform(X)))
 
 # %% [markdown]
 # ## 2. Standardization
@@ -51,8 +66,22 @@ print("same result:", np.allclose(min_max_by_hand, MinMaxScaler().fit_transform(
 # $z_{ij} = \dfrac{x_{ij} - \bar{x}_j}{s_j}$ gives each feature mean 0 and standard deviation 1.
 
 # %%
-standard_by_hand = (X - X.mean(axis=0)) / X.std(axis=0)
-print("same result:", np.allclose(standard_by_hand, StandardScaler().fit_transform(X)))
+class StandardScaler:
+    """Give each feature mean 0 and standard deviation 1 with the values learned in fit."""
+
+    def fit(self, X):
+        self.mean_, self.scale_ = X.mean(axis=0), X.std(axis=0)
+        return self
+
+    def transform(self, X):
+        return (X - self.mean_) / self.scale_
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
+standard_by_hand = StandardScaler().fit_transform(X)
+print("same result:", np.allclose(standard_by_hand, preprocessing.StandardScaler().fit_transform(X)))
 
 # %% [markdown]
 # ## 3. Robust scaling
@@ -61,9 +90,23 @@ print("same result:", np.allclose(standard_by_hand, StandardScaler().fit_transfo
 # so one extreme value barely moves it.
 
 # %%
-q1, median, q3 = np.percentile(X, [25, 50, 75], axis=0)
-robust_by_hand = (X - median) / (q3 - q1)
-print("same result:", np.allclose(robust_by_hand, RobustScaler().fit_transform(X)))
+class RobustScaler:
+    """Center each feature on its median and divide by its interquartile range."""
+
+    def fit(self, X):
+        q1, self.center_, q3 = np.percentile(X, [25, 50, 75], axis=0)
+        self.scale_ = q3 - q1
+        return self
+
+    def transform(self, X):
+        return (X - self.center_) / self.scale_
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
+robust_by_hand = RobustScaler().fit_transform(X)
+print("same result:", np.allclose(robust_by_hand, preprocessing.RobustScaler().fit_transform(X)))
 
 # %% [markdown]
 # ## 4. Fit on training rows, apply to new rows
@@ -74,11 +117,9 @@ print("same result:", np.allclose(robust_by_hand, RobustScaler().fit_transform(X
 # %%
 X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.3, random_state=RANDOM_STATE, stratify=labels)
 
-train_mean, train_std = X_train.mean(axis=0), X_train.std(axis=0)
-test_by_hand = (X_test - train_mean) / train_std
-
-scaler = StandardScaler().fit(X_train)
-print("same result:", np.allclose(test_by_hand, scaler.transform(X_test)))
+scaler_by_hand = StandardScaler().fit(X_train)
+scaler_library = preprocessing.StandardScaler().fit(X_train)
+print("same result:", np.allclose(scaler_by_hand.transform(X_test), scaler_library.transform(X_test)))
 
 # %% [markdown]
 # ## 5. Why it matters
@@ -88,7 +129,7 @@ print("same result:", np.allclose(test_by_hand, scaler.transform(X_test)))
 
 # %%
 raw_knn = KNeighborsClassifier().fit(X_train, y_train)
-scaled_knn = make_pipeline(StandardScaler(), KNeighborsClassifier()).fit(X_train, y_train)
+scaled_knn = make_pipeline(preprocessing.StandardScaler(), KNeighborsClassifier()).fit(X_train, y_train)
 print(f"raw features:    test accuracy {raw_knn.score(X_test, y_test):.3f}")
 print(f"scaled features: test accuracy {scaled_knn.score(X_test, y_test):.3f}")
 

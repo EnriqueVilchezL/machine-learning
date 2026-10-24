@@ -19,10 +19,10 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import model_selection
 from sklearn.base import clone
 from sklearn.datasets import load_breast_cancer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_score, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -42,28 +42,50 @@ model = make_pipeline(StandardScaler(), LogisticRegression())
 # $\text{CV}_{(k)} = \frac{1}{k}\sum_{m} s_m$.
 
 # %%
-rng = np.random.default_rng(RANDOM_STATE)
-folds = np.array_split(rng.permutation(len(y)), FOLD_COUNT)
+class KFold:
+    """Cut the row numbers into k folds; each fold is the test part once."""
 
-fold_scores = []
-for test_rows in folds:
-    train_rows = np.setdiff1d(np.arange(len(y)), test_rows)
-    fitted = clone(model).fit(X[train_rows], y[train_rows])
-    fold_scores.append(fitted.score(X[test_rows], y[test_rows]))
+    def __init__(self, n_splits=5, shuffle=False, random_state=None):
+        self.n_splits, self.shuffle, self.random_state = n_splits, shuffle, random_state
 
+    def split(self, X, y=None):
+        rows = np.arange(len(X))
+        if self.shuffle:
+            rows = np.random.default_rng(self.random_state).permutation(rows)
+        for test_rows in np.array_split(rows, self.n_splits):
+            yield np.setdiff1d(rows, test_rows), test_rows
+
+
+def cross_val_score(estimator, X, y, cv=5):
+    """Train a fresh copy of the model on each training part and score it on the fold left out."""
+    folds = KFold(cv) if isinstance(cv, int) else cv
+    return np.array([clone(estimator).fit(X[train_rows], y[train_rows]).score(X[test_rows], y[test_rows])
+                     for train_rows, test_rows in folds.split(X, y)])
+
+
+fold_scores = cross_val_score(model, X, y, cv=KFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE))
 print("fold scores:", np.round(fold_scores, 3))
-print(f"CV estimate {np.mean(fold_scores):.3f}, spread {np.std(fold_scores):.3f}")
+print(f"CV estimate {fold_scores.mean():.3f}, spread {fold_scores.std():.3f}")
+
+# %% [markdown]
+# Without shuffling, both `KFold` classes cut the rows in the same places:
 
 # %%
-same_folds = [(np.setdiff1d(np.arange(len(y)), test_rows), test_rows) for test_rows in folds]
-library_scores = cross_val_score(model, X, y, cv=same_folds)
+same_cuts = all(np.array_equal(ours, theirs) for (_, ours), (_, theirs)
+                in zip(KFold(FOLD_COUNT).split(X), model_selection.KFold(FOLD_COUNT).split(X)))
+print("same folds:", same_cuts)
+
+# %%
+same_folds = list(KFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE).split(X))
+library_scores = model_selection.cross_val_score(model, X, y, cv=same_folds)
 print("same scores on the same folds:", np.allclose(fold_scores, library_scores))
 
 # %% [markdown]
 # In practice scikit-learn makes the folds itself:
 
 # %%
-scores = cross_val_score(model, X, y, cv=StratifiedKFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE))
+folds = model_selection.StratifiedKFold(FOLD_COUNT, shuffle=True, random_state=RANDOM_STATE)
+scores = model_selection.cross_val_score(model, X, y, cv=folds)
 print(f"CV estimate {scores.mean():.3f} ± {scores.std():.3f}")
 
 # %% [markdown]
@@ -86,8 +108,9 @@ plt.ylabel("cross-validated accuracy")
 plt.show()
 
 # %%
-search = GridSearchCV(make_pipeline(StandardScaler(), KNeighborsClassifier()),
-                      {"kneighborsclassifier__n_neighbors": list(NEIGHBOR_CHOICES)}, cv=FOLD_COUNT)
+search = model_selection.GridSearchCV(make_pipeline(StandardScaler(), KNeighborsClassifier()),
+                                      {"kneighborsclassifier__n_neighbors": list(NEIGHBOR_CHOICES)},
+                                      cv=model_selection.KFold(FOLD_COUNT))
 search.fit(X, y)
 print("same choice:", search.best_params_["kneighborsclassifier__n_neighbors"] == best_by_hand)
 
@@ -98,7 +121,7 @@ print("same choice:", search.best_params_["kneighborsclassifier__n_neighbors"] =
 # and score the final model once on the test set.
 
 # %%
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE)
+X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE)
 search.fit(X_train, y_train)
 print("chosen:", search.best_params_, f"| test accuracy {search.score(X_test, y_test):.3f}")
 

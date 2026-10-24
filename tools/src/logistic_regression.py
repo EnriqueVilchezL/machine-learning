@@ -19,15 +19,15 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import linear_model
 from sklearn.datasets import load_breast_cancer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 RANDOM_STATE = 42
-LEARNING_RATE = 0.1
-STEPS = 500
+LEARNING_RATE = 0.5
+STEPS = 5000
 
 X, y = load_breast_cancer(return_X_y=True)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y)
@@ -52,32 +52,53 @@ print(sigmoid(np.array([-5, 0, 2, 5])).round(3))
 # ## 2. Learning the weights by hand
 #
 # Gradient descent on the log-loss: $\theta_j \leftarrow \theta_j - \alpha \frac{1}{n}\sum_i (p_i - y_i)\, x_{ij}$.
+# scikit-learn also adds a small penalty $\frac{1}{2Cn}\sum_{j \ge 1} \theta_j^2$ on large weights, so the class adds
+# its gradient $\frac{\theta_j}{Cn}$ too, with the same default $C = 1$.
 
 # %%
-X_ones = np.column_stack([np.ones(len(X_train)), X_train])
-theta = np.zeros(X_ones.shape[1])
-losses = []
-for _ in range(STEPS):
-    p = sigmoid(X_ones @ theta)
-    losses.append(-np.mean(y_train * np.log(p) + (1 - y_train) * np.log(1 - p)))
-    theta -= LEARNING_RATE * X_ones.T @ (p - y_train) / len(y_train)
+class LogisticRegression:
+    """Binary logistic regression trained by gradient descent on the log-loss."""
 
-plt.plot(losses)
+    def __init__(self, C: float = 1.0, learning_rate: float = 0.5, n_steps: int = 5000):
+        self.C, self.learning_rate, self.n_steps = C, learning_rate, n_steps
+
+    def fit(self, X, y):
+        self.classes_, n = np.unique(y), len(y)
+        self.coef_, self.intercept_, self.loss_curve_ = np.zeros(X.shape[1]), 0.0, []
+        for _ in range(self.n_steps):
+            p = sigmoid(X @ self.coef_ + self.intercept_)
+            self.loss_curve_.append(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+            self.coef_ -= self.learning_rate * (X.T @ (p - y) / n + self.coef_ / (self.C * n))
+            self.intercept_ -= self.learning_rate * np.mean(p - y)
+        return self
+
+    def predict_proba(self, X):
+        p = sigmoid(X @ self.coef_ + self.intercept_)
+        return np.column_stack([1 - p, p])
+
+    def predict(self, X):
+        return self.classes_[(self.predict_proba(X)[:, 1] >= 0.5).astype(int)]
+
+    def score(self, X, y):
+        return np.mean(self.predict(X) == y)
+
+
+by_hand = LogisticRegression(learning_rate=LEARNING_RATE, n_steps=STEPS).fit(X_train, y_train)
+
+plt.plot(by_hand.loss_curve_)
 plt.xlabel("step")
 plt.ylabel("log-loss")
 plt.show()
 
 # %%
-p_test_by_hand = sigmoid(np.column_stack([np.ones(len(X_test)), X_test]) @ theta)
-predictions_by_hand = (p_test_by_hand >= 0.5).astype(int)
-
-model = LogisticRegression().fit(X_train, y_train)
-print(f"test accuracy: by hand {np.mean(predictions_by_hand == y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
-print(f"same prediction on {np.mean(predictions_by_hand == model.predict(X_test)):.0%} of the test tumors")
+model = linear_model.LogisticRegression().fit(X_train, y_train)
+print("same predictions:", np.array_equal(by_hand.predict(X_test), model.predict(X_test)))
+print("same probabilities (to 0.01):", np.allclose(by_hand.predict_proba(X_test), model.predict_proba(X_test), atol=0.01))
+print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
 
 # %% [markdown]
-# The two weights differ a little because scikit-learn adds a small penalty on large weights
-# and solves the problem with a different method.
+# The two solutions are close but not identical: scikit-learn uses a different solver that stops
+# at its own tolerance.
 #
 # ## 3. The log-loss
 #
@@ -110,6 +131,6 @@ for threshold in [0.3, 0.5, 0.8]:
 # %% [markdown]
 # ## Exercises
 #
-# 1. Change `LEARNING_RATE` to 0.01 and to 2. What happens to the loss curve?
+# 1. Change `LEARNING_RATE` to 0.01 and to 5. What happens to the loss curve?
 # 2. Compute the odds $p/(1-p)$ for three test tumors and check that their log equals the score $z$.
 # 3. Find the feature with the largest weight in `model.coef_` and explain what $e^{\theta_j}$ means for it.

@@ -12,23 +12,30 @@
 # [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/EnriqueVilchezL/machine-learning/blob/main/book/06-deep-learning/cnn/cnn-notebook.ipynb)
 #
 # Companion notebook for the *Convolutional neural networks* slides. Each idea is written first by hand
-# with NumPy and then with the SciPy tool that does the same job.
+# with NumPy, in small classes shaped like PyTorch's, and then with the PyTorch module that does the same job.
 #
 # **Data:** the Digits data (1 797 handwritten digits, each a grid of 8 × 8 gray pixels).
 
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.ndimage import maximum_filter
-from scipy.signal import correlate, correlate2d
+import torch
+import torch.nn.functional as F
 from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from torch import nn
 
 RANDOM_STATE = 42
-STEP_H = 1e-6
+TRAINING_STEPS = 100
 
-images = load_digits().images
-image = images[0]
+torch.manual_seed(RANDOM_STATE)
+torch.set_default_dtype(torch.float64)
 rng = np.random.default_rng(RANDOM_STATE)
+
+digits = load_digits()
+images = digits.images / 16
+image = images[0][None]  # one channel: shape (C, H, W) = (1, 8, 8), the layout PyTorch uses
+image_t = torch.tensor(image)
 print("image shape:", image.shape)
 
 # %% [markdown]
@@ -36,27 +43,53 @@ print("image shape:", image.shape)
 #
 # Place the $k \times k$ kernel with its corner at row $i$, column $j$, multiply, add up and add the bias:
 # $Z_{ij} = \sum_{m=0}^{k-1} \sum_{n=0}^{k-1} X_{i+m,\,j+n} \, K_{mn} + b$.
+# The NumPy `Conv2d` below has the same arguments as `nn.Conv2d` and keeps the kernels in `weight`,
+# shaped (filters, channels, $k$, $k$). It already handles channels, padding and stride, used in the next sections.
 # This kernel adds the left column of each patch and subtracts the right one: it finds vertical edges.
-# In SciPy this operation is `correlate2d`.
 
 # %%
-def convolve_by_hand(X: np.ndarray, K: np.ndarray, b: float = 0.0) -> np.ndarray:
-    """Slide K over X (no padding, stride 1) and fill the feature map."""
-    k = K.shape[0]
-    n_out = X.shape[0] - k + 1, X.shape[1] - k + 1
-    return np.array([[np.sum(X[i:i + k, j:j + k] * K) + b for j in range(n_out[1])] for i in range(n_out[0])])
+class Conv2d:
+    """Slide each kernel over one image of shape (C, H, W), like nn.Conv2d."""
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int = 1, padding: int = 0):
+        self.weight = rng.normal(size=(out_channels, in_channels, kernel_size, kernel_size))
+        self.bias = np.zeros(out_channels)
+        self.stride, self.padding = stride, padding
+
+    def __call__(self, X: np.ndarray) -> np.ndarray:
+        p, s, k = self.padding, self.stride, self.weight.shape[-1]
+        X = np.pad(X, ((0, 0), (p, p), (p, p)))
+        n_out = ((X.shape[1] - k) // s + 1, (X.shape[2] - k) // s + 1)
+        Z = np.zeros((len(self.weight), *n_out))
+        for i, j in np.ndindex(n_out):
+            patch = X[:, i * s:i * s + k, j * s:j * s + k]
+            Z[:, i, j] = np.sum(self.weight * patch, axis=(1, 2, 3)) + self.bias
+        return Z
 
 
-vertical_edge = np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]])
-feature_map = convolve_by_hand(image, vertical_edge)
+def copy_weights(mine: Conv2d, theirs: nn.Conv2d) -> None:
+    """Put the NumPy kernels and biases into the torch layer."""
+    with torch.no_grad():
+        theirs.weight.copy_(torch.from_numpy(mine.weight))
+        theirs.bias.copy_(torch.from_numpy(mine.bias))
+
+
+vertical_edge = np.array([[1.0, 0, -1], [1, 0, -1], [1, 0, -1]])
+conv = Conv2d(1, 1, kernel_size=3)
+conv.weight = vertical_edge[None, None]
+feature_map = conv(image)
+
+torch_conv = nn.Conv2d(1, 1, kernel_size=3)
+copy_weights(conv, torch_conv)
 print("feature map shape:", feature_map.shape)
-print("same result:", np.allclose(feature_map, correlate2d(image, vertical_edge, mode="valid")))
+print("same result:", np.allclose(feature_map, torch_conv(image_t).detach().numpy()))
 
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(7, 3.5))
-axes[0].imshow(image, cmap="gray_r")
+axes[0].imshow(image[0], cmap="gray_r")
 axes[0].set_title("image $\\mathbf{X}$")
-axes[1].imshow(feature_map, cmap="RdBu_r", vmin=-np.abs(feature_map).max(), vmax=np.abs(feature_map).max())
+limit = np.abs(feature_map).max()
+axes[1].imshow(feature_map[0], cmap="RdBu_r", vmin=-limit, vmax=limit)
 axes[1].set_title("feature map $\\mathbf{Z}$")
 for ax in axes:
     ax.axis("off")
@@ -67,19 +100,21 @@ plt.show()
 #
 # Padding $p$ adds a border of zeros; stride $s$ is how far the kernel jumps.
 # The output side is $n_{\text{out}} = \left\lfloor \frac{n + 2p - k}{s} \right\rfloor + 1$.
+# Besides the layer `nn.Conv2d`, PyTorch has the plain function `F.conv2d`, which takes the kernel as an argument.
 
 # %%
 def output_size(n: int, k: int, p: int, s: int) -> int:
     return (n + 2 * p - k) // s + 1
 
 
-padded_by_hand = convolve_by_hand(np.pad(image, 1), vertical_edge)
-print(f"p = 1, s = 1: shape {padded_by_hand.shape}, formula {output_size(8, 3, 1, 1)}",
-      "| same result:", np.allclose(padded_by_hand, correlate2d(image, vertical_edge, mode="same")))
-
-strided_by_hand = np.array([[np.sum(image[i:i + 3, j:j + 3] * vertical_edge) for j in range(0, 6, 2)] for i in range(0, 6, 2)])
-print(f"p = 0, s = 2: shape {strided_by_hand.shape}, formula {output_size(8, 3, 0, 2)}",
-      "| same result:", np.allclose(strided_by_hand, correlate2d(image, vertical_edge, mode="valid")[::2, ::2]))
+kernel_t = torch.tensor(vertical_edge[None, None])
+for p, s in [(1, 1), (0, 2)]:
+    conv = Conv2d(1, 1, kernel_size=3, stride=s, padding=p)
+    conv.weight = vertical_edge[None, None]
+    by_hand = conv(image)
+    torch_result = F.conv2d(image_t, kernel_t, stride=s, padding=p)
+    print(f"p = {p}, s = {s}: shape {by_hand.shape[1:]}, formula {output_size(8, 3, p, s)}",
+          "| same result:", np.allclose(by_hand, torch_result.numpy()))
 
 # %% [markdown]
 # ## 3. Channels, filters and ReLU
@@ -90,17 +125,17 @@ print(f"p = 0, s = 2: shape {strided_by_hand.shape}, formula {output_size(8, 3, 
 # Here three digits play the role of the three color channels.
 
 # %%
-color_image = np.stack(images[:3], axis=-1)
-kernel = rng.normal(size=(3, 3, 3))
-bias = 0.5
+color_image = images[:3]  # shape (C, H, W) = (3, 8, 8)
+conv = Conv2d(3, 1, kernel_size=3)
+conv.bias = np.array([0.5])
+A = np.maximum(0, conv(color_image))
 
-Z_by_hand = sum(correlate2d(color_image[:, :, c], kernel[:, :, c], mode="valid") for c in range(3)) + bias
-Z_scipy = correlate(color_image, kernel, mode="valid")[:, :, 0] + bias
-print("same result:", np.allclose(Z_by_hand, Z_scipy))
-
-A = np.maximum(0, Z_by_hand)
+torch_layer = nn.Sequential(nn.Conv2d(3, 1, kernel_size=3), nn.ReLU())
+copy_weights(conv, torch_layer[0])
+print("same result:", np.allclose(A, torch_layer(torch.tensor(color_image)).detach().numpy()))
 print(f"ReLU sets {np.mean(A == 0):.0%} of the entries to 0")
-print("parameters of one filter, k*k*C + 1 =", kernel.size + 1)
+print("parameters of one filter, k*k*C + 1 =", conv.weight.size + conv.bias.size,
+      "| torch counts", sum(p.numel() for p in torch_layer.parameters()))
 
 # %% [markdown]
 # ## 4. Pooling
@@ -109,9 +144,20 @@ print("parameters of one filter, k*k*C + 1 =", kernel.size + 1)
 # It has no weights to learn.
 
 # %%
-pooled_by_hand = A.reshape(3, 2, 3, 2).max(axis=(1, 3))
-pooled_scipy = maximum_filter(A, size=2, origin=-1)[::2, ::2]
-print("shape", A.shape, "->", pooled_by_hand.shape, "| same result:", np.allclose(pooled_by_hand, pooled_scipy))
+class MaxPool2d:
+    """Largest value of each k x k window, stride k, like nn.MaxPool2d."""
+
+    def __init__(self, kernel_size: int):
+        self.kernel_size = kernel_size
+
+    def __call__(self, A: np.ndarray) -> np.ndarray:
+        C, H, W, k = *A.shape, self.kernel_size
+        return A[:, :H // k * k, :W // k * k].reshape(C, H // k, k, W // k, k).max(axis=(2, 4))
+
+
+pooled_by_hand = MaxPool2d(2)(A)
+pooled_torch = nn.MaxPool2d(2)(torch.tensor(A))
+print("shape", A.shape, "->", pooled_by_hand.shape, "| same result:", np.allclose(pooled_by_hand, pooled_torch.numpy()))
 
 # %% [markdown]
 # ## 5. The gradient of a shared weight
@@ -119,26 +165,52 @@ print("shape", A.shape, "->", pooled_by_hand.shape, "| same result:", np.allclos
 # Each kernel weight is used at every position, so its gradient adds up all of them:
 # $\dfrac{\partial L}{\partial K_{mn}} = \sum_i \sum_j \dfrac{\partial L}{\partial Z_{ij}} \, X_{i+m,\,j+n}$.
 # With the toy loss $L = \frac{1}{2}\sum_{ij} Z_{ij}^2$ we have $\partial L / \partial Z_{ij} = Z_{ij}$.
+# PyTorch's autograd finds the same gradient in `weight.grad` after `loss.backward()`.
 
 # %%
-def toy_loss(K: np.ndarray) -> float:
-    return 0.5 * np.sum(correlate2d(image, K, mode="valid") ** 2)
+conv = Conv2d(1, 1, kernel_size=3)
+dL_dZ = conv(image)[0]
+gradient_by_hand = np.array([[np.sum(dL_dZ * image[0, m:m + 6, n:n + 6]) for n in range(3)] for m in range(3)])
 
+torch_conv = nn.Conv2d(1, 1, kernel_size=3)
+copy_weights(conv, torch_conv)
+loss = 0.5 * (torch_conv(image_t) ** 2).sum()
+loss.backward()
+print("same result:", np.allclose(gradient_by_hand, torch_conv.weight.grad[0, 0].numpy()))
 
-K = rng.normal(size=(3, 3))
-dL_dZ = correlate2d(image, K, mode="valid")
-gradient_by_hand = np.array([[np.sum(dL_dZ * image[m:m + 6, n:n + 6]) for n in range(3)] for m in range(3)])
+# %% [markdown]
+# ## 6. A small CNN
+#
+# Convolution, ReLU and pooling, then a dense layer to the 10 digits, trained with `nn.CrossEntropyLoss` and `torch.optim.Adam`.
+# PyTorch layers work on a batch, so the images enter with shape (examples, channels, $H$, $W$).
+# Eight filters of size $3 \times 3$ with $p = 1$ keep the $8 \times 8$ size, and pooling halves it.
 
-numeric = np.zeros_like(K)
-for m, n in np.ndindex(K.shape):
-    nudge = np.zeros_like(K)
-    nudge[m, n] = STEP_H
-    numeric[m, n] = (toy_loss(K + nudge) - toy_loss(K - nudge)) / (2 * STEP_H)
-print("same result:", np.allclose(gradient_by_hand, numeric, rtol=1e-4))
+# %%
+X_train, X_test, y_train, y_test = train_test_split(images[:, None], digits.target, test_size=0.3,
+                                                    random_state=RANDOM_STATE, stratify=digits.target)
+X_train_t, X_test_t, y_train_t = torch.tensor(X_train), torch.tensor(X_test), torch.tensor(y_train)
+
+side = output_size(8, 3, 1, 1) // 2
+cnn = nn.Sequential(nn.Conv2d(1, 8, kernel_size=3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                    nn.Flatten(), nn.Linear(8 * side * side, 10))
+print("shape before the dense layer:", tuple(cnn[:3](X_test_t).shape[1:]), "| formula:", (8, side, side))
+
+optimizer = torch.optim.Adam(cnn.parameters(), lr=0.01)
+cross_entropy = nn.CrossEntropyLoss()
+for _ in range(TRAINING_STEPS):
+    optimizer.zero_grad()
+    loss = cross_entropy(cnn(X_train_t), y_train_t)
+    loss.backward()
+    optimizer.step()
+
+with torch.no_grad():
+    predictions = cnn(X_test_t).argmax(dim=1).numpy()
+print(f"training cost {loss.item():.3f}, test accuracy {np.mean(predictions == y_test):.3f}")
 
 # %% [markdown]
 # ## Exercises
 #
 # 1. Use the horizontal-edge kernel (the transpose of `vertical_edge`) in section 1 and compare both feature maps.
-# 2. Write average pooling by hand and compare it with `scipy.ndimage.uniform_filter(A, size=2, origin=-1)[::2, ::2]`.
-# 3. Count the parameters of a layer with 64 filters of size $3 \times 3$ on a color image, and of a dense layer from a $200 \times 200 \times 3$ image to 1 000 neurons.
+# 2. Write an `AvgPool2d` class like `MaxPool2d` and compare it with `nn.AvgPool2d(2)`.
+# 3. Count the parameters of a layer with 64 filters of size $3 \times 3$ on a color image (check with `nn.Conv2d(3, 64, 3)`),
+#    and of a dense layer from a $200 \times 200 \times 3$ image to 1 000 neurons.

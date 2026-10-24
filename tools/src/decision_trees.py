@@ -19,11 +19,12 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import tree
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier, plot_tree
 
 RANDOM_STATE = 42
+MAX_DEPTH = 2
 
 iris = load_iris()
 X, y = iris.data, iris.target
@@ -50,7 +51,7 @@ def entropy(labels: np.ndarray) -> float:
 print(f"all 150 flowers: Gini {gini(y):.3f}, entropy {entropy(y):.3f}")
 
 # %%
-stump = DecisionTreeClassifier(max_depth=1, random_state=RANDOM_STATE).fit(X, y)
+stump = tree.DecisionTreeClassifier(max_depth=1, random_state=RANDOM_STATE).fit(X, y)
 print("same Gini at the root:", np.isclose(gini(y), stump.tree_.impurity[0]))
 
 # %% [markdown]
@@ -60,15 +61,20 @@ print("same Gini at the root:", np.isclose(gini(y), stump.tree_.impurity[0]))
 # weighted Gini of the two sides, $\frac{n_L}{n}G_L + \frac{n_R}{n}G_R$, and keep the lowest.
 
 # %%
-best_score, best_feature, best_threshold = np.inf, None, None
-for feature in range(X.shape[1]):
-    values = np.unique(X[:, feature])
-    for threshold in (values[:-1] + values[1:]) / 2:
-        left = X[:, feature] <= threshold
-        score = left.mean() * gini(y[left]) + (~left).mean() * gini(y[~left])
-        if score < best_score:
-            best_score, best_feature, best_threshold = score, feature, threshold
+def best_split(X: np.ndarray, y: np.ndarray) -> tuple:
+    """Lowest weighted Gini over all features and thresholds: (score, feature, threshold)."""
+    best = (np.inf, None, None)
+    for feature in range(X.shape[1]):
+        values = np.unique(X[:, feature])
+        for threshold in (values[:-1] + values[1:]) / 2:
+            left = X[:, feature] <= threshold
+            score = left.mean() * gini(y[left]) + (~left).mean() * gini(y[~left])
+            if score < best[0]:
+                best = (score, feature, threshold)
+    return best
 
+
+best_score, best_feature, best_threshold = best_split(X, y)
 print(f"by hand: {iris.feature_names[best_feature]} <= {best_threshold:.2f}, weighted Gini {best_score:.3f}")
 
 # %%
@@ -84,20 +90,59 @@ print("same weighted Gini:", np.isclose(best_score, library_score))
 #
 # ## 3. Growing the tree
 #
-# Repeating the best split on each side builds the tree. A leaf predicts the majority class.
+# Repeating the best split on each side builds the tree, until a node is pure or reaches `max_depth`.
+# A leaf predicts the majority class. Each node is stored as `(feature, threshold, left, right)`
+# and each leaf as a class label. The tree is kept at depth 2: deeper down, two splits can tie and
+# scikit-learn breaks ties at random, so the two trees may differ there.
 
 # %%
+class DecisionTreeClassifier:
+    """Classification tree grown with recursive Gini splits."""
+
+    def __init__(self, max_depth: int = 3):
+        self.max_depth = max_depth
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        self.tree_ = self._grow(X, y, depth=0)
+        return self
+
+    def _grow(self, X, y, depth):
+        if depth == self.max_depth or gini(y) == 0:
+            return np.bincount(y).argmax()
+        _, feature, threshold = best_split(X, y)
+        left = X[:, feature] <= threshold
+        return (feature, threshold, self._grow(X[left], y[left], depth + 1), self._grow(X[~left], y[~left], depth + 1))
+
+    def _predict_one(self, x):
+        node = self.tree_
+        while isinstance(node, tuple):
+            feature, threshold, left, right = node
+            node = left if x[feature] <= threshold else right
+        return node
+
+    def predict(self, X):
+        return np.array([self._predict_one(x) for x in X])
+
+    def score(self, X, y):
+        return np.mean(self.predict(X) == y)
+
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_STATE, stratify=y)
-tree = DecisionTreeClassifier(max_depth=3, random_state=RANDOM_STATE).fit(X_train, y_train)
-print(f"test accuracy {tree.score(X_test, y_test):.3f}")
+by_hand = DecisionTreeClassifier(max_depth=MAX_DEPTH).fit(X_train, y_train)
+
+# %%
+model = tree.DecisionTreeClassifier(max_depth=MAX_DEPTH, random_state=RANDOM_STATE).fit(X_train, y_train)
+print("same predictions:", np.array_equal(by_hand.predict(X_test), model.predict(X_test)))
+print(f"test accuracy: by hand {by_hand.score(X_test, y_test):.3f}, scikit-learn {model.score(X_test, y_test):.3f}")
 
 plt.figure(figsize=(12, 6))
-plot_tree(tree, feature_names=iris.feature_names, class_names=iris.target_names, filled=True)
+tree.plot_tree(model, feature_names=iris.feature_names, class_names=iris.target_names, filled=True)
 plt.show()
 
 # %% [markdown]
 # ## Exercises
 #
-# 1. Use entropy instead of Gini in section 2 and compare with `DecisionTreeClassifier(criterion="entropy")`.
-# 2. Train trees with `max_depth` from 1 to 8 and plot training and test accuracy.
-# 3. Write the prediction of a depth-2 tree by hand with two `if` tests and compare it with `tree.predict`.
+# 1. Use entropy instead of Gini in section 2 and compare with `tree.DecisionTreeClassifier(criterion="entropy")`.
+# 2. Train trees with `max_depth` from 1 to 8 (by hand and with scikit-learn) and plot training and test accuracy.
+# 3. Print `by_hand.tree_` from section 3 and find the same splits in the scikit-learn plot.

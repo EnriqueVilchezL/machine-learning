@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import stats
-from sklearn.impute import SimpleImputer
+from sklearn import impute
 from sklearn.model_selection import train_test_split
 
 RANDOM_STATE = 42
@@ -43,16 +43,34 @@ titanic.isna().sum()
 # ## 2. Fill missing ages with the median
 #
 # Take the median of the known values $\tilde{x}_j$ and put it in every empty cell.
+# `fit` learns the median, `transform` fills the gaps.
 
 # %%
-ages = titanic["age"].to_numpy()
-median_age = np.median(ages[~np.isnan(ages)])
-ages_by_hand = np.where(np.isnan(ages), median_age, ages)
-print("median age:", median_age)
+class SimpleImputer:
+    """Fill missing values with the median (or mean) of each column."""
 
-# %%
+    def __init__(self, strategy="median"):
+        self.strategy = strategy
+
+    def fit(self, X):
+        X = np.asarray(X, dtype=float)
+        self.statistics_ = np.nanmedian(X, axis=0) if self.strategy == "median" else np.nanmean(X, axis=0)
+        return self
+
+    def transform(self, X):
+        X = np.asarray(X, dtype=float)
+        return np.where(np.isnan(X), self.statistics_, X)
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
 imputer = SimpleImputer(strategy="median")
-ages_library = imputer.fit_transform(titanic[["age"]]).ravel()
+ages_by_hand = imputer.fit_transform(titanic[["age"]]).ravel()
+print("median age:", imputer.statistics_[0])
+
+# %%
+ages_library = impute.SimpleImputer(strategy="median").fit_transform(titanic[["age"]]).ravel()
 print("same result:", np.allclose(ages_by_hand, ages_library))
 
 # %% [markdown]
@@ -95,17 +113,18 @@ plt.show()
 # %%
 train, test = train_test_split(titanic, test_size=0.2, random_state=RANDOM_STATE)
 
-train_median = np.nanmedian(train["age"])
-test_ages_by_hand = test["age"].fillna(train_median).to_numpy()
+imputer_by_hand = SimpleImputer(strategy="median").fit(train[["age"]])
+test_ages_by_hand = imputer_by_hand.transform(test[["age"]]).ravel()
 
 # %%
-imputer = SimpleImputer(strategy="median").fit(train[["age"]])
-test_ages_library = imputer.transform(test[["age"]]).ravel()
-print("learned median:", imputer.statistics_[0], "| same result:", np.allclose(test_ages_by_hand, test_ages_library))
+imputer_library = impute.SimpleImputer(strategy="median").fit(train[["age"]])
+test_ages_library = imputer_library.transform(test[["age"]]).ravel()
+print("learned median:", imputer_library.statistics_[0],
+      "| same result:", np.allclose(test_ages_by_hand, test_ages_library))
 
 # %% [markdown]
 # ## Exercises
 #
-# 1. Fill `embarked` with its most frequent value, by hand and with `SimpleImputer(strategy="most_frequent")`.
+# 1. Fill `embarked` with its most frequent value, by hand and with `impute.SimpleImputer(strategy="most_frequent")`.
 # 2. Fill each missing age with the median age of the passenger's class (`pclass`).
 # 3. Change the IQR factor from 1.5 to 3. How many fares are still flagged?

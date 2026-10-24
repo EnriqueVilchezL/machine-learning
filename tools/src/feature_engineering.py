@@ -21,13 +21,12 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import preprocessing
 from sklearn.compose import make_column_transformer
 from sklearn.datasets import fetch_openml
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import (FunctionTransformer, KBinsDiscretizer, OneHotEncoder,
-                                   OrdinalEncoder, PolynomialFeatures, StandardScaler)
 
 RANDOM_STATE = 42
 SAMPLE_SIZE = 5_000
@@ -44,50 +43,97 @@ adult[["age", "workclass", "education", "hours-per-week", "capital-gain", "class
 # $\mathbf{e}(x) = (\mathbb{I}(x = c_1), \dots, \mathbb{I}(x = c_K))$: one 1 and $K-1$ zeros.
 
 # %%
-workclass = adult["workclass"].astype(str).to_numpy()
-categories = np.unique(workclass)
-one_hot_by_hand = (workclass[:, None] == categories[None, :]).astype(int)
-print(categories)
+class OneHotEncoder:
+    """Turn each category column into one 0/1 column per category seen in fit."""
+
+    def fit(self, X):
+        self.categories_ = [np.unique(column) for column in X.T]
+        return self
+
+    def transform(self, X):
+        return np.hstack([(X[:, [j]] == categories).astype(float) for j, categories in enumerate(self.categories_)])
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
+workclass = adult[["workclass"]].astype(str).to_numpy()
+encoder = OneHotEncoder()
+one_hot_by_hand = encoder.fit_transform(workclass)
+print(encoder.categories_[0])
 print(one_hot_by_hand[:3])
 
 # %%
-encoder = OneHotEncoder(sparse_output=False)
-one_hot_library = encoder.fit_transform(workclass.reshape(-1, 1))
+one_hot_library = preprocessing.OneHotEncoder(sparse_output=False).fit_transform(workclass)
 print("same result:", np.array_equal(one_hot_by_hand, one_hot_library))
 
 # %% [markdown]
 # ## 2. Ordinal encoding
 #
-# When the categories have an order, a single number per category keeps that order.
+# When the categories have an order $c_1 < c_2 < \dots < c_K$, category $c_k$ becomes the single number $k - 1$.
 
 # %%
+class OrdinalEncoder:
+    """Replace each category by its position in the given (or sorted) list of categories."""
+
+    def __init__(self, categories="auto"):
+        self.categories = categories
+
+    def fit(self, X):
+        given = self.categories != "auto"
+        self.categories_ = [np.array(self.categories[j]) if given else np.unique(column) for j, column in enumerate(X.T)]
+        return self
+
+    def transform(self, X):
+        return np.column_stack([(X[:, [j]] == categories).argmax(axis=1) for j, categories in enumerate(self.categories_)])
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
 education_order = ["Preschool", "1st-4th", "5th-6th", "7th-8th", "9th", "10th", "11th", "12th",
                    "HS-grad", "Some-college", "Assoc-voc", "Assoc-acdm", "Bachelors",
                    "Masters", "Prof-school", "Doctorate"]
-rank = {level: position for position, level in enumerate(education_order)}
-education_by_hand = adult["education"].map(rank).to_numpy()
+education = adult[["education"]].astype(str).to_numpy()
+education_by_hand = OrdinalEncoder(categories=[education_order]).fit_transform(education)
 
 # %%
-encoder = OrdinalEncoder(categories=[education_order])
-education_library = encoder.fit_transform(adult[["education"]]).ravel()
+education_library = preprocessing.OrdinalEncoder(categories=[education_order]).fit_transform(education)
 print("same result:", np.array_equal(education_by_hand, education_library))
 
 # %% [markdown]
 # ## 3. Binning
 #
-# Equal-width bins on $[a, b]$: width $w = (b - a)/B$ and bin index $\lfloor (x - a)/w \rfloor$
+# Equal-width bins on $[a, b]$: width $w = (b - a)/B$ and $\text{bin}(x) = \lfloor (x - a)/w \rfloor$
 # (the largest value goes in the last bin).
 
 # %%
-ages = adult["age"].to_numpy(dtype=float)
-low, high = ages.min(), ages.max()
-width = (high - low) / BIN_COUNT
-bins_by_hand = np.minimum(np.floor((ages - low) / width), BIN_COUNT - 1)
-print("bin edges:", low + width * np.arange(BIN_COUNT + 1))
+class KBinsDiscretizer:
+    """Cut each feature into equal-width bins between the minimum and maximum seen in fit."""
+
+    def __init__(self, n_bins=5):
+        self.n_bins = n_bins
+
+    def fit(self, X):
+        self.bin_edges_ = np.linspace(X.min(axis=0), X.max(axis=0), self.n_bins + 1).T
+        return self
+
+    def transform(self, X):
+        low, high = self.bin_edges_[:, 0], self.bin_edges_[:, -1]
+        width = (high - low) / self.n_bins
+        return np.clip(np.floor((X - low) / width), 0, self.n_bins - 1)
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
+ages = adult[["age"]].to_numpy(dtype=float)
+binner = KBinsDiscretizer(n_bins=BIN_COUNT)
+bins_by_hand = binner.fit_transform(ages)
+print("bin edges:", binner.bin_edges_[0])
 
 # %%
-binner = KBinsDiscretizer(n_bins=BIN_COUNT, encode="ordinal", strategy="uniform")
-bins_library = binner.fit_transform(ages.reshape(-1, 1)).ravel()
+bins_library = preprocessing.KBinsDiscretizer(n_bins=BIN_COUNT, encode="ordinal", strategy="uniform").fit_transform(ages)
 print("same result:", np.array_equal(bins_by_hand, bins_library))
 
 # %% [markdown]
@@ -98,7 +144,7 @@ print("same result:", np.array_equal(bins_by_hand, bins_library))
 # %%
 gains = adult["capital-gain"].to_numpy(dtype=float)
 log_gains_by_hand = np.log(1 + gains)
-log_gains_library = FunctionTransformer(np.log1p).fit_transform(gains.reshape(-1, 1)).ravel()
+log_gains_library = preprocessing.FunctionTransformer(np.log1p).fit_transform(gains.reshape(-1, 1)).ravel()
 print("same result:", np.allclose(log_gains_by_hand, log_gains_library))
 
 fig, (left, right) = plt.subplots(1, 2, figsize=(10, 3))
@@ -114,12 +160,26 @@ plt.show()
 # New columns from old ones: $x_1^2$, $x_1 x_2$ and $x_2^2$ let a linear model follow curves and interactions.
 
 # %%
+class PolynomialFeatures:
+    """Add every square and every product of two columns (degree 2)."""
+
+    def fit(self, X):
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X):
+        columns = range(self.n_features_in_)
+        return np.column_stack([X] + [X[:, a] * X[:, b] for a in columns for b in columns if a <= b])
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
 age_hours = adult[["age", "hours-per-week"]].to_numpy(dtype=float)
-age, hours = age_hours[:, 0], age_hours[:, 1]
-squares_by_hand = np.column_stack([age, hours, age**2, age * hours, hours**2])
+squares_by_hand = PolynomialFeatures().fit_transform(age_hours)
 
 # %%
-squares_library = PolynomialFeatures(degree=2, include_bias=False).fit_transform(age_hours)
+squares_library = preprocessing.PolynomialFeatures(degree=2, include_bias=False).fit_transform(age_hours)
 print("same result:", np.allclose(squares_by_hand, squares_library))
 
 # %% [markdown]
@@ -133,10 +193,10 @@ categorical = ["workclass", "education", "marital-status", "occupation"]
 target = adult["class"] == ">50K"
 model = LogisticRegression(max_iter=1000)
 
-numeric_only = make_pipeline(StandardScaler(), model)
+numeric_only = make_pipeline(preprocessing.StandardScaler(), model)
 with_categories = make_pipeline(
-    make_column_transformer((StandardScaler(), numeric),
-                            (OneHotEncoder(handle_unknown="ignore"), categorical)),
+    make_column_transformer((preprocessing.StandardScaler(), numeric),
+                            (preprocessing.OneHotEncoder(handle_unknown="ignore"), categorical)),
     model)
 
 for name, pipeline, columns in [("numeric only", numeric_only, numeric),
@@ -147,6 +207,6 @@ for name, pipeline, columns in [("numeric only", numeric_only, numeric),
 # %% [markdown]
 # ## Exercises
 #
-# 1. Build quantile bins for `age` with `np.quantile` and compare with `KBinsDiscretizer(strategy="quantile")`.
+# 1. Build quantile bins for `age` with `np.quantile` and compare with `preprocessing.KBinsDiscretizer(strategy="quantile")`.
 # 2. Add the log of `capital-gain` to the model of section 6. Does the accuracy change?
 # 3. Group the countries in `native-country` that appear fewer than 50 times into one value `"Other"`.

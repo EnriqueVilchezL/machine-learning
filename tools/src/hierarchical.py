@@ -19,9 +19,9 @@
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
+from scipy.cluster import hierarchy
 from scipy.spatial.distance import pdist, squareform
-from sklearn.cluster import AgglomerativeClustering
+from sklearn import cluster
 from sklearn.datasets import make_blobs
 from sklearn.metrics import adjusted_rand_score
 
@@ -36,26 +36,61 @@ X, _ = make_blobs(n_samples=30, centers=K, cluster_std=1.5, random_state=RANDOM_
 # $d(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_j (a_j - b_j)^2}$, for every pair of examples.
 
 # %%
-distances_by_hand = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(axis=2))
-print("distance table:", distances_by_hand.shape)
-print("same result:", np.allclose(distances_by_hand, squareform(pdist(X))))
+def distances(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """Euclidean distance from every row of A to every row of B."""
+    return np.sqrt(((A[:, None, :] - B[None, :, :]) ** 2).sum(axis=2))
+
+
+print("distance table:", distances(X, X).shape)
+print("same result:", np.allclose(distances(X, X), squareform(pdist(X))))
 
 # %% [markdown]
 # ## 2. Merging the closest pair
 #
 # Start with every example alone and merge $(A^*, B^*) = \arg\min_{A \neq B} D(A, B)$, $n - 1$ times.
 # The linkage $D$ is the smallest (single), largest (complete) or mean (average) distance over all pairs $\mathbf{a} \in A$, $\mathbf{b} \in B$.
+# `fit` keeps the height of every merge in `distances_`, and the labels from the moment `n_clusters` clusters remain.
 
 # %%
-for method, rule in {"single": np.min, "complete": np.max, "average": np.mean}.items():
-    clusters = [[i] for i in range(len(X))]
-    heights = []
-    while len(clusters) > 1:
-        height, a, b = min((rule(distances_by_hand[np.ix_(A, B)]), a, b)
-                           for a, A in enumerate(clusters) for b, B in enumerate(clusters) if a < b)
-        heights.append(height)
-        clusters[a] += clusters.pop(b)
-    print(f"{method:8} {len(heights)} merges | same heights:", np.allclose(np.sort(heights), np.sort(linkage(X, method)[:, 2])))
+class AgglomerativeClustering:
+    """Bottom-up clustering: merge the two closest clusters until only one is left."""
+
+    LINKAGES = {"single": np.min, "complete": np.max, "average": np.mean}
+
+    def __init__(self, n_clusters: int = 2, linkage: str = "average"):
+        self.n_clusters, self.linkage = n_clusters, linkage
+
+    def fit(self, X, y=None):
+        d, rule = distances(X, X), self.LINKAGES[self.linkage]
+        clusters, heights = [[i] for i in range(len(X))], []
+        while True:
+            if len(clusters) == self.n_clusters:
+                self.labels_ = np.zeros(len(X), dtype=int)
+                for k, members in enumerate(clusters):
+                    self.labels_[members] = k
+            if len(clusters) == 1:
+                break
+            height, a, b = min((rule(d[np.ix_(A, B)]), a, b)
+                               for a, A in enumerate(clusters) for b, B in enumerate(clusters) if a < b)
+            heights.append(height)
+            clusters[a] += clusters.pop(b)
+        self.distances_ = np.array(heights)
+        return self
+
+    def fit_predict(self, X, y=None):
+        return self.fit(X).labels_
+
+
+# %% [markdown]
+# SciPy's `linkage` lists the same merge heights. scikit-learn gives the same grouping, up to the cluster numbers.
+
+# %%
+for method in AgglomerativeClustering.LINKAGES:
+    by_hand = AgglomerativeClustering(n_clusters=K, linkage=method).fit(X)
+    model = cluster.AgglomerativeClustering(n_clusters=K, linkage=method).fit(X)
+    same_heights = np.allclose(np.sort(by_hand.distances_), hierarchy.linkage(X, method)[:, 2])
+    same_grouping = adjusted_rand_score(by_hand.labels_, model.labels_) == 1.0
+    print(f"{method:8} {len(by_hand.distances_)} merges | same heights: {same_heights} | same grouping: {same_grouping}")
 
 # %% [markdown]
 # ## 3. Ward's linkage
@@ -66,8 +101,8 @@ for method, rule in {"single": np.min, "complete": np.max, "average": np.mean}.i
 # SciPy reports the height $\sqrt{2\Delta}$.
 
 # %%
-ward_tree = linkage(X, "ward")
-two = fcluster(ward_tree, t=2, criterion="maxclust")
+ward_tree = hierarchy.linkage(X, "ward")
+two = hierarchy.fcluster(ward_tree, t=2, criterion="maxclust")
 A, B = X[two == 1], X[two == 2]
 
 
@@ -87,15 +122,18 @@ print("same height:", np.isclose(np.sqrt(2 * delta), ward_tree[-1, 2]))
 # a good cut sits in a long gap between joins.
 
 # %%
-average_tree = linkage(X, "average")
-dendrogram(average_tree)
+average_tree = hierarchy.linkage(X, "average")
+hierarchy.dendrogram(average_tree)
 plt.ylabel("merge distance")
 plt.show()
 
+# %% [markdown]
+# Cutting SciPy's tree into $K$ branches gives the clusters our class kept when $K$ were left.
+
 # %%
-cut_labels = fcluster(average_tree, t=K, criterion="maxclust")
-model = AgglomerativeClustering(n_clusters=K, linkage="average").fit(X)
-print("same grouping:", adjusted_rand_score(cut_labels, model.labels_) == 1.0)
+cut_labels = hierarchy.fcluster(average_tree, t=K, criterion="maxclust")
+by_hand = AgglomerativeClustering(n_clusters=K, linkage="average")
+print("same grouping:", adjusted_rand_score(cut_labels, by_hand.fit_predict(X)) == 1.0)
 
 # %% [markdown]
 # ## Exercises
